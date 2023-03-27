@@ -1,0 +1,7 @@
+mod adder {
+    struct Adder { a, b }
+
+    func add(adder) {
+        return math::add(adder.a, adder.b);
+    }
+}

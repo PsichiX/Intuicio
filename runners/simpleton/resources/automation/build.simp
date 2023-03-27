@@ -1,0 +1,46 @@
+mod build {
+    import "actions";
+    
+    func pipeline(data) {
+        var result = actions::Pipeline {};
+        reflect::pack(result, data);
+        result.actions = build::actions(result.actions);
+        return result;
+    }
+
+    func actions(data) {
+        var iter = iter::build([
+            array::iter(data, false),
+            [<func iter::filter_map>, @[](item) {
+                return build::action(item);
+            }]
+        ]);
+        return array::collect(iter);
+    }
+
+    func action(data) {
+        var action = actions::Action {};
+        reflect::pack(action, data);
+        if text::equals(action.id, "CreateDirectory") {
+            return build::create_directory_action(action.action);
+        }
+        if text::equals(action.id, "Command") {
+            return build::command_action(action.action);
+        }
+        if text::equals(action.id, "Pipeline") {
+            return build::pipeline(action.action);
+        }
+    }
+
+    func create_directory_action(data) {
+        var result = actions::CreateDirectoryAction {};
+        reflect::pack(result, data);
+        return result;
+    }
+
+    func command_action(data) {
+        var result = actions::CommandAction {};
+        reflect::pack(result, data);
+        return result;
+    }
+}

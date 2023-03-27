@@ -1,0 +1,37 @@
+#!simpleton
+
+mod main {
+    import "hello";
+    import "math";
+    import "text";
+    import "array";
+    import "map";
+    import "reflect";
+    import "json";
+    import "toml";
+    import "fs";
+    import "bytes";
+    import "process";
+    import "net";
+    import "closure";
+    import "iter";
+    import "promise";
+
+    func main(args) {
+        example_hello::main(args);
+        example_math::main(args);
+        example_text::main(args);
+        example_array::main(args);
+        example_map::main(args);
+        example_reflect::main(args);
+        example_json::main(args);
+        example_toml::main(args);
+        example_fs::main(args);
+        example_bytes::main(args);
+        example_process::main(args);
+        example_net::main(args);
+        example_closure::main(args);
+        example_iter::main(args);
+        example_promise::main(args);
+    }
+}

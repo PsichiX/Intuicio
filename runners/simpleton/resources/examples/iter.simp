@@ -1,0 +1,195 @@
+mod example_iter {
+    func main(args) {
+        var counter = { index: 0 };
+        var value = map::collect(
+            @[counter]() {
+                var index = map::get(counter, "index");
+                if math::less_than(index, 10) {
+                    map::set(counter, "index", math::add(index, 1));
+                    return { key: reflect::to_text(index), value: index };
+                } else {
+                    return null;
+                }
+            },
+        );
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(
+                map::collect(map::iter(value)),
+                false,
+            ),
+        );
+        var iter = iter::build([
+            map::iter(value),
+            [<func iter::filter>, @[](pair) {
+                return math::equals(math::modulo(pair.value, 2), 0);
+            }],
+            [<func iter::map>, @[](pair) {
+                return pair.key;
+            }],
+        ]);
+        console::log_line(
+            debug::debug(array::collect(iter), false),
+        );
+
+        var counter = { index: 0 };
+        var value = array::collect(
+            @[counter]() {
+                var index = map::get(counter, "index");
+                if math::less_than(index, 10) {
+                    map::set(counter, "index", math::add(index, 1));
+                    return index;
+                } else {
+                    return null;
+                }
+            },
+        );
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(
+                array::collect(array::iter(value, true)),
+                false,
+            ),
+        );
+
+        var iter = iter::filter_map(
+            array::iter(value, false),
+            @[](value) {
+                if math::equals(math::modulo(value, 2), 0) {
+                    return reflect::to_text(value);
+                } else {
+                    return null;
+                }
+            },
+        );
+        console::log_line(
+            debug::debug(array::collect(iter), false),
+        );
+        iter = iter::build([
+            array::iter(value, true),
+            [<func iter::filter>, @[](value) {
+                return math::equals(math::modulo(value, 2), 0);
+            }],
+            [<func iter::map>, @[](value) {
+                return reflect::to_text(value);
+            }],
+        ]);
+        console::log_line(
+            debug::debug(array::collect(iter), false),
+        );
+        value = [[0, 1], [2, 3]];
+        iter = iter::build([
+            array::iter(value, true),
+            [<func iter::map>, @[](value) {
+                return array::iter(value, false);
+            }],
+            [<func iter::flatten>],
+        ]);
+        console::log_line(
+            debug::debug(array::collect(iter), false),
+        );
+
+        for item in iter::walk(-3, 7) {
+            console::log_line(
+                debug::debug(item, false),
+            );
+        }
+
+        console::log_line(
+            debug::debug(
+                iter::fold(
+                    iter::range(0, 10),
+                    0,
+                    @[](accum, value) { return math::add(accum, value); },
+                ),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                iter::find(
+                    iter::walk(10, -10),
+                    @[](value) { return math::equals(value, 5); },
+                ),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                iter::find_map(
+                    iter::walk(10, -10),
+                    @[](value) {
+                        if math::equals(value, 5) {
+                            return math::negate(value);
+                        } else {
+                            return null;
+                        }
+                    },
+                ),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                iter::position(
+                    iter::walk(-3, 7),
+                    @[](value) { return math::equals(value, 0); },
+                ),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                iter::any(
+                    iter::walk(-3, 7),
+                    @[](value) { return math::equals(value, 0); },
+                ),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                iter::all(
+                    iter::walk(-3, 7),
+                    @[](value) { return math::equals(value, 0); },
+                ),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                iter::compared_by(
+                    iter::walk(-3, 7),
+                    @[](a, b) { return math::greater_than(a, b); },
+                ),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                array::collect(
+                    iter::chain([
+                        iter::range(0, 5),
+                        iter::range(10, 15),
+                    ]),
+                ),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                array::collect(
+                    iter::zip([
+                        iter::range(0, 5),
+                        iter::range(10, 15),
+                    ]),
+                ),
+                false,
+            ),
+        );
+    }
+}

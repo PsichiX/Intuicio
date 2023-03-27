@@ -1,0 +1,8 @@
+assets = "resources"
+
+[scripting]
+entry = "scripts/game.simp"
+
+[game]
+title = "Tetra with Intuicio integration"
+fullscreen = true

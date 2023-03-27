@@ -1,0 +1,15 @@
+mod example_hello {
+    func main(args) {
+        var name = "World";
+        if math::greater_than(array::size(args), 0) {
+            console::log("Provide your name: ");
+            name = console::read_line();
+        }
+        console::log_line(
+            text::format(
+                "Hello, {0}!",
+                [ name ],
+            ),
+        );
+    }
+}

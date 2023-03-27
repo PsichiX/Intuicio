@@ -1,0 +1,18 @@
+[package]
+name = "intuicio-derive"
+version = "0.1.0"
+edition = "2021"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Procedural macro module for Intuicio scripting platform"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/intuicio"
+repository = "https://github.com/PsichiX/intuicio"
+documentation = "https://docs.rs/intuicio-derive"
+readme = "../README.md"
+
+[dependencies]
+syn = { version = "1.0", features = ["full"] }
+quote = "1.0"
+
+[lib]
+proc-macro = true

@@ -1,0 +1,9 @@
+mod actions {
+    struct Pipeline { path, actions }
+
+    struct Action { id, action }
+
+    struct CreateDirectoryAction { path }
+
+    struct CommandAction { program, arguments }
+}

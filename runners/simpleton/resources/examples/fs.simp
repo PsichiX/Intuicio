@@ -1,0 +1,38 @@
+mod example_fs {
+    func main(args) {
+        var current_dir = fs::get_current_dir();
+        fs::set_current_dir("./resources/examples");
+
+        console::log_line(
+            debug::debug(fs::exists("./main.simp"), false),
+        );
+        console::log_line(
+            debug::debug(fs::exists("./"), false),
+        );
+        console::log_line(
+            debug::debug(fs::is_file("./main.simp"), false),
+        );
+        console::log_line(
+            debug::debug(fs::is_dir("./"), false),
+        );
+        console::log_line(
+            debug::debug(fs::make_dir("./test"), false),
+        );
+        console::log_line(
+            debug::debug(fs::scan_dir("./"), false),
+        );
+
+        var contents = fs::read_file("./main.simp");
+        console::log_line(
+            debug::debug(contents, false),
+        );
+        console::log_line(
+            debug::debug(fs::write_file("./test/temp.simp", contents), false),
+        );
+        console::log_line(
+            debug::debug(fs::delete("./test"), false),
+        );
+
+        fs::set_current_dir(current_dir);
+    }
+}

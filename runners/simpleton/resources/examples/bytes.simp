@@ -1,0 +1,42 @@
+mod example_bytes {
+    func main(args) {
+        var value = {
+            a: null,
+            b: true,
+            c: 1,
+            d: 2.3,
+            e: "hi",
+            f: {
+                x: 1234567890,
+                y: 2,
+                z: ["hey", "hi", "hello"],
+            },
+        };
+        console::log_line(
+            debug::debug(value, false),
+        );
+
+        var bytes = bytes::new();
+        bytes::serialize(bytes, value);
+        console::log_line(
+            debug::debug(bytes::position(bytes), false),
+        );
+        bytes::set_position(bytes, 0);
+        console::log_line(
+            debug::debug(bytes::position(bytes), false),
+        );
+        console::log_line(
+            debug::debug(bytes::deserialize(bytes), false),
+        );
+        
+        value = bytes::into(bytes);
+        console::log_line(
+            debug::debug(value, false),
+        );
+
+        bytes = bytes::from(value);
+        console::log_line(
+            debug::debug(bytes::deserialize(bytes), false),
+        );
+    }
+}

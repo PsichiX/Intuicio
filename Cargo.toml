@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "data",
+    "core",
+    "tests",
+    "derive",
+    "backends/vm",
+    "backends/rust",
+    "frontends/serde",
+    "frontends/simpleton",
+    "frontends/vault",
+    "runners/simpleton",
+    "demos/tetra",
+]

@@ -1,0 +1,33 @@
+mod example_net {
+    func main(args) {
+        var value = {
+            a: null,
+            b: true,
+            c: 1,
+            d: 2.3,
+            e: "hi",
+            f: {
+                x: 1234567890,
+                y: 2,
+                z: ["hey", "hi", "hello"],
+            },
+        };
+        var bytes = bytes::new();
+        bytes::serialize(bytes, value);
+
+        var buffer = bytes::into(bytes);
+        var server = net_server::new("127.0.0.1:8080");
+        var client = net_channel::connect("127.0.0.1:8080");
+        net_channel::set_no_delay(client, true);
+        net_channel::write(client, buffer);
+
+        var connection = net_server::accept(server);
+        net_channel::set_no_delay(connection, true);
+        buffer = net_channel::read(connection, array::size(buffer));
+        bytes = bytes::from(buffer);
+        value = bytes::deserialize(bytes);
+        console::log_line(
+            debug::debug(value, false),
+        );
+    }
+}

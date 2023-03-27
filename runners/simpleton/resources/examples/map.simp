@@ -1,0 +1,83 @@
+mod example_map {
+    func main(args) {
+        var value = {
+            a: null,
+            b: 1,
+            c: 2.3,
+            d: "hi",
+        };
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(map::size(value), false),
+        );
+        console::log_line(
+            debug::debug(map::capacity(value), false),
+        );
+
+        map::reserve(value, 5);
+        console::log_line(
+            debug::debug(map::capacity(value), false),
+        );
+
+        map::clear(value);
+        console::log_line(
+            debug::debug(map::size(value), false),
+        );
+
+        var hi = "hi";
+        value = {
+            a: null,
+            b: 1,
+            c: 2.3,
+            d: hi,
+        };
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(map::contains_key(value, "d"), false),
+        );
+        console::log_line(
+            debug::debug(map::contains_value(value, hi), false),
+        );
+        console::log_line(
+            debug::debug(map::find_key(value, hi), false),
+        );
+
+        var temp = map::remove(value, "a");
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(temp, false),
+        );
+
+        map::set(value, "e", 42);
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(map::get(value, "e"), false),
+        );
+        console::log_line(
+            debug::debug(
+                map::join({a: 1, b: 2}, {b: 3, c: 4}),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                map::zip(["a", "b"], [1, 2]),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(map::keys(value), false),
+        );
+        console::log_line(
+            debug::debug(map::values(value), false),
+        );
+    }
+}

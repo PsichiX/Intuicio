@@ -1,0 +1,40 @@
+{
+    "actions": [
+        {
+            "id": "CreateDirectory",
+            "action": {
+                "path": "./dist"
+            }
+        },
+        {
+            "id": "Pipeline",
+            "action": {
+                "path": "./dist",
+                "actions": [
+                    {
+                        "id": "Command",
+                        "action": {
+                            "program": "simpleton",
+                            "arguments": [
+                                "--into-code",
+                                "code.log",
+                                "../"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "Command",
+                        "action": {
+                            "program": "simpleton",
+                            "arguments": [
+                                "--into-intuicio",
+                                "intuicio.log",
+                                "../"
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,26 @@
+[package]
+name = "intuicio-runner-simpleton"
+version = "0.1.0"
+edition = "2021"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Simpleton runner module for Intuicio scripting platform"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/intuicio"
+repository = "https://github.com/PsichiX/intuicio"
+documentation = "https://docs.rs/intuicio-runner-simpleton"
+readme = "../../README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "simpleton"
+path = "src/main.rs"
+
+[dependencies]
+intuicio-data = { version = "0.1", path = "../../data" }
+intuicio-core = { version = "0.1", path = "../../core" }
+intuicio-derive = { version = "0.1", path = "../../derive" }
+intuicio-backend-vm = { version = "0.1", path = "../../backends/vm" }
+intuicio-frontend-simpleton = { version = "0.1", path = "../../frontends/simpleton" }
+clap = { version = "4", features = ["derive"] }

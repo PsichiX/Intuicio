@@ -1,0 +1,126 @@
+mod example_math {
+    func main(args) {
+        var value = math::add(40, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::add(1.2, 3.4);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::sub(40, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::sub(1.2, 3.4);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::mul(40, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::mul(1.2, 3.4);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::div(40, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::div(1.2, 3.4);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::negate(40);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::negate(1.2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::abs(-40);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::abs(-1.2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::pow(40, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::pow(1.2, 3.4);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::modulo(40, 7);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::modulo(1.2, 3.4);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::log(40, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::log(1.2, 3.4);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::signum(-40);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::signum(-1.2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::and(true, false);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::and(#f0, #aa);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::or(true, false);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::or(#f0, #aa);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::xor(#f0, #aa);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::shift_left($01, 1);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::shift_right($10, 1);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::equals(false, false);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::equals(42, 42);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::equals(4.2, 4.2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::not_equals(true, false);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::not_equals(40, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::not_equals(40.0, 2.0);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::less_than(1, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::less_than(1.0, 2.0);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::greater_than(2, 1);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::greater_than(2.0, 1.0);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::less_than_or_equal(2, 1);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::less_than_or_equal(2.0, 1.0);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::greater_than_or_equal(1, 2);
+        console::log_line(debug::debug(value, false));
+
+        var value = math::greater_than_or_equal(1.0, 2.0);
+        console::log_line(debug::debug(value, false));
+    }
+}

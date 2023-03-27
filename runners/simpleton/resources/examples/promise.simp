@@ -1,0 +1,47 @@
+mod example_promise {
+    func main(args) {
+        var promise = promise::new(
+            @[](next, input) {
+                var output = math::add(input, 1);
+                console::log_line(
+                    debug::debug({ input, output }, false),
+                );
+                promise::resolve(next, output);
+            },
+            null,
+        );
+        promise::then(promise, promise::new(
+            @[](next, input) {
+                var output = math::mul(input, 2);
+                console::log_line(
+                    debug::debug({ input, output }, false),
+                );
+                promise::resolve(next, output);
+            },
+            null,
+        ));
+        promise::then(promise, promise::new(
+            @[](next, input) {
+                var output = math::modulo(input, 3);
+                console::log_line(
+                    debug::debug({ input, output }, false),
+                );
+                promise::resolve(next, output);
+            },
+            null,
+        ));
+        promise::resolve(promise, 10);
+
+        var promise = promise::new(null, null);
+        promise::then(promise, promise::new(
+            null,
+            @[](next, error) {
+                console::log_line(
+                    debug::debug({ error }, false),
+                );
+                promise::reject(next, error);
+            },
+        ));
+        promise::reject(promise, "Failed!");
+    }
+}

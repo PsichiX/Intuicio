@@ -1,0 +1,15 @@
+[package]
+name = "intuicio-data"
+version = "0.1.0"
+edition = "2021"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Data module for Intuicio scripting platform"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/intuicio"
+repository = "https://github.com/PsichiX/intuicio"
+documentation = "https://docs.rs/intuicio-data"
+readme = "../README.md"
+
+[dependencies]
+serde = { version = "1", features = ["derive", "rc"] }
+typid = "1"

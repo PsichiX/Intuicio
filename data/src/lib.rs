@@ -1,0 +1,38 @@
+pub mod data_heap;
+pub mod data_stack;
+pub mod lifetime;
+pub mod managed;
+pub mod shared;
+
+pub mod prelude {
+    pub use crate::{
+        data_heap::*, data_stack::*, lifetime::*, managed::*, shared::*, Finalize, Initialize,
+    };
+}
+
+pub trait Initialize: Sized {
+    fn initialize(&mut self);
+
+    /// # Safety
+    unsafe fn initialize_raw(data: *mut ()) {
+        Self::initialize(data.cast::<Self>().as_mut().unwrap());
+    }
+}
+
+impl<T> Initialize for T
+where
+    T: Default,
+{
+    fn initialize(&mut self) {
+        *self = Self::default();
+    }
+}
+
+pub trait Finalize: Sized {
+    /// # Safety
+    unsafe fn finalize_raw(data: *mut ()) {
+        drop(unsafe { data.cast::<Self>().read() });
+    }
+}
+
+impl<T> Finalize for T {}

@@ -1,0 +1,38 @@
+mod test {
+    import "adder.simp";
+
+    func main() {
+        var a = 1;
+        var b = null;
+        var c = true;
+
+        while math::less_than(a, 40) {
+            a = math::add(a, 1);
+        }
+
+        if c {
+            b = 2.0;
+        }
+
+        var adder = adder::Adder {
+            a: reflect::to_real(a),
+            b
+        };
+        var result = adder::add(adder);
+
+        // prints: 40 + 2 = 42 | hello world! | true
+        console::log_line(
+            text::format(
+                "{0} + {1} = {2} | {3} | {4}",
+                [
+                    reflect::to_text(a),
+                    reflect::to_text(b),
+                    reflect::to_text(result),
+                    "hello world!",
+                    reflect::to_text(c)
+                ]
+            )
+        );
+        return result;
+    }
+}

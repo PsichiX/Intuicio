@@ -1,0 +1,21 @@
+mod example_json {
+    func main(args) {
+        var value = {
+            a: null,
+            b: true,
+            c: 1,
+            d: 2.3,
+            e: "hi",
+            f: {
+                x: 40,
+                y: 2,
+                z: ["hey", "hi", "hello"],
+            },
+        };
+        var json = json::serialize_pretty(value);
+        console::log_line(json);
+        console::log_line(
+            debug::debug(json::deserialize(json), false),
+        );
+    }
+}

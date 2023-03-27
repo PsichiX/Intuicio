@@ -1,0 +1,11 @@
+mod example_closure {
+    func main(args) {
+        var a = 42;
+        var closure = @[a](b, c) {
+            console::log_line(
+                debug::debug({a, b, c}, false),
+            );
+        };
+        closure::call(closure, [40, 2]);
+    }
+}

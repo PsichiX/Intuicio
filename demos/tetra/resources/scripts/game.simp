@@ -1,0 +1,59 @@
+mod game {
+    func initialize(state) {
+        var renderer = map::get(state, "renderer");
+        
+        map::set(
+            state,
+            "street",
+            image::load(renderer, "images/Street_Summer_Day.png")
+        );
+
+        map::set(
+            state,
+            "rin",
+            image::load(renderer, "images/Rin_SummerUni_OpenSmile.png")
+        );
+        
+        map::set(
+            state,
+            "roboto",
+            font::load(renderer, "fonts/Roboto-Regular.ttf", 64.0)
+        );
+    }
+
+    func draw(dt, state) {
+        var renderer = map::get(state, "renderer");
+        var roboto = map::get(state, "roboto");
+
+        image::draw(
+            renderer,
+            map::get(state, "street"),
+            vec2::Vec2 { x: 0.0, y: 0.0 },
+            color::white()
+        );
+        
+        image::draw_screen(
+            renderer,
+            map::get(state, "rin"),
+            vec2::Vec2 { x: 0.25, y: -0.25 },
+            color::white()
+        );
+
+        font::draw_screen(
+            renderer,
+            roboto,
+            "Ohayo!",
+            vec2::Vec2 { x: 0.53, y: 0.15 },
+            color::white()
+        );
+
+        var fps = reflect::to_integer(math::div(1.0, dt));
+        font::draw(
+            renderer,
+            roboto,
+            text::format("FPS: {0}", [ reflect::to_text(fps) ]),
+            vec2::Vec2 { x: 10.0, y: 10.0 },
+            color::black()
+        );
+    }
+}

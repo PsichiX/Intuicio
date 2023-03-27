@@ -1,0 +1,70 @@
+(
+    (name . "test")
+    (definitions
+        (Function (name . "main") (return_type "usize")
+            (statements
+                (Return CallFunction (name . "add") (module_name "intrinsics") (arguments
+                    (Literal Usize . 40)
+                    (Literal Usize . 2)
+                ))
+            )
+        )
+
+        (Function (name . "div") (return_type "f64")
+            (arguments
+                ((name . "a") (arg_type . "f64"))
+                ((name . "b") (arg_type . "f64"))
+            )
+            (statements
+                (Return CallFunction (name . "div") (module_name "intrinsics") (arguments
+                    (TakeVariable (name . "a"))
+                    (TakeVariable (name . "b"))
+                ))
+            )
+        )
+
+        (Function (name . "sqrt") (return_type "f32")
+            (arguments
+                ((name . "n") (arg_type . "f32"))
+            )
+            (statements
+                (Return CallFunction (name . "sqrt") (module_name "intrinsics") (arguments
+                    (TakeVariable (name . "n"))
+                ))
+            )
+        )
+
+        (Function (name . "fib") (return_type "usize")
+            (arguments
+                ((name . "n") (arg_type . "usize"))
+            )
+            (statements
+                (Return If
+                    (condition CallFunction (name . "less_than") (module_name "intrinsics") (arguments
+                        (CloneVariable (name . "n"))
+                        (Literal Usize . 2)
+                    ))
+                    (success . (
+                        (Return TakeVariable (name . "n"))
+                    ))
+                    (failure (
+                        (Return CallFunction (name . "add") (module_name "intrinsics") (arguments
+                            (CallFunction (name . "fib") (module_name "test") (arguments
+                                (CallFunction (name . "sub") (module_name "intrinsics") (arguments
+                                    (CloneVariable (name . "n"))
+                                    (Literal Usize . 1)
+                                ))
+                            ))
+                            (CallFunction (name . "fib") (module_name "test") (arguments
+                                (CallFunction (name . "sub") (module_name "intrinsics") (arguments
+                                    (CloneVariable (name . "n"))
+                                    (Literal Usize . 2)
+                                ))
+                            ))
+                        ))
+                    ))
+                )
+            )
+        )
+    )
+)

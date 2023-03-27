@@ -1,0 +1,49 @@
+mod run {
+    import "actions";
+
+    func pipeline(path, pipeline) {
+        if reflect::is_valid(pipeline.path) {
+            path = text::format("{0}/{1}", [path, pipeline.path]);
+        }
+        if reflect::is_valid(pipeline.actions) {
+            for action in array::iter(pipeline.actions, false) {
+                run::action(path, action);
+            }
+        }
+    }
+
+    func action(path, action) {
+        fs::set_current_dir(path);
+        var type = reflect::type_of(action);
+        if reflect::are_same(type, <struct actions::Pipeline>) {
+            return run::pipeline(path, action);
+        }
+        if reflect::are_same(type, <struct actions::CreateDirectoryAction>) {
+            return run::create_directory(path, action);
+        }
+        if reflect::are_same(type, <struct actions::CommandAction>) {
+            return run::command(path, action);
+        }
+    }
+
+    func create_directory(path, action) {
+        if reflect::is_valid(action.path) {
+            path = text::format("{0}/{1}", [path, action.path]);
+        }
+        fs::make_dir(path);
+        console::log_line(text::combine("* Created directory: ", path));
+    }
+
+    func command(path, action) {
+        process::command(action.program, action.arguments, {});
+        console::log_line(
+            text::format(
+                "* Run program: `{0} {1}`",
+                [
+                    action.program,
+                    text::join(action.arguments, " "),
+                ],
+            ),
+        );
+    }
+}

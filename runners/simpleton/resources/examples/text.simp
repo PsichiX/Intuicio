@@ -1,0 +1,47 @@
+mod example_text {
+    func main(args) {
+        var value = "hello world!";
+        console::log_line(value);
+        console::log_line(
+            debug::debug(text::length(value), false),
+        );
+        console::log_line(
+            text::character(value, 4),
+        );
+        console::log_line(
+            debug::debug(text::find(value, "world", false), false),
+        );
+        console::log_line(
+            text::slice(value, 6, 5),
+        );
+        console::log_line(
+            text::join(["hello", "world!"], " "),
+        );
+        console::log_line(
+            text::combine("hello", "world!"),
+        );
+        console::log_line(
+            text::format(
+                "{0} {1}!",
+                [ "hello", "world" ],
+            ),
+        );
+        console::log_line(
+            debug::debug(text::split("hello world!", " "), false),
+        );
+
+        var bytes = text::to_bytes("hello world!");
+        console::log_line(
+            debug::debug(bytes, false),
+        );
+        console::log_line(
+            text::from_bytes(bytes),
+        );
+        console::log_line(
+            debug::debug(text::equals("foo", "bar"), false),
+        );
+        console::log_line(
+            debug::debug(text::equals("foo", "foo"), false),
+        );
+    }
+}

@@ -1,0 +1,136 @@
+mod example_reflect {
+    struct Foo { a, b }
+
+    func add(a, b) {
+        return math::add(a, b);
+    }
+
+    func main(args) {
+        console::log_line(
+            debug::debug(
+                reflect::find_type_by_name("Integer", "math"),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(<struct math::Integer>, false),
+        );
+        console::log_line(
+            debug::debug(
+                reflect::type_of(42.0),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                reflect::type_name(reflect::type_of(42.0)),
+                false,
+            ),
+        );
+
+        var value = example_reflect::Foo {
+            a: 1,
+            b: 2.3,
+        };
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(
+                reflect::type_fields(reflect::type_of(value)),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                reflect::get_field(value, "a"),
+                false,
+            ),
+        );
+
+        reflect::set_field(value, "a", 42);
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(
+                reflect::type_byte_size(reflect::type_of(value)),
+                false,
+            ),
+        );
+
+        value = reflect::new(
+            reflect::find_type_by_name("Foo", "example_reflect"),
+            { a: 1, b: 2.3 },
+        );
+        console::log_line(
+            debug::debug(value, false),
+        );
+
+        reflect::pack(value, { a: -1, b: -2.3 });
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(reflect::unpack(value), false),
+        );
+
+        var func = reflect::find_function_by_name("add", "example_reflect");
+        console::log_line(
+            debug::debug(func, false),
+        );
+        console::log_line(
+            debug::debug(<func example_reflect::add>, false),
+        );
+        console::log_line(
+            debug::debug(reflect::call(func, [40, 2]), false),
+        );
+        console::log_line(
+            debug::debug(reflect::function_name(func), false),
+        );
+        console::log_line(
+            debug::debug(reflect::function_arguments(func), false),
+        );
+        console::log_line(
+            debug::debug(reflect::is_null(null), false),
+        );
+        console::log_line(
+            debug::debug(reflect::is_null(value), false),
+        );
+        console::log_line(
+            debug::debug(reflect::references_count(value), false),
+        );
+        console::log_line(
+            debug::debug(reflect::does_share_reference(value, 42), false),
+        );
+
+        var temp = value;
+        console::log_line(
+            debug::debug(reflect::does_share_reference(value, temp), false),
+        );
+        console::log_line(
+            debug::debug(
+                reflect::are_same(value, example_reflect::Foo { a: -1, b: -2.3 }),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(
+                reflect::are_same(value, { a: 1, b: 2.3 }),
+                false,
+            ),
+        );
+        console::log_line(
+            debug::debug(reflect::to_boolean(42), false),
+        );
+        console::log_line(
+            debug::debug(reflect::to_integer(4.2), false),
+        );
+        console::log_line(
+            debug::debug(reflect::to_real(42), false),
+        );
+        console::log_line(
+            debug::debug(reflect::to_text(true), false),
+        );
+    }
+}

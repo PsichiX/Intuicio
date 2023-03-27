@@ -1,0 +1,15 @@
+((modules (
+    (name . "test")
+    (functions (
+        (name . "main")
+        (outputs (
+            (name . "result")
+            (struct_name . "usize")
+        ))
+        (script
+            (Expression Literal Usize . 40)
+            (Expression Literal Usize . 2)
+            (CallFunction (name . "add") (module_name "intrinsics"))
+        )
+    ))
+)))

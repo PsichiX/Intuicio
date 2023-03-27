@@ -1,0 +1,20 @@
+mod example_toml {
+    func main(args) {
+        var value = {
+            a: true,
+            b: 1,
+            c: 2.3,
+            d: "hi",
+            e: {
+                x: 40,
+                y: 2,
+                z: ["hey", "hi", "hello"],
+            },
+        };
+        var toml = toml::serialize(value);
+        console::log_line(toml);
+        console::log_line(
+            debug::debug(toml::deserialize(toml), false),
+        );
+    }
+}

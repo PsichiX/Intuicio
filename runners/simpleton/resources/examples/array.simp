@@ -1,0 +1,76 @@
+mod example_array {
+    func main(args) {
+        var value = [null, true, 1, 2.3, "hi"];
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(array::size(value), false),
+        );
+        console::log_line(
+            debug::debug(array::capacity(value), false),
+        );
+
+        array::reserve(value, 5);
+        console::log_line(
+            debug::debug(array::capacity(value), false),
+        );
+
+        array::clear(value);
+        console::log_line(
+            debug::debug(array::size(value), false),
+        );
+
+        var hi = "hi";
+        value = [null, true, 1, 2.3, hi];
+        console::log_line(
+            debug::debug(array::contains(value, hi), false),
+        );
+        console::log_line(
+            debug::debug(array::find(value, hi, false), false),
+        );
+
+        array::push(value, 42);
+        console::log_line(
+            debug::debug(value, false),
+        );
+        
+        array::insert(value, 1, -3);
+        console::log_line(
+            debug::debug(value, false),
+        );
+
+        var temp = array::pop(value);
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(temp, false),
+        );
+
+        temp = array::remove(value, 1);
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(temp, false),
+        );
+
+        array::set(value, 0, "?");
+        console::log_line(
+            debug::debug(value, false),
+        );
+        console::log_line(
+            debug::debug(array::get(value, 0), false),
+        );
+        console::log_line(
+            debug::debug(array::slice(value, 2, 3), false),
+        );
+        console::log_line(
+            debug::debug(
+                array::join([0, 1], [2, 3]),
+                false,
+            ),
+        );
+    }
+}

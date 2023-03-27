@@ -1,0 +1,17 @@
+[package]
+name = "intuicio-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Core module for Intuicio scripting platform"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/intuicio"
+repository = "https://github.com/PsichiX/intuicio"
+documentation = "https://docs.rs/intuicio-core"
+readme = "../README.md"
+
+[dependencies]
+intuicio-data = { version = "0.1", path = "../data" }
+serde = { version = "1", features = ["derive", "rc"] }
+memoffset = "0.8"
+typid = "1"

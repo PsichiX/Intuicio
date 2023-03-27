@@ -1,0 +1,15 @@
+#!simpleton
+
+mod main {
+    import "actions";
+    import "build";
+    import "run";
+
+    func main(args) {
+        fs::set_current_dir("./resources/automation/");
+        var content = fs::read_file("./pipeline.json");
+        var pipeline = json::deserialize(content);
+        pipeline = build::pipeline(pipeline);
+        run::pipeline("./", pipeline);
+    }
+}

@@ -1,0 +1,33 @@
+[package]
+name = "intuicio-frontend-simpleton"
+version = "0.1.0"
+edition = "2021"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Simpleton frontend module for Intuicio scripting platform"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/intuicio"
+repository = "https://github.com/PsichiX/intuicio"
+documentation = "https://docs.rs/intuicio-frontend-simpleton"
+readme = "../../README.md"
+
+[features]
+default = ["console", "fs", "process", "net"]
+console = []
+fs = []
+process = []
+net = []
+
+[dependencies]
+intuicio-data = { version = "0.1", path = "../../data" }
+intuicio-core = { version = "0.1", path = "../../core" }
+intuicio-derive = { version = "0.1", path = "../../derive" }
+pest = "2.5"
+pest_derive = "2.5"
+regex = "1"
+serde_json = "1"
+toml = "0.7"
+byteorder = "1.4"
+snailquote = "0.3"
+
+[dev-dependencies]
+intuicio-backend-vm = { version = "0.1", path = "../../backends/vm" }

@@ -1,0 +1,8 @@
+mod example_process {
+    func main(args) {
+        var result = process::command("ls", ["./resources/"], {});
+        console::log_line(
+            debug::debug(result.status, false),
+        );
+    }
+}
