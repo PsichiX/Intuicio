@@ -559,7 +559,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 }
             }
             Self::FindFunction {
@@ -574,7 +574,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 }
             }
             Self::Closure {
@@ -616,7 +616,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 }
             }
             Self::Literal { literal, next } => {
@@ -625,7 +625,7 @@ impl SimpletonExpressionStart {
                     expression: SimpletonScriptExpression::Literal(literal),
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 }
             }
             Self::GetVariable { name, next } => {
@@ -636,7 +636,7 @@ impl SimpletonExpressionStart {
                 });
                 result.push(ScriptOperation::PopToRegister { index });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 }
             }
             Self::CallFunction {
@@ -656,7 +656,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 }
             }
         }
@@ -681,7 +681,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 } else {
                     panic!("Trying to assign value to structure type!");
                 }
@@ -698,7 +698,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 } else {
                     panic!("Trying to assign value to function type!");
                 }
@@ -742,7 +742,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
                 } else {
                     panic!("Trying to assign value to closure!");
                 }
@@ -753,7 +753,7 @@ impl SimpletonExpressionStart {
                     expression: SimpletonScriptExpression::Literal(literal),
                 });
                 if let Some(next) = next {
-                    next.compile_assign(result, registers);
+                    next.compile_assign(result, registers, closures);
                 } else {
                     panic!("Trying to assign value to literal!");
                 }
@@ -766,7 +766,7 @@ impl SimpletonExpressionStart {
                         expression: SimpletonScriptExpression::StackDuplicate,
                     });
                     result.push(ScriptOperation::PopToRegister { index });
-                    next.compile_assign(result, registers);
+                    next.compile_assign(result, registers, closures);
                 } else {
                     result.push(ScriptOperation::PopToRegister { index });
                 }
@@ -788,7 +788,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile_assign(result, registers);
+                    next.compile_assign(result, registers, closures);
                 } else {
                     panic!("Trying to assign value to function call!");
                 }
@@ -803,6 +803,14 @@ pub enum SimpletonExpressionNext {
         name: String,
         next: Option<Box<SimpletonExpressionNext>>,
     },
+    GetArrayItem {
+        index: Box<SimpletonExpressionStart>,
+        next: Option<Box<SimpletonExpressionNext>>,
+    },
+    GetMapItem {
+        index: Box<SimpletonExpressionStart>,
+        next: Option<Box<SimpletonExpressionNext>>,
+    },
 }
 
 impl SimpletonExpressionNext {
@@ -810,6 +818,7 @@ impl SimpletonExpressionNext {
         &self,
         result: &mut Vec<ScriptOperation<SimpletonScriptExpression>>,
         registers: &mut Vec<String>,
+        closures: &mut Vec<SimpletonFunction>,
     ) {
         match self {
             Self::GetField { name, next } => {
@@ -819,7 +828,39 @@ impl SimpletonExpressionNext {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers);
+                    next.compile(result, registers, closures);
+                }
+            }
+            Self::GetArrayItem { index, next } => {
+                index.compile(result, registers, closures);
+                result.push(ScriptOperation::Expression {
+                    expression: SimpletonScriptExpression::StackSwap,
+                });
+                result.push(ScriptOperation::CallFunction {
+                    query: FunctionQuery {
+                        name: Some("get".into()),
+                        module_name: Some("array".into()),
+                        ..Default::default()
+                    },
+                });
+                if let Some(next) = next {
+                    next.compile(result, registers, closures);
+                }
+            }
+            Self::GetMapItem { index, next } => {
+                index.compile(result, registers, closures);
+                result.push(ScriptOperation::Expression {
+                    expression: SimpletonScriptExpression::StackSwap,
+                });
+                result.push(ScriptOperation::CallFunction {
+                    query: FunctionQuery {
+                        name: Some("get".into()),
+                        module_name: Some("map".into()),
+                        ..Default::default()
+                    },
+                });
+                if let Some(next) = next {
+                    next.compile(result, registers, closures);
                 }
             }
         }
@@ -829,15 +870,50 @@ impl SimpletonExpressionNext {
         &self,
         result: &mut Vec<ScriptOperation<SimpletonScriptExpression>>,
         registers: &mut Vec<String>,
+        closures: &mut Vec<SimpletonFunction>,
     ) {
         match self {
             Self::GetField { name, next } => {
                 if let Some(next) = next {
-                    next.compile_assign(result, registers);
+                    next.compile_assign(result, registers, closures);
                 } else {
                     result.push(ScriptOperation::Expression {
                         expression: SimpletonScriptExpression::SetField {
                             name: name.to_owned(),
+                        },
+                    });
+                }
+            }
+            Self::GetArrayItem { index, next } => {
+                if let Some(next) = next {
+                    next.compile_assign(result, registers, closures);
+                } else {
+                    index.compile(result, registers, closures);
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::StackSwap,
+                    });
+                    result.push(ScriptOperation::CallFunction {
+                        query: FunctionQuery {
+                            name: Some("set".into()),
+                            module_name: Some("array".into()),
+                            ..Default::default()
+                        },
+                    });
+                }
+            }
+            Self::GetMapItem { index, next } => {
+                if let Some(next) = next {
+                    next.compile_assign(result, registers, closures);
+                } else {
+                    index.compile(result, registers, closures);
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::StackSwap,
+                    });
+                    result.push(ScriptOperation::CallFunction {
+                        query: FunctionQuery {
+                            name: Some("set".into()),
+                            module_name: Some("map".into()),
+                            ..Default::default()
                         },
                     });
                 }

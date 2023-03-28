@@ -62,6 +62,9 @@ mod example_map {
             debug::debug(map::get(value, "e"), false),
         );
         console::log_line(
+            debug::debug(value{"e"}, false),
+        );
+        console::log_line(
             debug::debug(
                 map::join({a: 1, b: 2}, {b: 3, c: 4}),
                 false,

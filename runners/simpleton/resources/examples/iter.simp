@@ -3,9 +3,9 @@ mod example_iter {
         var counter = { index: 0 };
         var value = map::collect(
             @[counter]() {
-                var index = map::get(counter, "index");
+                var index = counter{"index"};
                 if math::less_than(index, 10) {
-                    map::set(counter, "index", math::add(index, 1));
+                    counter{"index"} = math::add(index, 1);
                     return { key: reflect::to_text(index), value: index };
                 } else {
                     return null;
@@ -37,9 +37,9 @@ mod example_iter {
         var counter = { index: 0 };
         var value = array::collect(
             @[counter]() {
-                var index = map::get(counter, "index");
+                var index = counter{"index"};
                 if math::less_than(index, 10) {
-                    map::set(counter, "index", math::add(index, 1));
+                    counter{"index"} = math::add(index, 1);
                     return index;
                 } else {
                     return null;

@@ -60,8 +60,15 @@ mod example_array {
         console::log_line(
             debug::debug(value, false),
         );
+        value[0] = "?";
+        console::log_line(
+            debug::debug(value, false),
+        );
         console::log_line(
             debug::debug(array::get(value, 0), false),
+        );
+        console::log_line(
+            debug::debug(value[0], false),
         );
         console::log_line(
             debug::debug(array::slice(value, 2, 3), false),

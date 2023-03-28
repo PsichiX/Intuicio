@@ -290,6 +290,26 @@ fn parse_expression_next(pair: Pair<Rule>) -> SimpletonExpressionNext {
             };
             SimpletonExpressionNext::GetField { name, next }
         }
+        Rule::get_array_item => {
+            let mut pairs = pair.into_inner();
+            let index = Box::new(parse_expression_start(pairs.next().unwrap()));
+            let next = if let Some(pair) = pairs.next() {
+                Some(Box::new(parse_expression_next(pair)))
+            } else {
+                None
+            };
+            SimpletonExpressionNext::GetArrayItem { index, next }
+        }
+        Rule::get_map_item => {
+            let mut pairs = pair.into_inner();
+            let index = Box::new(parse_expression_start(pairs.next().unwrap()));
+            let next = if let Some(pair) = pairs.next() {
+                Some(Box::new(parse_expression_next(pair)))
+            } else {
+                None
+            };
+            SimpletonExpressionNext::GetMapItem { index, next }
+        }
         rule => unreachable!("{:?}", rule),
     }
 }

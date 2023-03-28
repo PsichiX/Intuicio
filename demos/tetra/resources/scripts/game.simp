@@ -1,40 +1,26 @@
 mod game {
     func initialize(state) {
-        var renderer = map::get(state, "renderer");
+        var renderer = state{"renderer"};
         
-        map::set(
-            state,
-            "street",
-            image::load(renderer, "images/Street_Summer_Day.png")
-        );
-
-        map::set(
-            state,
-            "rin",
-            image::load(renderer, "images/Rin_SummerUni_OpenSmile.png")
-        );
-        
-        map::set(
-            state,
-            "roboto",
-            font::load(renderer, "fonts/Roboto-Regular.ttf", 64.0)
-        );
+        state{"street"} = image::load(renderer, "images/Street_Summer_Day.png");
+        state{"rin"} = image::load(renderer, "images/Rin_SummerUni_OpenSmile.png");
+        state{"roboto"} = font::load(renderer, "fonts/Roboto-Regular.ttf", 64.0);
     }
 
     func draw(dt, state) {
-        var renderer = map::get(state, "renderer");
-        var roboto = map::get(state, "roboto");
+        var renderer = state{"renderer"};
+        var roboto = state{"roboto"};
 
         image::draw(
             renderer,
-            map::get(state, "street"),
+            state{"street"},
             vec2::Vec2 { x: 0.0, y: 0.0 },
             color::white()
         );
         
         image::draw_screen(
             renderer,
-            map::get(state, "rin"),
+            state{"rin"},
             vec2::Vec2 { x: 0.25, y: -0.25 },
             color::white()
         );
