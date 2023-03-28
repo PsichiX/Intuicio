@@ -4,6 +4,7 @@ pub mod closure;
 #[cfg(feature = "console")]
 pub mod console;
 pub mod debug;
+pub mod event;
 #[cfg(feature = "fs")]
 pub mod fs;
 pub mod iter;
@@ -79,4 +80,5 @@ pub fn install(registry: &mut Registry) {
     closure::install(registry);
     iter::install(registry);
     promise::install(registry);
+    event::install(registry);
 }

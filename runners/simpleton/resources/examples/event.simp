@@ -1,0 +1,60 @@
+mod example_event {
+    func response(value) {
+        console::log_line(
+            text::combine(
+                "Function response: ",
+                debug::debug(value, false),
+            ),
+        );
+    }
+
+    func main(args){
+        var event = event::Event {};
+        event::bind_once(event, <func example_event::response>);
+        event::bind_once(
+            event,
+            @[](value) {
+                console::log_line(
+                    text::combine(
+                        "Closure response: ",
+                        debug::debug(value, false),
+                    ),
+                );
+            },
+        );
+        event::bind_once(
+            event,
+            promise::new(
+                @[](next, value) {
+                    console::log_line(
+                        text::combine(
+                            "Promise response: ",
+                            debug::debug(value, false),
+                        ),
+                    );
+                },
+                null,
+            ),
+        );
+        event::dispatch(event, [42]);
+        event::dispatch(event, [0]);
+
+        event::bind(event, <func example_event::response>);
+        event::bind(
+            event,
+            @[](value) {
+                console::log_line(
+                    text::combine(
+                        "Closure response: ",
+                        debug::debug(value, false),
+                    ),
+                );
+            },
+        );
+        event::dispatch(event, [42]);
+        event::unbind(event, <func example_event::response>);
+        event::dispatch(event, [10]);
+        event::unbind(event, null);
+        event::dispatch(event, [0]);
+    }
+}

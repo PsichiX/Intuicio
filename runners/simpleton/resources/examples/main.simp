@@ -16,6 +16,7 @@ mod main {
     import "closure";
     import "iter";
     import "promise";
+    import "event";
 
     func main(args) {
         example_hello::main(args);
@@ -33,5 +34,6 @@ mod main {
         example_closure::main(args);
         example_iter::main(args);
         example_promise::main(args);
+        example_event::main(args);
     }
 }

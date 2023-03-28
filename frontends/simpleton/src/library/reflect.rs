@@ -201,7 +201,7 @@ pub fn does_share_reference(registry: &Registry, a: Reference, b: Reference) -> 
     Reference::new_boolean(a.does_share_reference(&b, false), registry)
 }
 
-fn are_same_impl(registry: &Registry, a: &Reference, b: &Reference) -> bool {
+pub fn are_same_impl(registry: &Registry, a: &Reference, b: &Reference) -> bool {
     if a.is_null() && b.is_null() {
         true
     } else if let (Some(a), Some(b)) = (a.read::<Boolean>(), b.read::<Boolean>()) {
@@ -236,16 +236,20 @@ fn are_same_impl(registry: &Registry, a: &Reference, b: &Reference) -> bool {
             .map(|field| &field.name)
             .chain(b.struct_handle().fields().iter().map(|field| &field.name))
             .collect::<HashSet<_>>();
-        keys.into_iter()
-            .map(|key| {
-                (
-                    a.read_field::<Reference>(key),
-                    b.read_field::<Reference>(key),
-                )
-            })
-            .all(|(a, b)| {
-                a.is_some() && b.is_some() && are_same_impl(registry, a.unwrap(), b.unwrap())
-            })
+        if keys.is_empty() {
+            false
+        } else {
+            keys.into_iter()
+                .map(|key| {
+                    (
+                        a.read_field::<Reference>(key),
+                        b.read_field::<Reference>(key),
+                    )
+                })
+                .all(|(a, b)| {
+                    a.is_some() && b.is_some() && are_same_impl(registry, a.unwrap(), b.unwrap())
+                })
+        }
     }
 }
 

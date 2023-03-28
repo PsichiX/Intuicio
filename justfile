@@ -46,14 +46,14 @@ publish:
   sleep 15
   cargo publish --no-verify --manifest-path ./derive/Cargo.toml
   sleep 15
+  cargo publish --no-verify --manifest-path ./backends/vm/Cargo.toml
+  sleep 15
+  cargo publish --no-verify --manifest-path ./backends/rust/Cargo.toml
+  sleep 15
   cargo publish --no-verify --manifest-path ./frontends/serde/Cargo.toml
   sleep 15
   cargo publish --no-verify --manifest-path ./frontends/vault/Cargo.toml
   sleep 15
   cargo publish --no-verify --manifest-path ./frontends/simpleton/Cargo.toml
-  sleep 15
-  cargo publish --no-verify --manifest-path ./backends/vm/Cargo.toml
-  sleep 15
-  cargo publish --no-verify --manifest-path ./backends/rust/Cargo.toml
   sleep 15
   cargo publish --no-verify --manifest-path ./runners/simpleton/Cargo.toml
