@@ -1,6 +1,6 @@
 [package]
 name = "tests"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 publish = false
 
@@ -9,11 +9,11 @@ bench = []
 all = []
 
 [dev-dependencies]
-intuicio-data = { version = "0.2", path = "../data" }
-intuicio-core = { version = "0.2", path = "../core" }
-intuicio-derive = { version = "0.2", path = "../derive" }
-intuicio-backend-vm = { version = "0.2", path = "../backends/vm" }
-intuicio-frontend-vault = { version = "0.2", path = "../frontends/vault" }
+intuicio-data = { version = "0.3", path = "../data" }
+intuicio-core = { version = "0.3", path = "../core" }
+intuicio-derive = { version = "0.3", path = "../derive" }
+intuicio-backend-vm = { version = "0.3", path = "../backends/vm" }
+intuicio-frontend-vault = { version = "0.3", path = "../frontends/vault" }
 rune = "*"
 rune-modules = "*"
 rhai = "*"

@@ -5,7 +5,12 @@ use crate::{
     struct_type::{RuntimeStructBuilder, StructField, StructHandle, StructQuery},
     Visibility,
 };
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    error::Error,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 pub type ScriptHandle<'a, SE> = Arc<Script<'a, SE>>;
 pub type Script<'a, SE> = Vec<ScriptOperation<'a, SE>>;
@@ -424,5 +429,166 @@ impl<SE: ScriptExpression> ScriptPackage<'static, SE> {
         for module in &self.modules {
             module.install_functions::<SFG>(registry, input.clone());
         }
+    }
+}
+
+pub trait ScriptContentProvider<T> {
+    fn load(&mut self, path: &str) -> Result<Option<T>, Box<dyn Error>>;
+
+    fn sanitize_path(&self, path: &str) -> Result<String, Box<dyn Error>> {
+        Ok(path.to_owned())
+    }
+
+    fn join_paths(&self, parent: &str, relative: &str) -> Result<String, Box<dyn Error>>;
+}
+
+#[derive(Default)]
+pub struct ExtensionContentProvider<S> {
+    default_extension: Option<String>,
+    extension_providers: HashMap<String, Box<dyn ScriptContentProvider<S>>>,
+}
+
+impl<S> ExtensionContentProvider<S> {
+    pub fn default_extension(mut self, extension: impl ToString) -> Self {
+        self.default_extension = Some(extension.to_string());
+        self
+    }
+
+    pub fn extension(
+        mut self,
+        extension: &str,
+        content_provider: impl ScriptContentProvider<S> + 'static,
+    ) -> Self {
+        self.extension_providers
+            .insert(extension.to_owned(), Box::new(content_provider));
+        self
+    }
+}
+
+impl<S> ScriptContentProvider<S> for ExtensionContentProvider<S> {
+    fn load(&mut self, path: &str) -> Result<Option<S>, Box<dyn Error>> {
+        let extension = match Path::new(path).extension() {
+            Some(extension) => extension.to_string_lossy().to_string(),
+            None => match &self.default_extension {
+                Some(extension) => extension.to_owned(),
+                None => return Err(Box::new(ExtensionContentProviderError::NoDefaultExtension)),
+            },
+        };
+        if let Some(content_provider) = self.extension_providers.get_mut(&extension) {
+            content_provider.load(path)
+        } else {
+            Err(Box::new(
+                ExtensionContentProviderError::ContentProviderForExtensionNotFound(extension),
+            ))
+        }
+    }
+
+    fn sanitize_path(&self, path: &str) -> Result<String, Box<dyn Error>> {
+        let extension = match Path::new(path).extension() {
+            Some(extension) => extension.to_string_lossy().to_string(),
+            None => match &self.default_extension {
+                Some(extension) => extension.to_owned(),
+                None => return Err(Box::new(ExtensionContentProviderError::NoDefaultExtension)),
+            },
+        };
+        if let Some(content_provider) = self.extension_providers.get(&extension) {
+            content_provider.sanitize_path(path)
+        } else {
+            Err(Box::new(
+                ExtensionContentProviderError::ContentProviderForExtensionNotFound(extension),
+            ))
+        }
+    }
+
+    fn join_paths(&self, parent: &str, relative: &str) -> Result<String, Box<dyn Error>> {
+        let extension = match Path::new(relative).extension() {
+            Some(extension) => extension.to_string_lossy().to_string(),
+            None => match &self.default_extension {
+                Some(extension) => extension.to_owned(),
+                None => return Err(Box::new(ExtensionContentProviderError::NoDefaultExtension)),
+            },
+        };
+        if let Some(content_provider) = self.extension_providers.get(&extension) {
+            content_provider.join_paths(parent, relative)
+        } else {
+            Err(Box::new(
+                ExtensionContentProviderError::ContentProviderForExtensionNotFound(extension),
+            ))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ExtensionContentProviderError {
+    NoDefaultExtension,
+    ContentProviderForExtensionNotFound(String),
+}
+
+impl std::fmt::Display for ExtensionContentProviderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExtensionContentProviderError::NoDefaultExtension => {
+                write!(f, "No default extension set")
+            }
+            ExtensionContentProviderError::ContentProviderForExtensionNotFound(extension) => {
+                write!(
+                    f,
+                    "Could not find content provider for extension: `{}`",
+                    extension
+                )
+            }
+        }
+    }
+}
+
+impl Error for ExtensionContentProviderError {}
+
+pub struct IgnoreContentProvider;
+
+impl<S> ScriptContentProvider<S> for IgnoreContentProvider {
+    fn load(&mut self, _: &str) -> Result<Option<S>, Box<dyn Error>> {
+        Ok(None)
+    }
+
+    fn join_paths(&self, parent: &str, relative: &str) -> Result<String, Box<dyn Error>> {
+        Ok(format!("{}/{}", parent, relative))
+    }
+}
+
+pub trait BytesContentParser<T> {
+    fn parse(&self, bytes: Vec<u8>) -> Result<T, Box<dyn Error>>;
+}
+
+pub struct FileContentProvider<T> {
+    extension: String,
+    parser: Box<dyn BytesContentParser<T>>,
+}
+
+impl<T> FileContentProvider<T> {
+    pub fn new(extension: impl ToString, parser: impl BytesContentParser<T> + 'static) -> Self {
+        Self {
+            extension: extension.to_string(),
+            parser: Box::new(parser),
+        }
+    }
+}
+
+impl<T> ScriptContentProvider<T> for FileContentProvider<T> {
+    fn load(&mut self, path: &str) -> Result<Option<T>, Box<dyn Error>> {
+        Ok(Some(self.parser.parse(std::fs::read(path)?)?))
+    }
+
+    fn sanitize_path(&self, path: &str) -> Result<String, Box<dyn Error>> {
+        let mut result = PathBuf::from(path);
+        if result.extension().is_none() {
+            result.set_extension(&self.extension);
+        }
+        Ok(result.canonicalize()?.to_string_lossy().into_owned())
+    }
+
+    fn join_paths(&self, parent: &str, relative: &str) -> Result<String, Box<dyn Error>> {
+        let mut path = PathBuf::from(parent);
+        path.pop();
+        Ok(path.join(relative).to_string_lossy().into_owned())
     }
 }

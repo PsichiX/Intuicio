@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-backend-rust"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 exclude = ["./resources/"]
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
@@ -12,5 +12,5 @@ documentation = "https://docs.rs/intuicio-backend-rust"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-core = { version = "0.2", path = "../../core" }
+intuicio-core = { version = "0.3", path = "../../core" }
 serde = { version = "1", features = ["derive", "rc"] }

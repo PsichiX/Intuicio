@@ -3,20 +3,15 @@ use intuicio_core::{
     function::{FunctionQuery, FunctionQueryParameter},
     registry::Registry,
     script::{
-        ScriptExpression, ScriptFunction, ScriptFunctionParameter, ScriptFunctionSignature,
-        ScriptHandle, ScriptModule, ScriptOperation, ScriptPackage, ScriptStruct,
-        ScriptStructField,
+        BytesContentParser, ScriptContentProvider, ScriptExpression, ScriptFunction,
+        ScriptFunctionParameter, ScriptFunctionSignature, ScriptHandle, ScriptModule,
+        ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
     struct_type::StructQuery,
     Visibility,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    any::TypeId,
-    collections::HashMap,
-    error::Error,
-    path::{Path, PathBuf},
-};
+use std::{any::TypeId, collections::HashMap, error::Error};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VaultLiteral {
@@ -572,7 +567,7 @@ pub struct VaultPackage {
 impl VaultPackage {
     pub fn new<CP>(path: &str, content_provider: &mut CP) -> Result<Self, Box<dyn Error>>
     where
-        CP: VaultContentProvider,
+        CP: ScriptContentProvider<VaultModule>,
     {
         let mut result = Self::default();
         result.load(path, content_provider)?;
@@ -581,19 +576,19 @@ impl VaultPackage {
 
     pub fn load<CP>(&mut self, path: &str, content_provider: &mut CP) -> Result<(), Box<dyn Error>>
     where
-        CP: VaultContentProvider,
+        CP: ScriptContentProvider<VaultModule>,
     {
-        let path = CP::sanitize_path(path);
+        let path = content_provider.sanitize_path(path)?;
         if self.modules.contains_key(&path) {
             return Ok(());
         }
-        let content = content_provider.load(&path)?;
-        let module = VaultModule::parse(&content)?;
-        let dependencies = module.dependencies.to_owned();
-        self.modules.insert(path.to_owned(), module);
-        for relative in dependencies {
-            let path = CP::join_paths(&path, &relative);
-            self.load(&path, content_provider)?;
+        if let Some(module) = content_provider.load(&path)? {
+            let dependencies = module.dependencies.to_owned();
+            self.modules.insert(path.to_owned(), module);
+            for relative in dependencies {
+                let path = content_provider.join_paths(&path, &relative)?;
+                self.load(&path, content_provider)?;
+            }
         }
         Ok(())
     }
@@ -609,35 +604,12 @@ impl VaultPackage {
     }
 }
 
-pub trait VaultContentProvider {
-    fn load(&mut self, path: &str) -> Result<String, Box<dyn Error>>;
+pub struct VaultContentParser;
 
-    fn sanitize_path(path: &str) -> String {
-        path.to_owned()
-    }
-
-    fn join_paths(parent: &str, relative: &str) -> String;
-}
-
-pub struct FileContentProvider;
-
-impl VaultContentProvider for FileContentProvider {
-    fn load(&mut self, path: &str) -> Result<String, Box<dyn Error>> {
-        Ok(std::fs::read_to_string(path)?)
-    }
-
-    fn sanitize_path(path: &str) -> String {
-        Path::new(path)
-            .canonicalize()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned()
-    }
-
-    fn join_paths(parent: &str, relative: &str) -> String {
-        let mut path = PathBuf::from(parent);
-        path.pop();
-        path.join(relative).to_string_lossy().into_owned()
+impl BytesContentParser<VaultModule> for VaultContentParser {
+    fn parse(&self, bytes: Vec<u8>) -> Result<VaultModule, Box<dyn Error>> {
+        let content = String::from_utf8(bytes)?;
+        Ok(VaultModule::parse(&content)?)
     }
 }
 
@@ -745,7 +717,8 @@ mod tests {
                 (this, this)
             }
         });
-        VaultPackage::new("../../resources/package.vault", &mut FileContentProvider)
+        let mut content_provider = FileContentProvider::new("vault", VaultContentParser);
+        VaultPackage::new("../../resources/package.vault", &mut content_provider)
             .unwrap()
             .compile()
             .install::<VmScope<VaultScriptExpression>>(

@@ -1,0 +1,7 @@
+mod test {
+    fn main() -> (result: struct usize) {
+        literal 40 usize;
+        literal 2 usize;
+        call mod intrinsics fn add;
+    }
+}

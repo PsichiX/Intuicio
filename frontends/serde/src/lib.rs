@@ -3,14 +3,15 @@ use intuicio_core::{
     function::FunctionQuery,
     registry::Registry,
     script::{
-        ScriptExpression, ScriptFunction, ScriptFunctionParameter, ScriptFunctionSignature,
-        ScriptHandle, ScriptModule, ScriptOperation, ScriptPackage, ScriptStruct,
-        ScriptStructField,
+        ScriptContentProvider, ScriptExpression, ScriptFunction, ScriptFunctionParameter,
+        ScriptFunctionSignature, ScriptHandle, ScriptModule, ScriptOperation, ScriptPackage,
+        ScriptStruct, ScriptStructField,
     },
     struct_type::StructQuery,
     Visibility,
 };
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, error::Error};
 
 pub type SerdeScript = Vec<SerdeOperation>;
 
@@ -64,6 +65,7 @@ impl SerdeLiteral {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SerdeExpression {
     Literal(SerdeLiteral),
+    StackDrop,
 }
 
 impl ScriptExpression for SerdeExpression {
@@ -72,14 +74,11 @@ impl ScriptExpression for SerdeExpression {
             Self::Literal(literal) => {
                 literal.evaluate(context);
             }
+            Self::StackDrop => {
+                context.stack().drop();
+            }
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerdeOperationFunctionQueryParameter {
-    pub name: Option<String>,
-    pub type_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,10 +106,6 @@ pub enum SerdeOperation {
         struct_name: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         visibility: Option<Visibility>,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        inputs: Vec<SerdeOperationFunctionQueryParameter>,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        outputs: Vec<SerdeOperationFunctionQueryParameter>,
     },
     BranchScope {
         script_success: SerdeScript,
@@ -195,6 +190,7 @@ fn build_script(script: &SerdeScript) -> ScriptHandle<'static, SerdeExpression> 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeFunctionParameter {
     pub name: String,
+    pub module_name: Option<String>,
     pub struct_name: String,
 }
 
@@ -203,7 +199,11 @@ impl SerdeFunctionParameter {
         ScriptFunctionParameter {
             name: self.name.to_owned(),
             struct_query: StructQuery {
-                name: Some(self.struct_name.as_str().to_owned().into()),
+                name: Some(self.struct_name.to_owned().into()),
+                module_name: self
+                    .module_name
+                    .as_ref()
+                    .map(|module_name| module_name.to_owned().into()),
                 ..Default::default()
             },
         }
@@ -256,6 +256,7 @@ pub struct SerdeStructField {
     pub name: String,
     #[serde(default, skip_serializing_if = "Visibility::is_public")]
     pub visibility: Visibility,
+    pub module_name: Option<String>,
     pub struct_name: String,
 }
 
@@ -265,7 +266,11 @@ impl SerdeStructField {
             name: self.name.to_owned(),
             visibility: self.visibility,
             struct_query: StructQuery {
-                name: Some(self.struct_name.as_str().to_owned().into()),
+                name: Some(self.struct_name.to_owned().into()),
+                module_name: self
+                    .module_name
+                    .as_ref()
+                    .map(|module_name| module_name.to_owned().into()),
                 ..Default::default()
             },
         }
@@ -319,16 +324,56 @@ impl SerdeModule {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerdePackage {
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct SerdeFile {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<SerdeModule>,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct SerdePackage {
+    pub files: HashMap<String, SerdeFile>,
+}
+
 impl SerdePackage {
+    pub fn new<CP>(path: &str, content_provider: &mut CP) -> Result<Self, Box<dyn Error>>
+    where
+        CP: ScriptContentProvider<SerdeFile>,
+    {
+        let mut result = Self::default();
+        result.load(path, content_provider)?;
+        Ok(result)
+    }
+
+    pub fn load<CP>(&mut self, path: &str, content_provider: &mut CP) -> Result<(), Box<dyn Error>>
+    where
+        CP: ScriptContentProvider<SerdeFile>,
+    {
+        let path = content_provider.sanitize_path(path)?;
+        if self.files.contains_key(&path) {
+            return Ok(());
+        }
+        if let Some(file) = content_provider.load(&path)? {
+            let dependencies = file.dependencies.to_owned();
+            self.files.insert(path.to_owned(), file);
+            for relative in dependencies {
+                let path = content_provider.join_paths(&path, &relative)?;
+                self.load(&path, content_provider)?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn compile(&self) -> ScriptPackage<'static, SerdeExpression> {
         ScriptPackage {
-            modules: self.modules.iter().map(|module| module.compile()).collect(),
+            modules: self
+                .files
+                .values()
+                .flat_map(|file| file.modules.iter())
+                .map(|module| module.compile())
+                .collect(),
         }
     }
 }
@@ -339,28 +384,38 @@ mod tests {
     use intuicio_backend_vm::prelude::*;
     use intuicio_core::prelude::*;
 
+    pub struct LexprContentParser;
+
+    impl BytesContentParser<SerdeFile> for LexprContentParser {
+        fn parse(&self, bytes: Vec<u8>) -> Result<SerdeFile, Box<dyn Error>> {
+            let content = String::from_utf8(bytes)?;
+            Ok(serde_lexpr::from_str::<SerdeFile>(&content)?)
+        }
+    }
+
     #[test]
     fn test_frontend_lexpr() {
-        let content = std::fs::read_to_string("../../resources/package.lexpr").unwrap();
-        let package = serde_lexpr::from_str::<SerdePackage>(&content).unwrap();
-        println!("LEXPR: {}", serde_lexpr::to_string(&package).unwrap());
         let mut registry = Registry::default().with_basic_types();
-        let i32_handle = registry.find_struct(StructQuery::of::<i32>()).unwrap();
-        registry.add_function(Function::new(
-            FunctionSignature::new("add")
-                .with_module_name("intrinsics")
-                .with_input(FunctionParameter::new("a", i32_handle.clone()))
-                .with_input(FunctionParameter::new("b", i32_handle.clone()))
-                .with_output(FunctionParameter::new("result", i32_handle)),
-            FunctionBody::closure(|context, _| {
-                let a = context.stack().pop::<usize>().unwrap();
-                let b = context.stack().pop::<usize>().unwrap();
-                context.stack().push(a + b);
-            }),
-        ));
-        package
+        registry.add_function(define_function! {
+            registry => mod intrinsics fn add(a: usize, b: usize) -> (result: usize) {
+                (a + b,)
+            }
+        });
+        let mut content_provider = FileContentProvider::new("lexpr", LexprContentParser);
+        SerdePackage::new("../../resources/package.lexpr", &mut content_provider)
+            .unwrap()
             .compile()
-            .install::<VmScope<SerdeExpression>>(&mut registry, None);
+            .install::<VmScope<SerdeExpression>>(
+                &mut registry,
+                None,
+                // Some(
+                //     PrintDebugger::full()
+                //         .basic_printables()
+                //         .stack_bytes(false)
+                //         .registers_bytes(false)
+                //         .into_handle(),
+                // ),
+            );
         assert!(registry
             .find_function(FunctionQuery {
                 name: Some("main".into()),

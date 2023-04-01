@@ -1,6 +1,9 @@
 use crate::{
-    Integer, Real, SimpletonExpressionNext, SimpletonExpressionStart, SimpletonFunction,
-    SimpletonLiteral, SimpletonModule, SimpletonStatement, SimpletonStruct, Text,
+    script::{
+        SimpletonExpressionNext, SimpletonExpressionStart, SimpletonFunction, SimpletonLiteral,
+        SimpletonModule, SimpletonStatement, SimpletonStruct,
+    },
+    Integer, Real, Text,
 };
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;

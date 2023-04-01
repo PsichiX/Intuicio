@@ -2,7 +2,7 @@ mod library;
 
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
-use intuicio_frontend_simpleton::*;
+use intuicio_frontend_simpleton::prelude::*;
 use std::path::Path;
 
 #[derive(Debug, Default, Clone)]
@@ -22,7 +22,8 @@ pub fn execute(entry: &str, config: Config, args: impl IntoIterator<Item = Strin
     } else {
         entry.to_owned()
     };
-    let package = SimpletonPackage::new(&entry, &mut FileContentProvider).unwrap();
+    let mut content_provider = FileContentProvider::new("simp", SimpletonContentParser);
+    let package = SimpletonPackage::new(&entry, &mut content_provider).unwrap();
     if let Some(path) = &config.into_code {
         std::fs::write(path, format!("{:#?}", package)).unwrap();
     }

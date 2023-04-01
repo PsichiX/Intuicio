@@ -7,6 +7,7 @@ members = [
     "backends/vm",
     "backends/rust",
     "frontends/serde",
+    "frontends/assembler",
     "frontends/simpleton",
     "frontends/vault",
     "runners/simpleton",

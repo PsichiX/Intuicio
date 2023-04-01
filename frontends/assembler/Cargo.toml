@@ -1,20 +1,22 @@
 [package]
-name = "intuicio-frontend-vault"
+name = "intuicio-frontend-assembler"
 version = "0.3.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
-description = "Vault frontend module for Intuicio scripting platform"
+description = "Assembly frontend module for Intuicio scripting platform"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
-documentation = "https://docs.rs/intuicio-frontend-vault"
+documentation = "https://docs.rs/intuicio-frontend-assembler"
 readme = "../../README.md"
 
 [dependencies]
 intuicio-data = { version = "0.3", path = "../../data" }
 intuicio-core = { version = "0.3", path = "../../core" }
-serde = { version = "1", features = ["derive", "rc"] }
-serde-lexpr = "0.1"
+intuicio-frontend-serde = { version = "0.3", path = "../serde" }
+pest = "2.5"
+pest_derive = "2.5"
+snailquote = "0.3"
 
 [dev-dependencies]
 intuicio-backend-vm = { version = "0.3", path = "../../backends/vm" }

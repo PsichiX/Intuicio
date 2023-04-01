@@ -52,6 +52,8 @@ publish:
   sleep 15
   cargo publish --no-verify --manifest-path ./frontends/serde/Cargo.toml
   sleep 15
+  cargo publish --no-verify --manifest-path ./frontends/assembler/Cargo.toml
+  sleep 15
   cargo publish --no-verify --manifest-path ./frontends/vault/Cargo.toml
   sleep 15
   cargo publish --no-verify --manifest-path ./frontends/simpleton/Cargo.toml

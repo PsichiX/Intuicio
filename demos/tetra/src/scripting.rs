@@ -2,7 +2,7 @@ use crate::library::engine::Engine;
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_data::prelude::*;
-use intuicio_frontend_simpleton::*;
+use intuicio_frontend_simpleton::prelude::*;
 use tetra::{time::get_delta_time, Context as TetraContext};
 
 pub struct Scripting {
@@ -33,7 +33,8 @@ impl Scripting {
         intuicio_frontend_simpleton::library::install(&mut registry);
         crate::library::install(&mut registry);
         let entry = format!("{}/{}", assets, entry);
-        SimpletonPackage::new(&entry, &mut FileContentProvider)
+        let mut content_provider = FileContentProvider::new("simp", SimpletonContentParser);
+        SimpletonPackage::new(&entry, &mut content_provider)
             .unwrap()
             .compile()
             .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
