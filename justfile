@@ -22,7 +22,7 @@ checks:
   just clippy
 
 demo:
-  cd ./demos/tetra/ && cargo run
+  cd ./demos/tetra/ && cargo run --release
 
 clean:
   find . -name target -type d -exec rm -r {} +
