@@ -1,4 +1,4 @@
-use super::{color::Color, renderer::Renderer, vec2::Vec2};
+use super::{color::Color, engine::Engine, vec2::Vec2};
 use intuicio_core::prelude::*;
 use intuicio_derive::*;
 use intuicio_frontend_simpleton::*;
@@ -14,7 +14,7 @@ use tetra::{
 #[intuicio(name = "Font", module_name = "font")]
 pub struct Font {
     #[intuicio(ignore)]
-    font: Option<TetraFont>,
+    pub(crate) font: Option<TetraFont>,
 }
 
 #[intuicio_methods(module_name = "font")]
@@ -22,15 +22,15 @@ impl Font {
     #[intuicio_method(use_registry)]
     pub fn load(
         registry: &Registry,
-        mut renderer: Reference,
+        mut engine: Reference,
         path: Reference,
         size: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let path = path.read::<Text>().unwrap();
-        let path = format!("{}/{}", renderer.assets, path.as_str());
+        let path = format!("{}/{}", engine.assets, path.as_str());
         let size = *size.read::<Real>().unwrap() as f32;
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let result = Self {
             font: Some(TetraFont::vector(&mut ctx, path.as_str(), size).unwrap()),
@@ -40,18 +40,18 @@ impl Font {
 
     #[intuicio_method()]
     pub fn draw(
-        mut renderer: Reference,
+        mut engine: Reference,
         font: Reference,
         content: Reference,
         position: Reference,
         color: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let font = font.read::<Font>().unwrap();
         let content = content.read::<Text>().unwrap();
         let position = position.read::<Vec2>().unwrap().into_tetra();
         let color = color.read::<Color>().unwrap().into_tetra();
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         TetraText::new(content.as_str(), font.font.as_ref().unwrap().clone()).draw(
             &mut ctx,
@@ -67,7 +67,7 @@ impl Font {
     #[intuicio_method()]
     #[allow(clippy::too_many_arguments)]
     pub fn draw_advanced(
-        mut renderer: Reference,
+        mut engine: Reference,
         font: Reference,
         content: Reference,
         position: Reference,
@@ -76,7 +76,7 @@ impl Font {
         rotation: Reference,
         color: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let font = font.read::<Font>().unwrap();
         let content = content.read::<Text>().unwrap();
         let position = position.read::<Vec2>().unwrap().into_tetra();
@@ -84,7 +84,7 @@ impl Font {
         let origin = origin.read::<Vec2>().unwrap().into_tetra();
         let rotation = *rotation.read::<Real>().unwrap() as f32;
         let color = color.read::<Color>().unwrap().into_tetra();
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         TetraText::new(content.as_str(), font.font.as_ref().unwrap().clone()).draw(
             &mut ctx,
@@ -101,18 +101,18 @@ impl Font {
 
     #[intuicio_method()]
     pub fn draw_screen(
-        mut renderer: Reference,
+        mut engine: Reference,
         font: Reference,
         content: Reference,
         factor: Reference,
         color: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let font = font.read::<Font>().unwrap();
         let content = content.read::<Text>().unwrap();
         let factor = factor.read::<Vec2>().unwrap().into_tetra();
         let color = color.read::<Color>().unwrap().into_tetra();
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let mut text = TetraText::new(content.as_str(), font.font.as_ref().unwrap().clone());
         let bounds = text.get_bounds(&mut ctx).unwrap();
@@ -135,7 +135,7 @@ impl Font {
     #[intuicio_method()]
     #[allow(clippy::too_many_arguments)]
     pub fn draw_screen_advanced(
-        mut renderer: Reference,
+        mut engine: Reference,
         font: Reference,
         content: Reference,
         factor: Reference,
@@ -144,7 +144,7 @@ impl Font {
         rotation: Reference,
         color: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let font = font.read::<Font>().unwrap();
         let content = content.read::<Text>().unwrap();
         let factor = factor.read::<Vec2>().unwrap().into_tetra();
@@ -152,7 +152,7 @@ impl Font {
         let origin = origin.read::<Vec2>().unwrap().into_tetra();
         let rotation = *rotation.read::<Real>().unwrap() as f32;
         let color = color.read::<Color>().unwrap().into_tetra();
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let mut text = TetraText::new(content.as_str(), font.font.as_ref().unwrap().clone());
         let bounds = text.get_bounds(&mut ctx).unwrap();

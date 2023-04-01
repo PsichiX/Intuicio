@@ -30,49 +30,53 @@ fn debug_impl(value: &Reference, result: &mut dyn Write, indent: &mut Option<usi
         write!(result, r#""{}""#, value.as_str()).unwrap();
     } else if let Some(value) = value.read::<Array>() {
         write!(result, "[").unwrap();
-        if let Some(indent) = indent {
-            *indent += 1;
-            writeln!(result).unwrap();
-            debug_indent(result, *indent);
-        }
-        for (index, value) in value.iter().enumerate() {
-            if index > 0 {
-                write!(result, ", ").unwrap();
-                if let Some(indent) = indent {
-                    writeln!(result).unwrap();
-                    debug_indent(result, *indent);
-                }
+        if !value.is_empty() {
+            if let Some(indent) = indent {
+                *indent += 1;
+                writeln!(result).unwrap();
+                debug_indent(result, *indent);
             }
-            debug_impl(value, result, indent);
-        }
-        if let Some(indent) = indent {
-            *indent -= 1;
-            writeln!(result).unwrap();
-            debug_indent(result, *indent);
+            for (index, value) in value.iter().enumerate() {
+                if index > 0 {
+                    write!(result, ", ").unwrap();
+                    if let Some(indent) = indent {
+                        writeln!(result).unwrap();
+                        debug_indent(result, *indent);
+                    }
+                }
+                debug_impl(value, result, indent);
+            }
+            if let Some(indent) = indent {
+                *indent -= 1;
+                writeln!(result).unwrap();
+                debug_indent(result, *indent);
+            }
         }
         write!(result, "]").unwrap();
     } else if let Some(value) = value.read::<Map>() {
         write!(result, "{{").unwrap();
-        if let Some(indent) = indent {
-            *indent += 1;
-            writeln!(result).unwrap();
-            debug_indent(result, *indent);
-        }
-        for (index, (key, value)) in value.iter().enumerate() {
-            if index > 0 {
-                write!(result, ", ").unwrap();
-                if let Some(indent) = indent {
-                    writeln!(result).unwrap();
-                    debug_indent(result, *indent);
-                }
+        if !value.is_empty() {
+            if let Some(indent) = indent {
+                *indent += 1;
+                writeln!(result).unwrap();
+                debug_indent(result, *indent);
             }
-            write!(result, "{}: ", key).unwrap();
-            debug_impl(value, result, indent);
-        }
-        if let Some(indent) = indent {
-            *indent -= 1;
-            writeln!(result).unwrap();
-            debug_indent(result, *indent);
+            for (index, (key, value)) in value.iter().enumerate() {
+                if index > 0 {
+                    write!(result, ", ").unwrap();
+                    if let Some(indent) = indent {
+                        writeln!(result).unwrap();
+                        debug_indent(result, *indent);
+                    }
+                }
+                write!(result, "{}: ", key).unwrap();
+                debug_impl(value, result, indent);
+            }
+            if let Some(indent) = indent {
+                *indent -= 1;
+                writeln!(result).unwrap();
+                debug_indent(result, *indent);
+            }
         }
         write!(result, "}}").unwrap();
     } else if let Some(value) = value.read::<Type>() {
@@ -107,33 +111,35 @@ fn debug_impl(value: &Reference, result: &mut dyn Write, indent: &mut Option<usi
             value.struct_handle().name
         )
         .unwrap();
-        if let Some(indent) = indent {
-            *indent += 1;
-            writeln!(result).unwrap();
-            debug_indent(result, *indent);
-        }
-        for (index, field) in value.struct_handle().fields().iter().enumerate() {
-            if let Some(value) = value.read_field::<Reference>(&field.name) {
-                if index > 0 {
-                    write!(result, ", ").unwrap();
-                    if let Some(indent) = indent {
-                        writeln!(result).unwrap();
-                        debug_indent(result, *indent);
-                    }
-                }
-                write!(result, "{}: ", field.name).unwrap();
-                debug_impl(value, result, indent);
-            } else {
-                if index > 0 {
-                    write!(result, ", ").unwrap();
-                }
-                write!(result, "<?>").unwrap();
+        if !value.struct_handle().fields().is_empty() {
+            if let Some(indent) = indent {
+                *indent += 1;
+                writeln!(result).unwrap();
+                debug_indent(result, *indent);
             }
-        }
-        if let Some(indent) = indent {
-            *indent -= 1;
-            writeln!(result).unwrap();
-            debug_indent(result, *indent);
+            for (index, field) in value.struct_handle().fields().iter().enumerate() {
+                if let Some(value) = value.read_field::<Reference>(&field.name) {
+                    if index > 0 {
+                        write!(result, ", ").unwrap();
+                        if let Some(indent) = indent {
+                            writeln!(result).unwrap();
+                            debug_indent(result, *indent);
+                        }
+                    }
+                    write!(result, "{}: ", field.name).unwrap();
+                    debug_impl(value, result, indent);
+                } else {
+                    if index > 0 {
+                        write!(result, ", ").unwrap();
+                    }
+                    write!(result, "<?>").unwrap();
+                }
+            }
+            if let Some(indent) = indent {
+                *indent -= 1;
+                writeln!(result).unwrap();
+                debug_indent(result, *indent);
+            }
         }
         write!(result, "}}").unwrap();
     } else {

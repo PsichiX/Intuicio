@@ -1,0 +1,114 @@
+mod story {
+    import "chapter";
+    import "character";
+
+    struct State {
+        chapter,
+        action,
+        wait,
+    }
+
+    struct Dialogue {
+        text,
+        character,
+    }
+
+    struct DialogueOption {
+        index,
+        text,
+        label,
+    }
+
+    struct Story {
+        chapters,
+        characters,
+        background_image,
+        dialogue,
+        state,
+    }
+
+    func new(data, engine) {
+        var chapters_iter = iter::build([
+            map::iter(data{"chapters"}),
+            [<func iter::map>, @[](pair) {
+                return map::Pair {
+                    key: pair.key,
+                    value: chapter::new(pair.value),
+                };
+            }],
+        ]);
+        var characters_iter = iter::build([
+            map::iter(data{"characters"}),
+            [<func iter::map>, @[engine](pair) {
+                return map::Pair {
+                    key: pair.key,
+                    value: character::new(pair.value, engine),
+                };
+            }],
+        ]);
+        return story::Story {
+            chapters: map::collect(chapters_iter),
+            characters: map::collect(characters_iter),
+        };
+    }
+
+    func run(story, chapter) {
+        story.state = story::State {
+            chapter,
+            action: 0,
+        };
+    }
+
+    func update(story, engine) {
+        if reflect::is_null(story.state) {
+            return null;
+        }
+        if reflect::is_valid(story.state.wait) {
+            return null;
+        }
+
+        var chapter = story.chapters{story.state.chapter};
+        if reflect::is_null(chapter) {
+            story.state = null;
+            return null;
+        }
+
+        if math::less_than(story.state.action, array::size(chapter.actions)) {
+            var action = chapter.actions[story.state.action];
+            story.state.wait = action::execute(action, story, engine);
+            story.state.action = math::add(story.state.action, 1);
+            if reflect::is_valid(story.state.wait) {
+                console::log_line(
+                    text::combine(
+                        "* Waiting: ",
+                        debug::debug(story.state.wait, true),
+                    ),
+                );
+            }
+        } else {
+            story.state = null;
+        }
+    }
+
+    func draw(story, engine) {
+        if reflect::is_valid(story.background_image) {
+            image::draw_screen(
+                engine,
+                story.background_image,
+                vec2::Vec2 { x: 0.5, y: 0.5 },
+                color::white()
+            );
+        }
+
+        for pair in map::iter(story.characters) {
+            if math::and(pair.value.show, reflect::is_valid(pair.value.variant)) {
+                image::draw_screen(
+                    engine,
+                    pair.value.variants{pair.value.variant},
+                    pair.value.position,
+                    color::white()
+                );
+            }
+        }
+    }
+}

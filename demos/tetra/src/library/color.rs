@@ -7,20 +7,20 @@ pub type TetraColor = tetra::graphics::Color;
 #[derive(IntuicioStruct, Default, Clone)]
 #[intuicio(name = "Color", module_name = "color")]
 pub struct Color {
-    r: Reference,
-    g: Reference,
-    b: Reference,
-    a: Reference,
+    pub r: Reference,
+    pub g: Reference,
+    pub b: Reference,
+    pub a: Reference,
 }
 
 #[intuicio_methods(module_name = "color")]
 impl Color {
     pub fn from_tetra(value: TetraColor, registry: &Registry) -> Self {
         Self {
-            r: Reference::new(value.r as Real, registry),
-            g: Reference::new(value.g as Real, registry),
-            b: Reference::new(value.b as Real, registry),
-            a: Reference::new(value.a as Real, registry),
+            r: Reference::new_real(value.r as Real, registry),
+            g: Reference::new_real(value.g as Real, registry),
+            b: Reference::new_real(value.b as Real, registry),
+            a: Reference::new_real(value.a as Real, registry),
         }
     }
 

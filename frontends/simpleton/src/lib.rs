@@ -131,6 +131,13 @@ impl Reference {
         self.data.is_none()
     }
 
+    pub fn is_being_written(&mut self) -> bool {
+        self.data
+            .as_mut()
+            .map(|data| data.write().is_none())
+            .unwrap_or_default()
+    }
+
     pub fn new_boolean(value: Boolean, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
@@ -454,6 +461,7 @@ impl SimpletonLiteral {
         result: &mut Vec<ScriptOperation<SimpletonScriptExpression>>,
         registers: &mut Vec<String>,
         closures: &mut Vec<SimpletonFunction>,
+        closures_index: &mut usize,
     ) -> SimpletonScriptLiteral {
         match self {
             Self::Null => SimpletonScriptLiteral::Null,
@@ -463,7 +471,7 @@ impl SimpletonLiteral {
             Self::Text(value) => SimpletonScriptLiteral::Text(value.to_owned()),
             Self::Array { items } => {
                 for item in items.iter().rev() {
-                    item.compile(result, registers, closures);
+                    item.compile(result, registers, closures, closures_index);
                 }
                 SimpletonScriptLiteral::Array {
                     items_count: items.len(),
@@ -471,7 +479,7 @@ impl SimpletonLiteral {
             }
             Self::Map { items } => {
                 for (key, value) in items.iter().rev() {
-                    value.compile(result, registers, closures);
+                    value.compile(result, registers, closures, closures_index);
                     result.push(ScriptOperation::Expression {
                         expression: SimpletonScriptExpression::Literal(
                             SimpletonScriptLiteral::Text(key.to_owned()),
@@ -488,7 +496,7 @@ impl SimpletonLiteral {
                 fields,
             } => {
                 for (key, value) in fields.iter().rev() {
-                    value.compile(result, registers, closures);
+                    value.compile(result, registers, closures, closures_index);
                     result.push(ScriptOperation::Expression {
                         expression: SimpletonScriptExpression::Literal(
                             SimpletonScriptLiteral::Text(key.to_owned()),
@@ -545,6 +553,7 @@ impl SimpletonExpressionStart {
         result: &mut Vec<ScriptOperation<SimpletonScriptExpression>>,
         registers: &mut Vec<String>,
         closures: &mut Vec<SimpletonFunction>,
+        closures_index: &mut usize,
     ) {
         match self {
             Self::FindStruct {
@@ -559,7 +568,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
             Self::FindFunction {
@@ -574,7 +583,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
             Self::Closure {
@@ -583,7 +592,8 @@ impl SimpletonExpressionStart {
                 statements,
                 next,
             } => {
-                let name = format!("_{}", closures.len());
+                let name = format!("_{}", *closures_index);
+                *closures_index += 1;
                 closures.push(SimpletonFunction {
                     name: name.to_owned(),
                     arguments: captures.iter().chain(arguments.iter()).cloned().collect(),
@@ -616,16 +626,16 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
             Self::Literal { literal, next } => {
-                let literal = literal.compile(result, registers, closures);
+                let literal = literal.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::Literal(literal),
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
             Self::GetVariable { name, next } => {
@@ -636,7 +646,7 @@ impl SimpletonExpressionStart {
                 });
                 result.push(ScriptOperation::PopToRegister { index });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
             Self::CallFunction {
@@ -646,7 +656,7 @@ impl SimpletonExpressionStart {
                 next,
             } => {
                 for argument in arguments.iter().rev() {
-                    argument.compile(result, registers, closures);
+                    argument.compile(result, registers, closures, closures_index);
                 }
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
@@ -656,7 +666,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
         }
@@ -667,6 +677,7 @@ impl SimpletonExpressionStart {
         result: &mut Vec<ScriptOperation<SimpletonScriptExpression>>,
         registers: &mut Vec<String>,
         closures: &mut Vec<SimpletonFunction>,
+        closures_index: &mut usize,
     ) {
         match self {
             Self::FindStruct {
@@ -681,7 +692,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 } else {
                     panic!("Trying to assign value to structure type!");
                 }
@@ -698,7 +709,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 } else {
                     panic!("Trying to assign value to function type!");
                 }
@@ -709,7 +720,8 @@ impl SimpletonExpressionStart {
                 statements,
                 next,
             } => {
-                let name = format!("_{}", closures.len());
+                let name = format!("_{}", *closures_index);
+                *closures_index += 1;
                 closures.push(SimpletonFunction {
                     name: name.to_owned(),
                     arguments: captures.iter().chain(arguments.iter()).cloned().collect(),
@@ -742,18 +754,18 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 } else {
                     panic!("Trying to assign value to closure!");
                 }
             }
             Self::Literal { literal, next } => {
-                let literal = literal.compile(result, registers, closures);
+                let literal = literal.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::Literal(literal),
                 });
                 if let Some(next) = next {
-                    next.compile_assign(result, registers, closures);
+                    next.compile_assign(result, registers, closures, closures_index);
                 } else {
                     panic!("Trying to assign value to literal!");
                 }
@@ -766,7 +778,7 @@ impl SimpletonExpressionStart {
                         expression: SimpletonScriptExpression::StackDuplicate,
                     });
                     result.push(ScriptOperation::PopToRegister { index });
-                    next.compile_assign(result, registers, closures);
+                    next.compile_assign(result, registers, closures, closures_index);
                 } else {
                     result.push(ScriptOperation::PopToRegister { index });
                 }
@@ -778,7 +790,7 @@ impl SimpletonExpressionStart {
                 next,
             } => {
                 for argument in arguments.iter().rev() {
-                    argument.compile(result, registers, closures);
+                    argument.compile(result, registers, closures, closures_index);
                 }
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
@@ -788,7 +800,7 @@ impl SimpletonExpressionStart {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile_assign(result, registers, closures);
+                    next.compile_assign(result, registers, closures, closures_index);
                 } else {
                     panic!("Trying to assign value to function call!");
                 }
@@ -819,6 +831,7 @@ impl SimpletonExpressionNext {
         result: &mut Vec<ScriptOperation<SimpletonScriptExpression>>,
         registers: &mut Vec<String>,
         closures: &mut Vec<SimpletonFunction>,
+        closures_index: &mut usize,
     ) {
         match self {
             Self::GetField { name, next } => {
@@ -828,11 +841,11 @@ impl SimpletonExpressionNext {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
             Self::GetArrayItem { index, next } => {
-                index.compile(result, registers, closures);
+                index.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackSwap,
                 });
@@ -844,11 +857,11 @@ impl SimpletonExpressionNext {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
             Self::GetMapItem { index, next } => {
-                index.compile(result, registers, closures);
+                index.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackSwap,
                 });
@@ -860,7 +873,7 @@ impl SimpletonExpressionNext {
                     },
                 });
                 if let Some(next) = next {
-                    next.compile(result, registers, closures);
+                    next.compile(result, registers, closures, closures_index);
                 }
             }
         }
@@ -871,11 +884,17 @@ impl SimpletonExpressionNext {
         result: &mut Vec<ScriptOperation<SimpletonScriptExpression>>,
         registers: &mut Vec<String>,
         closures: &mut Vec<SimpletonFunction>,
+        closures_index: &mut usize,
     ) {
         match self {
             Self::GetField { name, next } => {
                 if let Some(next) = next {
-                    next.compile_assign(result, registers, closures);
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::GetField {
+                            name: name.to_owned(),
+                        },
+                    });
+                    next.compile_assign(result, registers, closures, closures_index);
                 } else {
                     result.push(ScriptOperation::Expression {
                         expression: SimpletonScriptExpression::SetField {
@@ -886,9 +905,20 @@ impl SimpletonExpressionNext {
             }
             Self::GetArrayItem { index, next } => {
                 if let Some(next) = next {
-                    next.compile_assign(result, registers, closures);
+                    index.compile(result, registers, closures, closures_index);
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::StackSwap,
+                    });
+                    result.push(ScriptOperation::CallFunction {
+                        query: FunctionQuery {
+                            name: Some("get".into()),
+                            module_name: Some("array".into()),
+                            ..Default::default()
+                        },
+                    });
+                    next.compile_assign(result, registers, closures, closures_index);
                 } else {
-                    index.compile(result, registers, closures);
+                    index.compile(result, registers, closures, closures_index);
                     result.push(ScriptOperation::Expression {
                         expression: SimpletonScriptExpression::StackSwap,
                     });
@@ -903,9 +933,20 @@ impl SimpletonExpressionNext {
             }
             Self::GetMapItem { index, next } => {
                 if let Some(next) = next {
-                    next.compile_assign(result, registers, closures);
+                    index.compile(result, registers, closures, closures_index);
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::StackSwap,
+                    });
+                    result.push(ScriptOperation::CallFunction {
+                        query: FunctionQuery {
+                            name: Some("get".into()),
+                            module_name: Some("map".into()),
+                            ..Default::default()
+                        },
+                    });
+                    next.compile_assign(result, registers, closures, closures_index);
                 } else {
-                    index.compile(result, registers, closures);
+                    index.compile(result, registers, closures, closures_index);
                     result.push(ScriptOperation::Expression {
                         expression: SimpletonScriptExpression::StackSwap,
                     });
@@ -996,6 +1037,8 @@ impl SimpletonStatement {
         result: &mut Vec<ScriptOperation<SimpletonScriptExpression>>,
         registers: &mut Vec<String>,
         closures: &mut Vec<SimpletonFunction>,
+        closures_index: &mut usize,
+        subscope_level: usize,
     ) {
         match self {
             Self::CreateVariable { name, value } => {
@@ -1005,31 +1048,33 @@ impl SimpletonStatement {
                 result.push(ScriptOperation::DefineRegister {
                     query: StructQuery::of::<Reference>(),
                 });
-                value.compile(result, registers, closures);
+                value.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::PopToRegister {
                     index: registers.iter().position(|n| n == name).unwrap(),
                 });
             }
             Self::AssignValue { object, value } => {
-                value.compile(result, registers, closures);
-                object.compile_assign(result, registers, closures);
+                value.compile(result, registers, closures, closures_index);
+                object.compile_assign(result, registers, closures, closures_index);
             }
             Self::Expression(expression) => {
-                expression.compile(result, registers, closures);
+                expression.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackDrop,
                 });
             }
             Self::Return(expression) => {
-                expression.compile(result, registers, closures);
-                result.push(ScriptOperation::Expression {
-                    expression: SimpletonScriptExpression::Literal(
-                        SimpletonScriptLiteral::Boolean(false),
-                    ),
-                });
-                result.push(ScriptOperation::Expression {
-                    expression: SimpletonScriptExpression::StackUnwrapBoolean,
-                });
+                expression.compile(result, registers, closures, closures_index);
+                for _ in 0..(subscope_level + 1) {
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::Literal(
+                            SimpletonScriptLiteral::Boolean(false),
+                        ),
+                    });
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::StackUnwrapBoolean,
+                    });
+                }
                 result.push(ScriptOperation::ContinueScopeConditionally);
             }
             Self::IfElse {
@@ -1037,35 +1082,54 @@ impl SimpletonStatement {
                 success,
                 failure,
             } => {
-                condition.compile(result, registers, closures);
+                condition.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackUnwrapBoolean,
                 });
                 // success body
                 let mut success_operations = vec![];
                 for statement in success {
-                    statement.compile(&mut success_operations, registers, closures);
+                    statement.compile(
+                        &mut success_operations,
+                        registers,
+                        closures,
+                        closures_index,
+                        subscope_level + 1,
+                    );
                 }
                 success_operations.push(ScriptOperation::Expression {
-                    expression: SimpletonScriptExpression::Literal(SimpletonScriptLiteral::Null),
+                    expression: SimpletonScriptExpression::Literal(
+                        SimpletonScriptLiteral::Boolean(true),
+                    ),
+                });
+                success_operations.push(ScriptOperation::Expression {
+                    expression: SimpletonScriptExpression::StackUnwrapBoolean,
                 });
                 // failure body
                 let mut failure_operations = vec![];
                 if let Some(failure) = failure {
                     for statement in failure {
-                        statement.compile(&mut failure_operations, registers, closures);
+                        statement.compile(
+                            &mut failure_operations,
+                            registers,
+                            closures,
+                            closures_index,
+                            subscope_level + 1,
+                        );
                     }
                 }
                 failure_operations.push(ScriptOperation::Expression {
-                    expression: SimpletonScriptExpression::Literal(SimpletonScriptLiteral::Null),
+                    expression: SimpletonScriptExpression::Literal(
+                        SimpletonScriptLiteral::Boolean(true),
+                    ),
+                });
+                failure_operations.push(ScriptOperation::Expression {
+                    expression: SimpletonScriptExpression::StackUnwrapBoolean,
                 });
                 // main body
                 result.push(ScriptOperation::BranchScope {
                     scope_success: ScriptHandle::new(success_operations),
                     scope_failure: Some(ScriptHandle::new(failure_operations)),
-                });
-                result.push(ScriptOperation::Expression {
-                    expression: SimpletonScriptExpression::StackValueOr(true),
                 });
                 result.push(ScriptOperation::ContinueScopeConditionally);
             }
@@ -1081,14 +1145,14 @@ impl SimpletonStatement {
                     }) {
                         panic!("Cannot return values inside while loops!");
                     }
-                    statement.compile(&mut operations, registers, closures);
+                    statement.compile(&mut operations, registers, closures, closures_index, 0);
                 }
-                condition.compile(&mut operations, registers, closures);
+                condition.compile(&mut operations, registers, closures, closures_index);
                 operations.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackUnwrapBoolean,
                 });
                 // main body
-                condition.compile(result, registers, closures);
+                condition.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackUnwrapBoolean,
                 });
@@ -1120,7 +1184,7 @@ impl SimpletonStatement {
                     }) {
                         panic!("Cannot return values inside for loops!");
                     }
-                    statement.compile(&mut operations, registers, closures);
+                    statement.compile(&mut operations, registers, closures, closures_index, 0);
                 }
                 operations.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackDuplicate,
@@ -1136,7 +1200,7 @@ impl SimpletonStatement {
                     expression: SimpletonScriptExpression::StackValueOr(false),
                 });
                 // main body
-                iterator.compile(result, registers, closures);
+                iterator.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackDuplicate,
                 });
@@ -1173,6 +1237,7 @@ impl SimpletonFunction {
         &self,
         module_name: &str,
         closures: &mut Vec<SimpletonFunction>,
+        closures_index: &mut usize,
     ) -> ScriptFunction<'static, SimpletonScriptExpression> {
         let signature = ScriptFunctionSignature {
             name: self.name.to_owned(),
@@ -1206,7 +1271,7 @@ impl SimpletonFunction {
             });
         }
         for statement in &self.statements {
-            statement.compile(&mut operations, &mut registers, closures);
+            statement.compile(&mut operations, &mut registers, closures, closures_index, 0);
         }
         operations.push(ScriptOperation::Expression {
             expression: SimpletonScriptExpression::Literal(SimpletonScriptLiteral::Null),
@@ -1259,6 +1324,7 @@ impl SimpletonModule {
     pub fn compile(
         &self,
         closures: &mut Vec<SimpletonFunction>,
+        closures_index: &mut usize,
     ) -> ScriptModule<'static, SimpletonScriptExpression> {
         ScriptModule {
             name: self.name.to_owned(),
@@ -1270,7 +1336,7 @@ impl SimpletonModule {
             functions: self
                 .functions
                 .iter()
-                .map(|function| function.compile(&self.name, closures))
+                .map(|function| function.compile(&self.name, closures, closures_index))
                 .collect(),
         }
     }
@@ -1313,16 +1379,17 @@ impl SimpletonPackage {
 
     pub fn compile(&self) -> ScriptPackage<'static, SimpletonScriptExpression> {
         let mut closures = vec![];
+        let mut closures_index = 0;
         let mut modules: Vec<ScriptModule<SimpletonScriptExpression>> = self
             .modules
             .values()
-            .map(|module| module.compile(&mut closures))
+            .map(|module| module.compile(&mut closures, &mut closures_index))
             .collect();
         let mut closure_functions = vec![];
         loop {
             let mut result = vec![];
             for closure in &closures {
-                closure_functions.push(closure.compile(CLOSURES, &mut result));
+                closure_functions.push(closure.compile(CLOSURES, &mut result, &mut closures_index));
             }
             if result.is_empty() {
                 break;

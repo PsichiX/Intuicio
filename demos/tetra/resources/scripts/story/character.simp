@@ -1,0 +1,35 @@
+mod character {
+    struct Character {
+        name,
+        color,
+        variants,
+        show,
+        variant,
+        position,
+    }
+
+    func new(data, engine) {
+        var iter = iter::build([
+            map::iter(data{"variants"}),
+            [<func iter::map>, @[engine](pair) {
+                return map::Pair {
+                    key: pair.key,
+                    value: image::load(engine, pair.value),
+                };
+            }],
+        ]);
+        
+        var position = vec2::Vec2 { x: 0.5, y: 0.5 };
+        if reflect::is_valid(data{"position"}) {
+            reflect::pack(position, data{"position"});
+        }
+
+        return character::Character {
+            name: data{"name"},
+            color: color::hex(data{"color"}),
+            variants: map::collect(iter),
+            show: false,
+            position,
+        };
+    }
+}

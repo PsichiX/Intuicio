@@ -412,7 +412,7 @@ impl IterWalk {
 }
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "Enumeration", module_name = "iter_enumerate")]
+#[intuicio(name = "Enumeration", module_name = "iter")]
 pub struct Enumeration {
     pub index: Reference,
     pub value: Reference,
@@ -434,6 +434,9 @@ impl IterEnumerate {
     pub fn next(context: &mut Context, registry: &Registry, mut iterator: Reference) -> Reference {
         let mut iterator = iterator.write::<IterEnumerate>().unwrap();
         let value = next(context, registry, iterator.iterator.clone());
+        if value.is_null() {
+            return Reference::null();
+        }
         let index = iterator.index;
         iterator.index += 1;
         Reference::new(

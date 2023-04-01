@@ -1,0 +1,134 @@
+{
+    "characters": {
+        "rin": {
+            "name": "Rin",
+            "color": "#FFFF00",
+            "variants": {
+                "frown": "images/Rin_SummerUni_Frown.png",
+                "smile": "images/Rin_SummerUni_Smile.png",
+                "open-smile": "images/Rin_SummerUni_OpenSmile.png"
+            },
+            "position": {
+                "x": 0.25,
+                "y": -0.25
+            }
+        }
+    },
+    "chapters": {
+        "welcome": [
+            {
+                "type": "ChangeBackground",
+                "properties": {
+                    "asset": "images/Street_Summer_Day.png"
+                }
+            },
+            {
+                "type": "ShowMessage",
+                "properties": {
+                    "text": "Hello, Narrator here.\nPlease click on dialogue to progress."
+                }
+            },
+            {
+                "type": "ShowCharacter",
+                "properties": {
+                    "id": "rin",
+                    "variant": "smile"
+                }
+            },
+            {
+                "type": "ShowMessage",
+                "properties": {
+                    "character": "rin",
+                    "text": "Ohayo!"
+                }
+            },
+            {
+                "type": "ShowMessage",
+                "properties": {
+                    "character": "rin",
+                    "text": "How do you feel today?",
+                    "options": [
+                        {
+                            "text": "Pretty good!",
+                            "label": "good"
+                        },
+                        {
+                            "text": "Could be better.",
+                            "label": "bad"
+                        }
+                    ]
+                }
+            },
+            {
+                "type": "Label",
+                "properties": {
+                    "name": "good"
+                }
+            },
+            {
+                "type": "ShowCharacter",
+                "properties": {
+                    "id": "rin",
+                    "variant": "open-smile"
+                }
+            },
+            {
+                "type": "ShowMessage",
+                "properties": {
+                    "character": "rin",
+                    "text": "That's really awesome, me too!"
+                }
+            },
+            {
+                "type": "JumpToLabel",
+                "properties": {
+                    "name": "end"
+                }
+            },
+            {
+                "type": "Label",
+                "properties": {
+                    "name": "bad"
+                }
+            },
+            {
+                "type": "ShowCharacter",
+                "properties": {
+                    "id": "rin",
+                    "variant": "frown"
+                }
+            },
+            {
+                "type": "ShowMessage",
+                "properties": {
+                    "character": "rin",
+                    "text": "Oh, it's sad to hear that.."
+                }
+            },
+            {
+                "type": "Label",
+                "properties": {
+                    "name": "end"
+                }
+            },
+            {
+                "type": "HideCharacter",
+                "properties": {
+                    "id": "rin"
+                }
+            },
+            {
+                "type": "ShowMessage",
+                "properties": {
+                    "text": "That's all for now, let's try again!"
+                }
+            },
+            {
+                "type": "JumpToChapter",
+                "properties": {
+                    "name": "welcome"
+                }
+            }
+        ]
+    }
+}

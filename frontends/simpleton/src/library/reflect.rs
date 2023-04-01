@@ -192,6 +192,11 @@ pub fn is_valid(registry: &Registry, value: Reference) -> Reference {
 }
 
 #[intuicio_function(module_name = "reflect", use_registry)]
+pub fn is_being_written(registry: &Registry, mut value: Reference) -> Reference {
+    Reference::new_boolean(value.is_being_written(), registry)
+}
+
+#[intuicio_function(module_name = "reflect", use_registry)]
 pub fn references_count(registry: &Registry, value: Reference) -> Reference {
     Reference::new_integer(value.references_count() as Integer - 1, registry)
 }
@@ -398,6 +403,21 @@ pub fn to_text(registry: &Registry, value: Reference) -> Reference {
     Reference::null()
 }
 
+#[intuicio_function(module_name = "reflect", use_context, use_registry)]
+pub fn stack_size(context: &mut Context, registry: &Registry) -> Reference {
+    Reference::new_integer(context.stack().position() as Integer, registry)
+}
+
+#[intuicio_function(module_name = "reflect", use_context, use_registry)]
+pub fn registers_size(context: &mut Context, registry: &Registry) -> Reference {
+    Reference::new_integer(context.registers().position() as Integer, registry)
+}
+
+#[intuicio_function(module_name = "reflect", use_context, use_registry)]
+pub fn heap_size(context: &mut Context, registry: &Registry) -> Reference {
+    Reference::new_integer(context.heap().size() as Integer, registry)
+}
+
 pub fn install(registry: &mut Registry) {
     registry.add_struct(define_native_struct! {
         registry => mod reflect struct Reference (Reference) {}
@@ -424,6 +444,7 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(function_arguments::define_function(registry));
     registry.add_function(is_null::define_function(registry));
     registry.add_function(is_valid::define_function(registry));
+    registry.add_function(is_being_written::define_function(registry));
     registry.add_function(references_count::define_function(registry));
     registry.add_function(does_share_reference::define_function(registry));
     registry.add_function(are_same::define_function(registry));
@@ -431,4 +452,7 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(to_integer::define_function(registry));
     registry.add_function(to_real::define_function(registry));
     registry.add_function(to_text::define_function(registry));
+    registry.add_function(stack_size::define_function(registry));
+    registry.add_function(registers_size::define_function(registry));
+    registry.add_function(heap_size::define_function(registry));
 }

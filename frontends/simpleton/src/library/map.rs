@@ -189,7 +189,7 @@ pub fn collect(context: &mut Context, registry: &Registry, iterator: Reference) 
 }
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "Pair", module_name = "map_iter")]
+#[intuicio(name = "Pair", module_name = "map")]
 pub struct Pair {
     pub key: Reference,
     pub value: Reference,

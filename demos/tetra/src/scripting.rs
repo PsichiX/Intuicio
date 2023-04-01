@@ -1,4 +1,4 @@
-use crate::library::renderer::Renderer;
+use crate::library::engine::Engine;
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_data::prelude::*;
@@ -37,11 +37,12 @@ impl Scripting {
             .unwrap()
             .compile()
             .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
-        let renderer = Reference::new(Renderer::new(assets, tetra_context), &registry);
+        let engine = Reference::new(Engine::new(assets, tetra_context), &registry);
         let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);
         let state = Reference::new_map(
             map! {
-                renderer: renderer,
+                engine: engine,
+                assets: Reference::new_text(assets.to_owned(), &registry),
             },
             &registry,
         );

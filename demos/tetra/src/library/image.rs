@@ -1,4 +1,4 @@
-use super::{color::Color, renderer::Renderer, vec2::Vec2};
+use super::{color::Color, engine::Engine, vec2::Vec2};
 use intuicio_core::prelude::*;
 use intuicio_derive::*;
 use intuicio_frontend_simpleton::*;
@@ -11,17 +11,17 @@ use tetra::{
 #[intuicio(name = "Image", module_name = "image")]
 pub struct Image {
     #[intuicio(ignore)]
-    texture: Option<Texture>,
+    pub(crate) texture: Option<Texture>,
 }
 
 #[intuicio_methods(module_name = "image")]
 impl Image {
     #[intuicio_method(use_registry)]
-    pub fn load(registry: &Registry, mut renderer: Reference, path: Reference) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+    pub fn load(registry: &Registry, mut engine: Reference, path: Reference) -> Reference {
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let path = path.read::<Text>().unwrap();
-        let path = format!("{}/{}", renderer.assets, path.as_str());
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let path = format!("{}/{}", engine.assets, path.as_str());
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let result = Self {
             texture: Some(Texture::new(&mut ctx, path.as_str()).unwrap()),
@@ -31,16 +31,16 @@ impl Image {
 
     #[intuicio_method()]
     pub fn draw(
-        mut renderer: Reference,
+        mut engine: Reference,
         image: Reference,
         position: Reference,
         color: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let image = image.read::<Image>().unwrap();
         let position = position.read::<Vec2>().unwrap().into_tetra();
         let color = color.read::<Color>().unwrap().into_tetra();
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         image.texture.as_ref().unwrap().draw(
             &mut ctx,
@@ -55,7 +55,7 @@ impl Image {
 
     #[intuicio_method()]
     pub fn draw_advanced(
-        mut renderer: Reference,
+        mut engine: Reference,
         image: Reference,
         position: Reference,
         scale: Reference,
@@ -63,14 +63,14 @@ impl Image {
         rotation: Reference,
         color: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let image = image.read::<Image>().unwrap();
         let position = position.read::<Vec2>().unwrap().into_tetra();
         let scale = scale.read::<Vec2>().unwrap().into_tetra();
         let origin = origin.read::<Vec2>().unwrap().into_tetra();
         let rotation = *rotation.read::<Real>().unwrap() as f32;
         let color = color.read::<Color>().unwrap().into_tetra();
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         image.texture.as_ref().unwrap().draw(
             &mut ctx,
@@ -87,16 +87,16 @@ impl Image {
 
     #[intuicio_method()]
     pub fn draw_screen(
-        mut renderer: Reference,
+        mut engine: Reference,
         image: Reference,
         factor: Reference,
         color: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let image = image.read::<Image>().unwrap();
         let factor = factor.read::<Vec2>().unwrap().into_tetra();
         let color = color.read::<Color>().unwrap().into_tetra();
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let screen_width = window::get_width(&ctx) as f32;
         let screen_height = window::get_height(&ctx) as f32;
@@ -119,7 +119,7 @@ impl Image {
 
     #[intuicio_method()]
     pub fn draw_screen_advanced(
-        mut renderer: Reference,
+        mut engine: Reference,
         image: Reference,
         factor: Reference,
         scale: Reference,
@@ -127,14 +127,14 @@ impl Image {
         rotation: Reference,
         color: Reference,
     ) -> Reference {
-        let renderer = &mut *renderer.write::<Renderer>().unwrap();
+        let engine = &mut *engine.write::<Engine>().unwrap();
         let image = image.read::<Image>().unwrap();
         let factor = factor.read::<Vec2>().unwrap().into_tetra();
         let scale = scale.read::<Vec2>().unwrap().into_tetra();
         let origin = origin.read::<Vec2>().unwrap().into_tetra();
         let rotation = *rotation.read::<Real>().unwrap() as f32;
         let color = color.read::<Color>().unwrap().into_tetra();
-        let ctx = renderer.tetra_context.as_mut().unwrap();
+        let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let screen_width = window::get_width(&ctx) as f32;
         let screen_height = window::get_height(&ctx) as f32;

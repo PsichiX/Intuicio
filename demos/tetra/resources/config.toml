@@ -2,6 +2,9 @@ assets = "resources"
 
 [scripting]
 entry = "scripts/game.simp"
+stack_capacity = 10240
+registers_capacity = 10240
+heap_page_capacity = 10240
 
 [game]
 title = "Tetra with Intuicio integration"

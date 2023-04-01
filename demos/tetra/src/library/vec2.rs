@@ -7,16 +7,16 @@ pub type TetraVec2 = tetra::math::Vec2<f32>;
 #[derive(Default, IntuicioStruct, Clone)]
 #[intuicio(name = "Vec2", module_name = "vec2")]
 pub struct Vec2 {
-    x: Reference,
-    y: Reference,
+    pub x: Reference,
+    pub y: Reference,
 }
 
 #[intuicio_methods(module_name = "vec2")]
 impl Vec2 {
     pub fn from_tetra(value: TetraVec2, registry: &Registry) -> Self {
         Self {
-            x: Reference::new(value.x as Real, registry),
-            y: Reference::new(value.y as Real, registry),
+            x: Reference::new_real(value.x as Real, registry),
+            y: Reference::new_real(value.y as Real, registry),
         }
     }
 
