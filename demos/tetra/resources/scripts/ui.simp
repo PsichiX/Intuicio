@@ -39,15 +39,15 @@ mod ui {
     }
 
     func options(ui, story, engine, gui) {
-        gui::margin(gui, 128.0, 128.0, 32.0, 232.0, @[ui, story, engine](gui) {
+        gui::margin(gui, 128.0, 128.0, 32.0, 32.0, @[ui, story, engine](gui) {
             gui::vertical_list(
                 gui,
                 story.state.wait.options,
                 64.0,
                 6.0,
                 0.0,
-                @[ui, story, engine](gui, text) {
-                    ui::option(ui, text, story, engine, gui);
+                @[ui, story, engine](gui, option) {
+                    ui::option(ui, option, story, engine, gui);
                 },
             );
         });
