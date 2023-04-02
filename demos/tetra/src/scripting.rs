@@ -26,9 +26,6 @@ impl Scripting {
         entry: &str,
         tetra_context: &mut TetraContext,
     ) -> Self {
-        let context_lifetime = Lifetime::default();
-        let tetra_context =
-            ManagedRefMut::new(tetra_context, context_lifetime.borrow_mut().unwrap());
         let mut registry = Registry::default();
         intuicio_frontend_simpleton::library::install(&mut registry);
         crate::library::install(&mut registry);
@@ -38,6 +35,9 @@ impl Scripting {
             .unwrap()
             .compile()
             .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
+        let context_lifetime = Lifetime::default();
+        let tetra_context =
+            ManagedRefMut::new(tetra_context, context_lifetime.borrow_mut().unwrap());
         let engine = Reference::new(Engine::new(assets, tetra_context), &registry);
         let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);
         let state = Reference::new_map(

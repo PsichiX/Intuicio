@@ -32,7 +32,7 @@ impl Registry {
             .with_struct(NativeStructBuilder::new::<f32>().build())
             .with_struct(NativeStructBuilder::new::<f64>().build())
             .with_struct(NativeStructBuilder::new::<char>().build())
-            .with_struct(NativeStructBuilder::new::<String>().build())
+            .with_struct(NativeStructBuilder::new_named::<String>("String").build())
     }
 
     pub fn with_function(mut self, function: Function) -> Self {

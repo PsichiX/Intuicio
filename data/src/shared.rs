@@ -27,11 +27,11 @@ impl<T> Shared<T> {
         self.data.try_borrow().ok()
     }
 
-    pub fn write(&mut self) -> Option<RefMut<T>> {
+    pub fn write(&self) -> Option<RefMut<T>> {
         self.data.try_borrow_mut().ok()
     }
 
-    pub fn swap(&mut self, data: T) -> Option<T> {
+    pub fn swap(&self, data: T) -> Option<T> {
         let mut value = self.data.try_borrow_mut().ok()?;
         Some(std::mem::replace(&mut value, data))
     }
@@ -54,7 +54,7 @@ mod tests {
         let a = Shared::new(42);
         assert_eq!(a.references_count(), 1);
         assert_eq!(*a.read().unwrap(), 42);
-        let mut b = a.clone();
+        let b = a.clone();
         assert_eq!(a.references_count(), 2);
         assert_eq!(b.references_count(), 2);
         assert_eq!(*b.read().unwrap(), 42);

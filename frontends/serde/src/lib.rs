@@ -332,7 +332,7 @@ pub struct SerdeFile {
     pub modules: Vec<SerdeModule>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct SerdePackage {
     pub files: HashMap<String, SerdeFile>,
 }

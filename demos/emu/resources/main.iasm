@@ -1,0 +1,9 @@
+mod main {
+    public fn bootload() -> () {
+        // TODO
+    }
+
+    public fn tick() -> () {
+        // TODO
+    }
+}

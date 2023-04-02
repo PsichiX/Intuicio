@@ -4,7 +4,7 @@ use intuicio_runner_simpleton::*;
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Entry scipt file path.
+    /// Entry script file path.
     #[arg(value_name = "PATH")]
     entry: String,
 

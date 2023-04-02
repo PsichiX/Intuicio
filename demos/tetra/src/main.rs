@@ -2,10 +2,9 @@ mod config;
 mod library;
 mod scripting;
 
-use std::path::Path;
-
 use crate::scripting::Scripting;
 use config::Config;
+use std::path::Path;
 use tetra::{
     graphics::{self, Color},
     Context, ContextBuilder, State,

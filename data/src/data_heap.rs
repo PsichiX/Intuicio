@@ -397,6 +397,7 @@ impl DataHeapMemoryPage {
 pub struct DataHeap {
     pages: Vec<Rc<RefCell<DataHeapMemoryPage>>>,
     page_capacity: usize,
+    pub pages_count_limit: Option<usize>,
     position: usize,
 }
 
@@ -405,6 +406,7 @@ impl DataHeap {
         Self {
             pages: Vec::with_capacity(1),
             page_capacity: page_capacity.max(MINIMUM_SIZE).next_power_of_two(),
+            pages_count_limit: None,
             position: 0,
         }
     }
@@ -474,6 +476,11 @@ impl DataHeap {
             }
             self.position += 1;
             accumulator += 1;
+        }
+        if let Some(pages_count_limit) = self.pages_count_limit {
+            if self.pages.len() >= pages_count_limit {
+                return None;
+            }
         }
         let capacity = self.page_capacity.max(layout.size());
         let page = Rc::new(RefCell::new(DataHeapMemoryPage::new(capacity)));
