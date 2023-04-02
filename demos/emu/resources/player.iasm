@@ -1,0 +1,89 @@
+mod player {
+    public fn create() -> () {
+        literal 1 i16;
+        literal 0 i16;
+        call fn object_set_sprite;
+        
+        literal 2 i16;
+        literal 768 i16;
+        call struct i16 fn div;
+        literal 2 i16;
+        literal 1024 i16;
+        call struct i16 fn div;
+        literal 0 i16;
+        call fn object_set_position;
+
+        literal 0 i16;
+        call fn object_show;
+    }
+
+    public fn move() -> () {
+        call fn input_flags;
+        literal 0b00000001 i8;
+        call struct i8 fn and;
+        literal 0 i8;
+        call struct i8 fn neq;
+        if {
+            literal 0 i16;
+            call fn object_position;
+            call struct i16 fn swap;
+            literal -10 i16;
+            call struct i16 fn add;
+            call struct i16 fn swap;
+            literal 0 i16;
+            call fn object_set_position;
+        }
+
+        call fn input_flags;
+        literal 0b00000010 i8;
+        call struct i8 fn and;
+        literal 0 i8;
+        call struct i8 fn neq;
+        if {
+            literal 0 i16;
+            call fn object_position;
+            call struct i16 fn swap;
+            literal 10 i16;
+            call struct i16 fn add;
+            call struct i16 fn swap;
+            literal 0 i16;
+            call fn object_set_position;
+        }
+
+        call fn input_flags;
+        literal 0b00000100 i8;
+        call struct i8 fn and;
+        literal 0 i8;
+        call struct i8 fn neq;
+        if {
+            literal 0 i16;
+            call fn object_position;
+            literal -10 i16;
+            call struct i16 fn add;
+            literal 0 i16;
+            call fn object_set_position;
+            literal 1 i16;
+            literal -1 i16;
+            literal 0 i16;
+            call fn object_set_scale;
+        }
+
+        call fn input_flags;
+        literal 0b00001000 i8;
+        call struct i8 fn and;
+        literal 0 i8;
+        call struct i8 fn neq;
+        if {
+            literal 0 i16;
+            call fn object_position;
+            literal 10 i16;
+            call struct i16 fn add;
+            literal 0 i16;
+            call fn object_set_position;
+            literal 1 i16;
+            literal 1 i16;
+            literal 0 i16;
+            call fn object_set_scale;
+        }
+    }
+}

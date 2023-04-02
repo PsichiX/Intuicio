@@ -22,4 +22,5 @@ tetra = { version = "0.7", features = ["sdl2_bundled"] }
 pot = "1"
 toml = "0.7"
 serde = "1"
+rand = "0.8"
 clap = { version = "4", features = ["derive"] }

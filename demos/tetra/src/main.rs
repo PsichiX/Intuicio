@@ -7,6 +7,7 @@ use config::Config;
 use std::path::Path;
 use tetra::{
     graphics::{self, Color},
+    time::Timestep,
     Context, ContextBuilder, State,
 };
 
@@ -42,6 +43,7 @@ fn main() -> tetra::Result {
     .fullscreen(config.game.fullscreen)
     .show_mouse(true)
     .quit_on_escape(true)
+    .timestep(Timestep::Fixed(30.0))
     .build()?
     .run(|ctx| {
         let mut scripting = Scripting::new(

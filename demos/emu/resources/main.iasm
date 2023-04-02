@@ -1,9 +1,13 @@
+import "player.iasm";
+import "map.iasm";
+
 mod main {
     public fn bootload() -> () {
-        // TODO
+        call mod map fn create;
+        call mod player fn create;
     }
 
     public fn tick() -> () {
-        // TODO
+        call mod player fn move;
     }
 }

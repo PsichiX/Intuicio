@@ -1,2 +1,15 @@
 title = "Fantasy Console"
-assembly_entry = "./main.iasm"
+assembly_entry = "main.iasm"
+objects = 1
+
+[[sprites]]
+file = "player.png"
+width = 64
+height = 64
+
+[[tilesets]]
+file = "tileset.png"
+cell_width = 64
+cell_height = 64
+cols = 2
+rows = 1

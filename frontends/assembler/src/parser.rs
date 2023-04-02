@@ -247,6 +247,18 @@ fn parse_make_register(pair: Pair<Rule>) -> AsmOperation {
     AsmOperation::MakeRegister { name, module_name }
 }
 
+macro_rules! parse_literal {
+    ($type:ty, $pair:expr) => {{
+        let pair = $pair.into_inner().next().unwrap();
+        match pair.as_rule() {
+            Rule::integer | Rule::index => <$type>::from_str(pair.as_str()).unwrap(),
+            Rule::hex_inner => <$type>::from_str_radix(pair.as_str(), 16).unwrap(),
+            Rule::binary_inner => <$type>::from_str_radix(pair.as_str(), 2).unwrap(),
+            rule => unreachable!("{:?}", rule),
+        }
+    }};
+}
+
 fn parse_push_literal(pair: Pair<Rule>) -> AsmOperation {
     let pair = pair
         .into_inner()
@@ -264,53 +276,41 @@ fn parse_push_literal(pair: Pair<Rule>) -> AsmOperation {
             AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::Bool(true)))
         }
         Rule::literal_i8 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::I8(
-            parse_literal::<i8>(pair),
+            parse_literal!(i8, pair),
         ))),
         Rule::literal_i16 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::I16(
-            parse_literal::<i16>(pair),
+            parse_literal!(i16, pair),
         ))),
         Rule::literal_i32 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::I32(
-            parse_literal::<i32>(pair),
+            parse_literal!(i32, pair),
         ))),
         Rule::literal_i64 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::I64(
-            parse_literal::<i64>(pair),
+            parse_literal!(i64, pair),
         ))),
-        Rule::literal_i128 => {
-            AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::I128(parse_literal::<
-                i128,
-            >(pair))))
-        }
-        Rule::literal_isize => {
-            AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::Isize(parse_literal::<
-                isize,
-            >(
-                pair
-            ))))
-        }
+        Rule::literal_i128 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::I128(
+            parse_literal!(i128, pair),
+        ))),
+        Rule::literal_isize => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::Isize(
+            parse_literal!(isize, pair),
+        ))),
         Rule::literal_u8 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::U8(
-            parse_literal::<u8>(pair),
+            parse_literal!(u8, pair),
         ))),
         Rule::literal_u16 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::U16(
-            parse_literal::<u16>(pair),
+            parse_literal!(u16, pair),
         ))),
         Rule::literal_u32 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::U32(
-            parse_literal::<u32>(pair),
+            parse_literal!(u32, pair),
         ))),
         Rule::literal_u64 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::U64(
-            parse_literal::<u64>(pair),
+            parse_literal!(u64, pair),
         ))),
-        Rule::literal_u128 => {
-            AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::U128(parse_literal::<
-                u128,
-            >(pair))))
-        }
-        Rule::literal_usize => {
-            AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::Usize(parse_literal::<
-                usize,
-            >(
-                pair
-            ))))
-        }
+        Rule::literal_u128 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::U128(
+            parse_literal!(u128, pair),
+        ))),
+        Rule::literal_usize => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::Usize(
+            parse_literal!(usize, pair),
+        ))),
         Rule::literal_f32 => AsmOperation::Expression(AsmExpression::Literal(AsmLiteral::F32(
             parse_literal::<f32>(pair),
         ))),

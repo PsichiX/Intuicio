@@ -1,0 +1,38 @@
+mod map {
+    public fn create() -> () {
+        literal 12 i16;
+        literal 16 i16;
+        literal 0 i16;
+        call fn tilemap_create;
+
+        literal 2 i16;
+        call fn tilemap_fill_tile;
+
+        literal 1 i16;
+        literal 10 i16;
+        literal 12 i16;
+        literal 1 i16;
+        literal 2 i16;
+        call fn tilemap_region_tile;
+
+        literal 2 i16;
+        literal 1 i16;
+        literal 2 i16;
+        call fn tilemap_set_tile;
+
+        literal 2 i16;
+        literal 1 i16;
+        literal 13 i16;
+        call fn tilemap_set_tile;
+
+        literal 2 i16;
+        literal 10 i16;
+        literal 13 i16;
+        call fn tilemap_set_tile;
+
+        literal 2 i16;
+        literal 10 i16;
+        literal 2 i16;
+        call fn tilemap_set_tile;
+    }
+}

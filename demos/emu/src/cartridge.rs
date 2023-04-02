@@ -38,6 +38,17 @@ pub struct Cartridge {
     pub tilesets: Vec<CartridgeTileset>,
 }
 
+#[allow(dead_code)]
+impl Cartridge {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        pot::from_slice(bytes)
+    }
+
+    pub fn into_bytes(&self) -> Result<Vec<u8>> {
+        pot::to_vec(self)
+    }
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CartridgeSprite {
     pub width: usize,
@@ -52,15 +63,4 @@ pub struct CartridgeTileset {
     pub cols: usize,
     pub rows: usize,
     pub bytes: Vec<u8>,
-}
-
-#[allow(dead_code)]
-impl Cartridge {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        pot::from_slice(bytes)
-    }
-
-    pub fn into_bytes(&self) -> Result<Vec<u8>> {
-        pot::to_vec(self)
-    }
 }

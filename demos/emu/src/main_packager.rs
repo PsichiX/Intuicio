@@ -7,6 +7,8 @@ use intuicio_frontend_assembler::{AsmContentParser, AsmPackage};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+const MAX_SIZE: usize = 1024 * 1024;
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Manifest {
     pub title: String,
@@ -61,6 +63,9 @@ fn main() {
         )
         .expect("Could not compile assembly!"),
     );
+    if manifest.objects > 256 {
+        panic!("Objects count is greater than 256!");
+    }
     let result = Cartridge {
         title: manifest.title,
         assembly,
@@ -69,25 +74,59 @@ fn main() {
         sprites: manifest
             .sprites
             .into_iter()
-            .map(|config| CartridgeSprite {
-                width: config.width,
-                height: config.height,
-                bytes: std::fs::read(config.file).expect("Could not read sprite file!"),
+            .map(|config| {
+                if config.width != config.width.next_power_of_two() {
+                    panic!("Sprite width is not power of two!");
+                }
+                if config.height != config.height.next_power_of_two() {
+                    panic!("Sprite height is not power of two!");
+                }
+                if config.width > 1024 {
+                    panic!("Sprite width is greater than 1024!");
+                }
+                if config.height > 1024 {
+                    panic!("Sprite height is greater than 1024!");
+                }
+                CartridgeSprite {
+                    width: config.width,
+                    height: config.height,
+                    bytes: std::fs::read(config.file).expect("Could not read sprite file!"),
+                }
             })
             .collect(),
         tilesets: manifest
             .tilesets
             .into_iter()
-            .map(|config| CartridgeTileset {
-                cell_width: config.cell_width,
-                cell_height: config.cell_height,
-                cols: config.cols,
-                rows: config.rows,
-                bytes: std::fs::read(config.file).expect("Could not read tileset file!"),
+            .map(|config| {
+                if config.cell_width != config.cell_width.next_power_of_two() {
+                    panic!("Tileset cell width is not power of two!");
+                }
+                if config.cell_height != config.cell_height.next_power_of_two() {
+                    panic!("Tileset cell height is not power of two!");
+                }
+                if config.cols * config.cell_width > 1024 {
+                    panic!("Tileset width is greater than 1024!");
+                }
+                if config.rows * config.cell_height > 1024 {
+                    panic!("Tileset height is greater than 1024!");
+                }
+                CartridgeTileset {
+                    cell_width: config.cell_width,
+                    cell_height: config.cell_height,
+                    cols: config.cols,
+                    rows: config.rows,
+                    bytes: std::fs::read(config.file).expect("Could not read tileset file!"),
+                }
             })
             .collect(),
     }
     .into_bytes()
     .expect("Could not package cartridge!");
+    if result.len() > MAX_SIZE {
+        panic!(
+            "Cartridge binary size is greater than 1 megabyte ({} bytes)!",
+            MAX_SIZE
+        );
+    }
     std::fs::write(cli.output, result).expect("Could not write cartridge to file!");
 }

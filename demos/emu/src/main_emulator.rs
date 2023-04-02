@@ -11,10 +11,12 @@ use std::path::PathBuf;
 use tetra::{
     graphics::{
         self,
-        mesh::{IndexBuffer, Mesh, Vertex, VertexBuffer},
-        Color, DrawParams, ImageData, Texture, TextureFormat,
+        mesh::{IndexBuffer, Mesh, Vertex, VertexBuffer, VertexWinding},
+        Color, DrawParams, Texture,
     },
+    input::{self, Key},
     math::Vec2,
+    time::Timestep,
     Context as TetraContext, ContextBuilder, State,
 };
 
@@ -40,14 +42,11 @@ impl Tilemap {
         let tileset = &tilesets[self.tileset];
         let tile_width = tileset.cell_width as f32;
         let tile_height = tileset.cell_height as f32;
-        let uv_width = 1.0 / (tileset.cols * tileset.cell_width) as f32;
-        let uv_height = 1.0 / (tileset.rows * tileset.cell_height) as f32;
         for (map_index, tile_index) in self
             .tiles
             .iter()
             .copied()
-            .filter_map(|tile_index| tile_index.checked_sub(1))
-            .map(|tile_index| tile_index as usize)
+            .filter_map(|tile_index| (tile_index as usize).checked_sub(1))
             .enumerate()
         {
             let x = (map_index % self.cols) * tileset.cell_width;
@@ -61,8 +60,8 @@ impl Tilemap {
                     y: y as f32,
                 },
                 uv: Vec2 {
-                    x: col as f32 * uv_width,
-                    y: row as f32 * uv_height,
+                    x: col as f32 / tileset.cols as f32,
+                    y: row as f32 / tileset.rows as f32,
                 },
                 color: Color::WHITE,
             });
@@ -72,8 +71,8 @@ impl Tilemap {
                     y: y as f32,
                 },
                 uv: Vec2 {
-                    x: (col + 1) as f32 * uv_width,
-                    y: row as f32 * uv_height,
+                    x: (col + 1) as f32 / tileset.cols as f32,
+                    y: row as f32 / tileset.rows as f32,
                 },
                 color: Color::WHITE,
             });
@@ -83,8 +82,8 @@ impl Tilemap {
                     y: y as f32 + tile_height,
                 },
                 uv: Vec2 {
-                    x: (col + 1) as f32 * uv_width,
-                    y: (row + 1) as f32 * uv_height,
+                    x: (col + 1) as f32 / tileset.cols as f32,
+                    y: (row + 1) as f32 / tileset.rows as f32,
                 },
                 color: Color::WHITE,
             });
@@ -94,8 +93,8 @@ impl Tilemap {
                     y: y as f32 + tile_height,
                 },
                 uv: Vec2 {
-                    x: col as f32 * uv_width,
-                    y: (row + 1) as f32 * uv_height,
+                    x: col as f32 / tileset.cols as f32,
+                    y: (row + 1) as f32 / tileset.rows as f32,
                 },
                 color: Color::WHITE,
             });
@@ -111,16 +110,32 @@ impl Tilemap {
             IndexBuffer::new(ctx, &indices).expect("Could not create index buffer!"),
         );
         result.set_texture(tileset.texture.clone());
+        result.set_front_face_winding(VertexWinding::Clockwise);
         result
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 struct Object {
     visible: bool,
     x: i16,
     y: i16,
+    scale_x: i16,
+    scale_y: i16,
     sprite: usize,
+}
+
+impl Default for Object {
+    fn default() -> Self {
+        Self {
+            visible: false,
+            x: 0,
+            y: 0,
+            scale_x: 1,
+            scale_y: 1,
+            sprite: 0,
+        }
+    }
 }
 
 pub struct Memory {
@@ -128,6 +143,8 @@ pub struct Memory {
     tilesets: Vec<Tileset>,
     objects: Vec<Object>,
     tilemap: Option<Tilemap>,
+    input_flags: i8,
+    camera_offset: (i16, i16),
 }
 
 struct GameState {
@@ -137,7 +154,28 @@ struct GameState {
 }
 
 impl State for GameState {
-    fn update(&mut self, _: &mut TetraContext) -> tetra::Result {
+    fn update(&mut self, ctx: &mut TetraContext) -> tetra::Result {
+        if let Some(mut memory) = self.memory.write() {
+            memory.input_flags = 0;
+            if input::is_key_down(ctx, Key::W) || input::is_key_down(ctx, Key::Up) {
+                memory.input_flags |= 1 << 0;
+            }
+            if input::is_key_down(ctx, Key::S) || input::is_key_down(ctx, Key::Down) {
+                memory.input_flags |= 1 << 1;
+            }
+            if input::is_key_down(ctx, Key::A) || input::is_key_down(ctx, Key::Left) {
+                memory.input_flags |= 1 << 2;
+            }
+            if input::is_key_down(ctx, Key::D) || input::is_key_down(ctx, Key::Right) {
+                memory.input_flags |= 1 << 3;
+            }
+            if input::is_key_down(ctx, Key::Space) || input::is_key_down(ctx, Key::Enter) {
+                memory.input_flags |= 1 << 4;
+            }
+            if input::is_key_down(ctx, Key::LeftShift) || input::is_key_down(ctx, Key::Backspace) {
+                memory.input_flags |= 1 << 5;
+            }
+        }
         if let Some(call) = self
             .host
             .call_function::<(), ()>("tick", &self.module_name, None)
@@ -158,12 +196,20 @@ impl State for GameState {
             if let Some(mesh) = mesh {
                 memory.tilemap.as_mut().unwrap().mesh = Some(mesh);
             }
+            let camera_offset =
+                Vec2::new(memory.camera_offset.0 as f32, memory.camera_offset.1 as f32);
             if let Some(mesh) = memory
                 .tilemap
                 .as_ref()
                 .and_then(|tilemap| tilemap.mesh.as_ref())
             {
-                mesh.draw(ctx, DrawParams::default())
+                mesh.draw(
+                    ctx,
+                    DrawParams {
+                        position: -camera_offset,
+                        ..Default::default()
+                    },
+                )
             }
             for object in memory.objects.iter().filter(|object| object.visible) {
                 if let Some(texture) = object
@@ -174,7 +220,12 @@ impl State for GameState {
                     texture.draw(
                         ctx,
                         DrawParams {
-                            position: Vec2::new(object.x as _, object.y as _),
+                            position: Vec2::new(object.x as _, object.y as _) - camera_offset,
+                            scale: Vec2::new(object.scale_x as _, object.scale_y as _),
+                            origin: Vec2::new(
+                                (texture.width() / 2) as f32,
+                                (texture.height() / 2) as f32,
+                            ),
                             ..Default::default()
                         },
                     )
@@ -201,6 +252,7 @@ fn main() -> tetra::Result {
         .fullscreen(false)
         .show_mouse(false)
         .quit_on_escape(true)
+        .timestep(Timestep::Fixed(30.0))
         .build()?
         .run(|ctx| {
             let memory = Shared::new(Memory {
@@ -208,39 +260,26 @@ fn main() -> tetra::Result {
                     .sprites
                     .iter()
                     .map(|sprite| {
-                        let data = ImageData::from_data(
-                            sprite.width as _,
-                            sprite.height as _,
-                            TextureFormat::Rgba8,
-                            sprite.bytes.to_owned(),
-                        )
-                        .expect("Could not create image data!");
-                        Texture::from_image_data(ctx, &data).expect("Could not create texture!")
+                        Texture::from_encoded(ctx, &sprite.bytes)
+                            .expect("Could not create texture!")
                     })
                     .collect(),
                 tilesets: cartridge
                     .tilesets
                     .iter()
-                    .map(|tileset| {
-                        let data = ImageData::from_data(
-                            (tileset.cell_width * tileset.cols) as _,
-                            (tileset.cell_height * tileset.rows) as _,
-                            TextureFormat::Rgba8,
-                            tileset.bytes.to_owned(),
-                        )
-                        .expect("Could not create image data!");
-                        Tileset {
-                            cell_width: tileset.cell_width,
-                            cell_height: tileset.cell_height,
-                            cols: tileset.cols,
-                            rows: tileset.rows,
-                            texture: Texture::from_image_data(ctx, &data)
-                                .expect("Could not create texture!"),
-                        }
+                    .map(|tileset| Tileset {
+                        cell_width: tileset.cell_width,
+                        cell_height: tileset.cell_height,
+                        cols: tileset.cols,
+                        rows: tileset.rows,
+                        texture: Texture::from_encoded(ctx, &tileset.bytes)
+                            .expect("Could not create texture!"),
                     })
                     .collect(),
                 objects: vec![Object::default(); cartridge.objects],
                 tilemap: None,
+                input_flags: 0,
+                camera_offset: (0, 0),
             });
             let mut registry = Registry::default();
             crate::library::install(&mut registry, memory.clone());
