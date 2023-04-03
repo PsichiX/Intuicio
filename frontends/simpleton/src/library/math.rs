@@ -118,6 +118,70 @@ pub fn signum(registry: &Registry, value: Reference) -> Reference {
 }
 
 #[intuicio_function(module_name = "math", use_registry)]
+pub fn sin(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.sin(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn cos(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.cos(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn tan(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.tan(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn asin(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.asin(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn acos(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.acos(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn atan(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.atan(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn atan2(registry: &Registry, a: Reference, b: Reference) -> Reference {
+    if let (Some(a), Some(b)) = (a.read::<Real>(), b.read::<Real>()) {
+        return Reference::new_real(a.atan2(*b), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn sqrt(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.sqrt(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
 pub fn and(registry: &Registry, a: Reference, b: Reference) -> Reference {
     if let (Some(a), Some(b)) = (a.read::<Boolean>(), b.read::<Boolean>()) {
         return Reference::new_boolean(*a && *b, registry);
@@ -270,6 +334,13 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(modulo::define_function(registry));
     registry.add_function(log::define_function(registry));
     registry.add_function(signum::define_function(registry));
+    registry.add_function(sin::define_function(registry));
+    registry.add_function(cos::define_function(registry));
+    registry.add_function(tan::define_function(registry));
+    registry.add_function(asin::define_function(registry));
+    registry.add_function(acos::define_function(registry));
+    registry.add_function(atan::define_function(registry));
+    registry.add_function(atan2::define_function(registry));
     registry.add_function(and::define_function(registry));
     registry.add_function(or::define_function(registry));
     registry.add_function(xor::define_function(registry));
