@@ -145,6 +145,7 @@ pub struct Memory {
     tilemap: Option<Tilemap>,
     input_flags: i8,
     camera_offset: (i16, i16),
+    ram: Vec<u8>,
 }
 
 struct GameState {
@@ -280,6 +281,7 @@ fn main() -> tetra::Result {
                 tilemap: None,
                 input_flags: 0,
                 camera_offset: (0, 0),
+                ram: vec![0; 8192],
             });
             let mut registry = Registry::default();
             crate::library::install(&mut registry, memory.clone());
@@ -288,8 +290,7 @@ fn main() -> tetra::Result {
                 .into_package()
                 .compile()
                 .install::<VmScope<AsmExpression>>(&mut registry, None);
-            let mut context = Context::new(10240, 10240, 1024);
-            context.heap().pages_count_limit = Some(10);
+            let context = Context::new(8192, 8192, 0);
             let mut host = Host::new(context, registry.into());
             if let Some(call) =
                 host.call_function::<(), ()>("bootload", &cartridge.module_name, None)

@@ -4,7 +4,61 @@ use intuicio_data::prelude::*;
 use rand::Rng;
 
 macro_rules! impl_type {
-    ($registry:expr => $type:ty) => {
+    ($type:ty, $registry:expr, $memory:expr) => {
+        let memory_ = $memory.clone();
+        $registry.add_function(Function::new(
+            function_signature! {
+                $registry => struct ($type) fn read_ram(address: i16) -> (result: $type)
+            },
+            FunctionBody::closure(move |context, _| {
+                let address = context.stack().pop::<i16>().unwrap();
+                let result = if let Some(memory) = memory_.read() {
+                    if address as usize > memory.ram.len() - std::mem::size_of::<$type>() {
+                        panic!(
+                            "Trying to read address outside of RAM boundaries: {}",
+                            address
+                        );
+                    }
+                    unsafe {
+                        memory
+                            .ram
+                            .as_ptr()
+                            .add(address as usize)
+                            .cast::<$type>()
+                            .read()
+                    }
+                } else {
+                    0
+                };
+                context.stack().push(result);
+            }),
+        ));
+        let memory_ = $memory.clone();
+        $registry.add_function(Function::new(
+            function_signature! {
+                $registry => struct ($type) fn write_ram(address: i16, value: $type) -> ()
+            },
+            FunctionBody::closure(move |context, _| {
+                let address = context.stack().pop::<i16>().unwrap();
+                let value = context.stack().pop::<$type>().unwrap();
+                if let Some(mut memory) = memory_.write() {
+                    if address as usize > memory.ram.len() - std::mem::size_of::<$type>() {
+                        panic!(
+                            "Trying to write address outside of RAM boundaries: {}",
+                            address
+                        );
+                    }
+                    unsafe {
+                        memory
+                            .ram
+                            .as_mut_ptr()
+                            .add(address as usize)
+                            .cast::<$type>()
+                            .write(value);
+                    }
+                }
+            }),
+        ));
         $registry.add_function(define_function! {
             $registry => struct ($type) fn clone(value: $type) -> (original: $type, cloned: $type) {
                 (value, value)
@@ -171,7 +225,7 @@ pub fn install(registry: &mut Registry, memory: Shared<Memory>) {
         }
     });
 
-    impl_type!(registry => i8);
+    impl_type!(i8, registry, memory);
     registry.add_function(define_function! {
         registry => struct (i8) fn to_i16(low: i8, high: i8) -> (result: i16) {
             let low = low as i16;
@@ -180,7 +234,7 @@ pub fn install(registry: &mut Registry, memory: Shared<Memory>) {
         }
     });
 
-    impl_type!(registry => i16);
+    impl_type!(i16, registry, memory);
     registry.add_function(define_function! {
         registry => struct (i16) fn to_i8(value: i16) -> (low: i8, high: i8) {
             let low = value & 0x00FF;
