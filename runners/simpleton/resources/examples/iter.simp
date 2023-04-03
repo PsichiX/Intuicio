@@ -191,5 +191,16 @@ mod example_iter {
                 false,
             ),
         );
+        console::log_line(
+            debug::debug(
+                array::collect(
+                    iter::chunks(
+                        iter::range(0, 5),
+                        2,
+                    ),
+                ),
+                false,
+            ),
+        );
     }
 }

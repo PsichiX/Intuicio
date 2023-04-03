@@ -275,6 +275,9 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(xor::define_function(registry));
     registry.add_function(shift_left::define_function(registry));
     registry.add_function(shift_right::define_function(registry));
+    registry.add_function(random_boolean::define_function(registry));
+    registry.add_function(random_integer::define_function(registry));
+    registry.add_function(random_real::define_function(registry));
     registry.add_function(equals::define_function(registry));
     registry.add_function(not_equals::define_function(registry));
     registry.add_function(less_than::define_function(registry));

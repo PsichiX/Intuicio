@@ -241,6 +241,24 @@ pub fn zip(registry: &Registry, iterators: Reference) -> Reference {
     )
 }
 
+#[intuicio_function(module_name = "iter", use_registry)]
+pub fn chunks(registry: &Registry, iterator: Reference, count: Reference) -> Reference {
+    Reference::new(
+        IterChunks {
+            iterator,
+            count,
+            next: Reference::new(
+                Closure {
+                    function: Function::by_name("next", "iter_chunks", registry).unwrap(),
+                    captured: vec![],
+                },
+                registry,
+            ),
+        },
+        registry,
+    )
+}
+
 #[intuicio_function(module_name = "iter", use_context, use_registry)]
 pub fn fold(
     context: &mut Context,
@@ -617,6 +635,37 @@ impl IterZip {
     }
 }
 
+#[derive(IntuicioStruct, Default)]
+#[intuicio(name = "IterChunks", module_name = "iter_chunks")]
+pub struct IterChunks {
+    #[intuicio(ignore)]
+    pub iterator: Reference,
+    #[intuicio(ignore)]
+    pub count: Reference,
+    pub next: Reference,
+}
+
+#[intuicio_methods(module_name = "iter_chunks")]
+impl IterChunks {
+    #[intuicio_method(use_context, use_registry)]
+    pub fn next(context: &mut Context, registry: &Registry, iterator: Reference) -> Reference {
+        let iterator = iterator.read::<IterChunks>().unwrap();
+        let count = *iterator.count.read::<Integer>().unwrap() as usize;
+        if count == 0 {
+            return Reference::null();
+        }
+        let mut result = Vec::with_capacity(count);
+        for _ in 0..count {
+            let value = next(context, registry, iterator.iterator.clone());
+            if value.is_null() {
+                return Reference::null();
+            }
+            result.push(value);
+        }
+        Reference::new_array(result, registry)
+    }
+}
+
 pub fn install(registry: &mut Registry) {
     registry.add_function(next::define_function(registry));
     registry.add_function(build::define_function(registry));
@@ -630,6 +679,7 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(flatten::define_function(registry));
     registry.add_function(chain::define_function(registry));
     registry.add_function(zip::define_function(registry));
+    registry.add_function(chunks::define_function(registry));
     registry.add_function(fold::define_function(registry));
     registry.add_function(find::define_function(registry));
     registry.add_function(find_map::define_function(registry));
@@ -654,4 +704,6 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(IterChain::next__define_function(registry));
     registry.add_struct(IterZip::define_struct(registry));
     registry.add_function(IterZip::next__define_function(registry));
+    registry.add_struct(IterChunks::define_struct(registry));
+    registry.add_function(IterChunks::next__define_function(registry));
 }
