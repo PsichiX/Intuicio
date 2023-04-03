@@ -8,7 +8,7 @@ struct Cli {
     #[arg(value_name = "PATH")]
     entry: String,
 
-    /// Additional arguments.
+    /// Additional script arguments.
     #[arg(value_name = "PATH")]
     args: Vec<String>,
 

@@ -1,6 +1,7 @@
 use crate::{Boolean, Integer, Real, Reference};
 use intuicio_core::{define_native_struct, registry::Registry};
 use intuicio_derive::intuicio_function;
+use rand::Rng;
 use std::ops::Rem;
 
 #[intuicio_function(module_name = "math", use_registry)]
@@ -160,6 +161,21 @@ pub fn shift_right(registry: &Registry, a: Reference, b: Reference) -> Reference
         return Reference::new_integer(*a >> *b, registry);
     }
     Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn random_boolean(registry: &Registry) -> Reference {
+    Reference::new_boolean(rand::thread_rng().gen::<Boolean>(), registry)
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn random_integer(registry: &Registry) -> Reference {
+    Reference::new_integer(rand::thread_rng().gen::<Integer>(), registry)
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn random_real(registry: &Registry) -> Reference {
+    Reference::new_real(rand::thread_rng().gen::<Real>(), registry)
 }
 
 #[intuicio_function(module_name = "math", use_registry)]

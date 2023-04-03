@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-simpleton"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Simpleton frontend module for Intuicio scripting platform"
@@ -28,6 +28,7 @@ serde_json = "1"
 toml = "0.7"
 byteorder = "1.4"
 snailquote = "0.3"
+rand = "0.8"
 
 [dev-dependencies]
 intuicio-backend-vm = { version = "0.3", path = "../../backends/vm" }
