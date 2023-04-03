@@ -182,6 +182,30 @@ pub fn sqrt(registry: &Registry, value: Reference) -> Reference {
 }
 
 #[intuicio_function(module_name = "math", use_registry)]
+pub fn floor(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.floor(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn ceil(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.ceil(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn round(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.round(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
 pub fn and(registry: &Registry, a: Reference, b: Reference) -> Reference {
     if let (Some(a), Some(b)) = (a.read::<Boolean>(), b.read::<Boolean>()) {
         return Reference::new_boolean(*a && *b, registry);
@@ -341,6 +365,10 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(acos::define_function(registry));
     registry.add_function(atan::define_function(registry));
     registry.add_function(atan2::define_function(registry));
+    registry.add_function(sqrt::define_function(registry));
+    registry.add_function(floor::define_function(registry));
+    registry.add_function(ceil::define_function(registry));
+    registry.add_function(round::define_function(registry));
     registry.add_function(and::define_function(registry));
     registry.add_function(or::define_function(registry));
     registry.add_function(xor::define_function(registry));
