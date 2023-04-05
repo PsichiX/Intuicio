@@ -1,5 +1,6 @@
 use intuicio_core::{
     context::Context,
+    crate_version,
     function::{FunctionQuery, FunctionQueryParameter},
     registry::Registry,
     script::{
@@ -8,10 +9,14 @@ use intuicio_core::{
         ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
     struct_type::StructQuery,
-    Visibility,
+    IntuicioVersion, Visibility,
 };
 use serde::{Deserialize, Serialize};
 use std::{any::TypeId, collections::HashMap, error::Error};
+
+pub fn frontend_vault_version() -> IntuicioVersion {
+    crate_version!()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VaultLiteral {

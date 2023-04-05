@@ -1,0 +1,26 @@
+mod example_jobs {
+    func thread(values) {
+        return iter::fold(
+            array::iter(values, false),
+            0,
+            @[](accum, value) { return math::add(accum, value); },
+        );
+    }
+
+    func main(args) {
+        var jobs = jobs::new(null);
+ 
+        var values = array::collect(iter::range(0, 100));
+        var job1 = jobs::schedule(jobs, <func example_jobs::thread>, [values]);
+        var a = 5;
+        var job2 = jobs::schedule(jobs, @[a](b) {
+            return math::add(a, b);
+        }, [10]);
+ 
+        var value1 = job::wait_then_consume(job1);
+        var value2 = job::wait_then_consume(job2);
+ 
+        console::log_line(debug::debug(value1, false));
+        console::log_line(debug::debug(value2, false));
+    }
+}

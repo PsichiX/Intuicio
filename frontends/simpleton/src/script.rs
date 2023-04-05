@@ -1103,7 +1103,7 @@ impl SimpletonModule {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SimpletonPackage {
     pub modules: HashMap<String, SimpletonModule>,
 }

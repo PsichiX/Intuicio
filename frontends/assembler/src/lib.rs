@@ -1,6 +1,6 @@
 pub mod parser;
 
-use intuicio_core::script::BytesContentParser;
+use intuicio_core::{crate_version, script::BytesContentParser, IntuicioVersion};
 use intuicio_frontend_serde::*;
 use std::error::Error;
 
@@ -15,6 +15,10 @@ pub type AsmStruct = SerdeStruct;
 pub type AsmModule = SerdeModule;
 pub type AsmFile = SerdeFile;
 pub type AsmPackage = SerdePackage;
+
+pub fn frontend_assembly_version() -> IntuicioVersion {
+    crate_version!()
+}
 
 pub struct AsmContentParser;
 

@@ -8,6 +8,8 @@ pub mod event;
 #[cfg(feature = "fs")]
 pub mod fs;
 pub mod iter;
+#[cfg(feature = "jobs")]
+pub mod jobs;
 pub mod json;
 pub mod map;
 pub mod math;
@@ -81,4 +83,6 @@ pub fn install(registry: &mut Registry) {
     iter::install(registry);
     promise::install(registry);
     event::install(registry);
+    #[cfg(feature = "jobs")]
+    jobs::install(registry);
 }

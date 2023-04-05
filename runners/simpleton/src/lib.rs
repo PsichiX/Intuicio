@@ -2,7 +2,11 @@ mod library;
 
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
-use intuicio_frontend_simpleton::prelude::*;
+use intuicio_frontend_simpleton::{
+    library::jobs::Jobs,
+    script::{SimpletonContentParser, SimpletonPackage, SimpletonScriptExpression},
+    Integer, Reference,
+};
 use std::path::Path;
 
 #[derive(Debug, Default, Clone)]
@@ -27,40 +31,44 @@ pub fn execute(entry: &str, config: Config, args: impl IntoIterator<Item = Strin
     if let Some(path) = &config.into_code {
         std::fs::write(path, format!("{:#?}", package)).unwrap();
     }
-    let package = package.compile();
     if let Some(path) = &config.into_intuicio {
-        std::fs::write(path, format!("{:#?}", package)).unwrap();
+        std::fs::write(path, format!("{:#?}", package.compile())).unwrap();
     }
     if config.into_code.is_some() || config.into_intuicio.is_some() {
         return 0;
     }
-    let mut registry = Registry::default();
-    intuicio_frontend_simpleton::library::install(&mut registry);
-    crate::library::install(&mut registry);
-    package.install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
-    let context = Context::new(
-        config.stack_capacity.unwrap_or(1024),
-        config.registers_capacity.unwrap_or(1024),
-        config.heap_page_capacity.unwrap_or(1024),
-    );
+    let stack_capacity = config.stack_capacity.unwrap_or(1024);
+    let registers_capacity = config.registers_capacity.unwrap_or(1024);
+    let heap_page_capacity = config.heap_page_capacity.unwrap_or(1024);
+    let host_producer = HostProducer::new(move || {
+        let mut registry = Registry::default();
+        intuicio_frontend_simpleton::library::install(&mut registry);
+        crate::library::install(&mut registry);
+        let package = package.compile();
+        package.install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
+        let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);
+        Host::new(context, registry.into())
+    });
+    let mut host = host_producer.produce();
+    host.context()
+        .set_custom(Jobs::HOST_PRODUCER_CUSTOM, host_producer);
     let args = Reference::new_array(
         args.into_iter()
-            .map(|arg| Reference::new_text(arg, &registry))
+            .map(|arg| Reference::new_text(arg, host.registry()))
             .collect(),
-        &registry,
+        host.registry(),
     );
-    Host::new(context, registry.into())
-        .call_function::<(Reference,), _>(
-            &config.name.unwrap_or_else(|| "main".to_owned()),
-            &config.module_name.unwrap_or_else(|| "main".to_owned()),
-            None,
-        )
-        .unwrap()
-        .run((args,))
-        .0
-        .read::<Integer>()
-        .map(|result| *result as i32)
-        .unwrap_or(0)
+    host.call_function::<(Reference,), _>(
+        &config.name.unwrap_or_else(|| "main".to_owned()),
+        &config.module_name.unwrap_or_else(|| "main".to_owned()),
+        None,
+    )
+    .unwrap()
+    .run((args,))
+    .0
+    .read::<Integer>()
+    .map(|result| *result as i32)
+    .unwrap_or(0)
 }
 
 #[cfg(test)]

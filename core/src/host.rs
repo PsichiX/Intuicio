@@ -6,7 +6,7 @@ use crate::{
     struct_type::StructQuery,
 };
 use intuicio_data::data_stack::DataStackPack;
-use std::{cell::RefCell, marker::PhantomData};
+use std::{cell::RefCell, marker::PhantomData, sync::Arc};
 use typid::ID;
 
 thread_local! {
@@ -14,6 +14,23 @@ thread_local! {
 }
 
 pub type HostId = ID<Host>;
+
+#[derive(Clone)]
+pub struct HostProducer {
+    producer: Arc<Box<dyn Fn() -> Host + Send + Sync>>,
+}
+
+impl HostProducer {
+    pub fn new(f: impl Fn() -> Host + Send + Sync + 'static) -> Self {
+        Self {
+            producer: Arc::new(Box::new(f)),
+        }
+    }
+
+    pub fn produce(&self) -> Host {
+        (self.producer)()
+    }
+}
 
 pub struct Host {
     context: Context,
@@ -23,6 +40,13 @@ pub struct Host {
 impl Host {
     pub fn new(context: Context, registry: RegistryHandle) -> Self {
         Self { context, registry }
+    }
+
+    pub fn fork(&self) -> Self {
+        Self {
+            context: self.context.fork(),
+            registry: self.registry.clone(),
+        }
     }
 
     pub fn push_global(self) -> Result<HostId, Self> {

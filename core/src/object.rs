@@ -212,6 +212,15 @@ mod tests {
     use std::rc::{Rc, Weak};
 
     #[test]
+    fn test_send() {
+        fn ensure_send<T: Send>() {
+            println!("{} is send!", std::any::type_name::<T>());
+        }
+
+        ensure_send::<Object>();
+    }
+
+    #[test]
     fn test_object() {
         #[derive(Default)]
         struct Droppable(Option<Weak<()>>);

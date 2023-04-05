@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub type RegistryHandle = Arc<Registry>;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Registry {
     functions: Vec<FunctionHandle>,
     structs: Vec<StructHandle>,

@@ -23,6 +23,13 @@ impl<T> Shared<T> {
         }
     }
 
+    pub fn try_consume(self) -> Result<T, Self> {
+        match Rc::try_unwrap(self.data) {
+            Ok(data) => Ok(data.into_inner()),
+            Err(data) => Err(Self { data }),
+        }
+    }
+
     pub fn read(&self) -> Option<Ref<T>> {
         self.data.try_borrow().ok()
     }
@@ -61,5 +68,7 @@ mod tests {
         *b.write().unwrap() = 10;
         assert_eq!(*a.read().unwrap(), 10);
         assert_eq!(*b.read().unwrap(), 10);
+        assert!(b.try_consume().is_err());
+        assert_eq!(a.try_consume().ok().unwrap(), 10);
     }
 }

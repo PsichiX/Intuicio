@@ -1,5 +1,6 @@
 use intuicio_core::{
     context::Context,
+    crate_version,
     function::FunctionQuery,
     registry::Registry,
     script::{
@@ -8,12 +9,16 @@ use intuicio_core::{
         ScriptStruct, ScriptStructField,
     },
     struct_type::StructQuery,
-    Visibility,
+    IntuicioVersion, Visibility,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error};
 
 pub type SerdeScript = Vec<SerdeOperation>;
+
+pub fn frontend_serde_version() -> IntuicioVersion {
+    crate_version!()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SerdeLiteral {

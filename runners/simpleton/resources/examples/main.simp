@@ -17,6 +17,7 @@ mod main {
     import "iter";
     import "promise";
     import "event";
+    import "jobs";
 
     func main(args) {
         example_hello::main(args);
@@ -35,5 +36,6 @@ mod main {
         example_iter::main(args);
         example_promise::main(args);
         example_event::main(args);
+        example_jobs::main(args);
     }
 }

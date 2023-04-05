@@ -1,8 +1,7 @@
-use std::collections::HashSet;
-
 use crate::{Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type};
 use intuicio_core::{context::Context, define_native_struct, object::Object, registry::Registry};
 use intuicio_derive::intuicio_function;
+use std::collections::HashSet;
 
 #[intuicio_function(module_name = "reflect", use_registry)]
 pub fn find_type_by_name(

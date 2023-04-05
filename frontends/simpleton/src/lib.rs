@@ -11,7 +11,7 @@ use intuicio_core::{
     function::{FunctionHandle, FunctionQuery},
     object::Object,
     registry::Registry,
-    struct_type::{StructHandle, StructQuery},
+    struct_type::{NativeStructBuilder, StructHandle, StructQuery},
     IntuicioVersion,
 };
 use intuicio_data::shared::Shared;
@@ -27,6 +27,10 @@ pub type Real = f64;
 pub type Text = String;
 pub type Array = Vec<Reference>;
 pub type Map = HashMap<Text, Reference>;
+
+thread_local! {
+    static EMPTY_STRUCT_HANDLE: StructHandle = NativeStructBuilder::new::<()>().build_handle();
+}
 
 pub fn frontend_simpleton_version() -> IntuicioVersion {
     crate_version!()
@@ -171,13 +175,13 @@ impl Reference {
             .unwrap()
             .clone();
         let mut value = unsafe { Object::new_uninitialized(struct_type) };
-        *value.write().unwrap() = data;
+        unsafe { value.as_mut_ptr().cast::<T>().write(data) };
         Self::new_raw(value)
     }
 
     pub fn new_custom<T: 'static>(data: T, ty: &Type) -> Self {
         let mut value = unsafe { Object::new_uninitialized(ty.data.as_ref().unwrap().clone()) };
-        *value.write().unwrap() = data;
+        unsafe { value.as_mut_ptr().cast::<T>().write(data) };
         Self::new_raw(value)
     }
 
@@ -234,6 +238,16 @@ impl Reference {
         ))
     }
 
+    pub fn try_consume(self) -> Result<Object, Self> {
+        match self.data {
+            Some(data) => match data.try_consume() {
+                Ok(data) => Ok(data),
+                Err(data) => Err(Self { data: Some(data) }),
+            },
+            None => Err(Self::null()),
+        }
+    }
+
     pub fn references_count(&self) -> usize {
         self.data
             .as_ref()
@@ -248,39 +262,108 @@ impl Reference {
             _ => false,
         }
     }
+
+    pub fn transferable(self) -> Result<Transferable, Self> {
+        match self.data {
+            Some(data) => {
+                if data.write().is_some() {
+                    let empty = Object::new(EMPTY_STRUCT_HANDLE.with(|handle| handle.clone()));
+                    let object = std::mem::replace(&mut *data.write().unwrap(), empty);
+                    Ok(Transferable::new(object))
+                } else {
+                    Err(Self { data: Some(data) })
+                }
+            }
+            None => Ok(Transferable::empty()),
+        }
+    }
+}
+
+pub struct Transferable {
+    data: Option<Object>,
+}
+
+impl Transferable {
+    pub fn new(data: Object) -> Self {
+        Self { data: Some(data) }
+    }
+
+    pub fn empty() -> Self {
+        Self { data: None }
+    }
+
+    pub fn reference(self) -> Reference {
+        match self.data {
+            Some(data) => Reference::new_raw(data),
+            None => Reference::null(),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        library::ObjectBuilder,
+        library::{jobs::Jobs, ObjectBuilder},
         script::{SimpletonContentParser, SimpletonPackage, SimpletonScriptExpression},
         Integer, Real, Reference,
     };
     use intuicio_backend_vm::prelude::*;
     use intuicio_core::prelude::*;
+    use std::thread::spawn;
 
     #[test]
-    fn test_simpleton_script() {
+    fn test_threading() {
         let mut registry = Registry::default();
         crate::library::install(&mut registry);
 
+        let object = Reference::new_integer(0, &registry)
+            .transferable()
+            .ok()
+            .unwrap();
+
+        let handle = spawn(|| {
+            let mut registry = Registry::default();
+            crate::library::install(&mut registry);
+
+            let mut object = object.reference();
+            let mut value = object.write::<Integer>().unwrap();
+            while *value < 42 {
+                *value += 1;
+            }
+            drop(value);
+            object.transferable().ok().unwrap()
+        });
+        let value = handle.join().unwrap().reference();
+        assert_eq!(*value.read::<Integer>().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_simpleton_script() {
         let mut content_provider = FileContentProvider::new("simp", SimpletonContentParser);
-        SimpletonPackage::new("../../resources/package.simp", &mut content_provider)
-            .unwrap()
-            .compile()
-            .install::<VmScope<SimpletonScriptExpression>>(
-                &mut registry,
-                None,
-                // Some(
-                //     PrintDebugger::full()
-                //         .basic_printables()
-                //         .stack_bytes(false)
-                //         .registers_bytes(false)
-                //         .into_handle(),
-                // ),
-            );
-        let mut vm = Host::new(Context::new(1024, 1024, 1024), registry.into());
+        let package =
+            SimpletonPackage::new("../../resources/package.simp", &mut content_provider).unwrap();
+        let host_producer = HostProducer::new(move || {
+            let mut registry = Registry::default();
+            crate::library::install(&mut registry);
+            package
+                .compile()
+                .install::<VmScope<SimpletonScriptExpression>>(
+                    &mut registry,
+                    None,
+                    // Some(
+                    //     PrintDebugger::full()
+                    //         .basic_printables()
+                    //         .stack_bytes(false)
+                    //         .registers_bytes(false)
+                    //         .into_handle(),
+                    // ),
+                );
+            let context = Context::new(1024, 1024, 1024);
+            Host::new(context, registry.into())
+        });
+        let mut vm = host_producer.produce();
+        vm.context()
+            .set_custom(Jobs::HOST_PRODUCER_CUSTOM, host_producer);
 
         let adder = Reference::new_raw(
             ObjectBuilder::new("Adder", "adder")
