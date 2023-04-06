@@ -24,6 +24,9 @@ checks:
 demo:
   cd ./demos/tetra/ && cargo run --release
 
+alchemyst-run:
+  cd ./runners/alchemyst && just run
+
 clean:
   find . -name target -type d -exec rm -r {} +
 
@@ -59,3 +62,5 @@ publish:
   cargo publish --no-verify --manifest-path ./frontends/simpleton/Cargo.toml
   sleep 15
   cargo publish --no-verify --manifest-path ./runners/simpleton/Cargo.toml
+  sleep 15
+  cargo publish --no-verify --manifest-path ./runners/alchemyst/Cargo.toml

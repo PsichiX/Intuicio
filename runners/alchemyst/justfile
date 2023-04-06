@@ -1,0 +1,8 @@
+list:
+  just --list
+
+run:
+  cargo run --release -- ./resources/uv.simp
+  cargo run --release -- ./resources/invert.simp ./resources/input.png ./resources/invert.png
+  cargo run --release -- ./resources/kernel.simp ./resources/input.png ./resources/kernel.png
+  cargo run --release -- ./resources/glitch.simp ./resources/input.png ./resources/glitch.png 50 10

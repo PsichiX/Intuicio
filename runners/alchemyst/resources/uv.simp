@@ -1,0 +1,22 @@
+#!alchemyst
+
+mod main {
+    func main(args) {
+        var output = image::new(128, 128, null);
+        image::process(
+            output,
+            image::ImageProcessingConfig {
+                uv_space: true,
+            },
+            @[](u, v, pixel) {
+                return color::Color {
+                    r: u,
+                    g: 0.0,
+                    b: v,
+                    a: 1.0,
+                };
+            },
+        );
+        image::save_ldr(output, "./resources/uv.png");
+    }
+}

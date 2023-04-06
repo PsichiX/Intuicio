@@ -1,0 +1,31 @@
+#!alchemyst
+
+mod main {
+    func main(args) {
+        var input_path = args[0];
+        var output_path = args[1];
+        if reflect::is_null(input_path) {
+            return null;
+        }
+        if reflect::is_null(output_path) {
+            return null;
+        }
+
+        var input = image::open(input_path);
+        var output = image::new(image::width(input), image::height(input), null);
+        image::process(
+            output,
+            null,
+            @[input](col, row, pixel) {
+                var color = image::get_pixel(input, col, row);
+                return color::Color {
+                    r: math::sub(1.0, color.r),
+                    g: math::sub(1.0, color.g),
+                    b: math::sub(1.0, color.b),
+                    a: 1.0
+                };
+            },
+        );
+        image::save_ldr(output, output_path);
+    }
+}

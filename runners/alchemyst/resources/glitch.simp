@@ -1,0 +1,74 @@
+mod main {
+    func main(args) {
+        var input_path = args[0];
+        var output_path = args[1];
+        var offset = args[2];
+        var refraction = args[3];
+        if reflect::is_null(input_path) {
+            return null;
+        }
+        if reflect::is_null(output_path) {
+            return null;
+        }
+        if reflect::is_null(offset) {
+            offset = 0;
+        } else {
+            offset = reflect::to_integer(offset);
+        }
+        if reflect::is_null(refraction) {
+            refraction = 0;
+        } else {
+            refraction = reflect::to_integer(refraction);
+        }
+
+        var input = image::open(input_path);
+        var pipeline = image_pipeline::Pipeline {
+            width: image::width(input),
+            height: image::height(input),
+            samplers: {
+                input: image_sampler::new(input),
+            },
+        };
+        var iter = iter::build([
+            iter::range(0, math::random_integer(10, 40)),
+            [<func iter::map>, @[offset, refraction](index) {
+                return {
+                    offset: math::random_integer(math::negate(offset), offset),
+                    refraction: math::random_integer(0, refraction),
+                };
+            }],
+        ]);
+        var glitch = array::collect(iter);
+        var output = image_pipeline::process_multi_thread(
+            pipeline,
+            @[glitch](fragment, samplers) {
+                var input = samplers{"input"};
+                var band = math::div(
+                    math::mul(fragment.row, array::size(glitch)),
+                    fragment.height,
+                );
+                var item = glitch[band];
+                var col = math::add(fragment.col, item{"offset"});
+                var refraction = item{"refraction"};
+                var width = math::sub(fragment.width, 1);
+                var r = image_sampler::fetch(
+                    input,
+                    math::clamp(math::sub(col, refraction), 0, width),
+                    fragment.row,
+                ).r;
+                var g = image_sampler::fetch(
+                    input,
+                    math::clamp(col, 0, width),
+                    fragment.row,
+                ).g;
+                var b = image_sampler::fetch(
+                    input,
+                    math::clamp(math::add(col, refraction), 0, width),
+                    fragment.row,
+                ).b;
+                return color::Color { r, g, b, a: 1.0 };
+            },
+        );
+        image::save_ldr(output, output_path);
+    }
+}

@@ -1,26 +1,38 @@
 [package]
-name = "intuicio-runner-simpleton"
+name = "alchemyst"
 version = "0.5.2"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
-description = "Simpleton runner module for Intuicio scripting platform"
+description = "Alchemyst PCG tool of Intuicio scripting platform"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
-documentation = "https://docs.rs/alchemyst"
+documentation = "https://docs.rs/intuicio-runner-simpleton"
 readme = "../../README.md"
 
 [lib]
 path = "src/lib.rs"
 
 [[bin]]
-name = "simpleton"
+name = "alchemyst"
 path = "src/main.rs"
+
+[features]
+default = ["console", "fs", "jobs"]
+console = ["intuicio-frontend-simpleton/console"]
+fs = ["intuicio-frontend-simpleton/fs"]
+jobs = ["intuicio-frontend-simpleton/jobs"]
 
 [dependencies]
 intuicio-data = { version = "0.5", path = "../../data" }
 intuicio-core = { version = "0.5", path = "../../core" }
 intuicio-derive = { version = "0.5", path = "../../derive" }
 intuicio-backend-vm = { version = "0.5", path = "../../backends/vm" }
-intuicio-frontend-simpleton = { version = "0.5", path = "../../frontends/simpleton" }
+image = "0.24"
+vek = "0.15"
 clap = { version = "4", features = ["derive"] }
+
+[dependencies.intuicio-frontend-simpleton]
+version = "0.5"
+path = "../../frontends/simpleton"
+default-features = false

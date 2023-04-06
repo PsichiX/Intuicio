@@ -1,0 +1,103 @@
+#!alchemyst
+
+mod main {
+    func main(args) {
+        var input_path = args[0];
+        var output_path = args[1];
+        if reflect::is_null(input_path) {
+            return null;
+        }
+        if reflect::is_null(output_path) {
+            return null;
+        }
+
+        var input = image::open(input_path);
+        var pipeline = image_pipeline::Pipeline {
+            width: image::width(input),
+            height: image::height(input),
+            samplers: {
+                input: image_sampler::new(input),
+            },
+        };
+        var kernel = [
+            -1.0, -1.0, -1.0,
+            -1.0, 8.0, -1.0,
+            -1.0, -1.0, -1.0,
+        ];
+        var output = image_pipeline::process_multi_thread(
+            pipeline,
+            @[kernel](fragment, samplers) {
+                var input = samplers{"input"};
+                return main::sum_colors(
+                    main::sample_matrix(input, kernel, fragment.col, fragment.row),
+                );
+            },
+        );
+        image::save_ldr(output, output_path);
+    }
+
+    func sample_matrix(input, kernel, x, y) {
+        return [
+            main::weight_color(
+                image_sampler::fetch(input, math::sub(x, 1), math::sub(y, 1)),
+                kernel[0],
+            ),
+            main::weight_color(
+                image_sampler::fetch(input, x, math::sub(y, 1)),
+                kernel[1],
+            ),
+            main::weight_color(
+                image_sampler::fetch(input, math::add(x, 1), math::sub(y, 1)),
+                kernel[2],
+            ),
+            main::weight_color(
+                image_sampler::fetch(input, math::sub(x, 1), y),
+                kernel[3],
+            ),
+            main::weight_color(
+                image_sampler::fetch(input, x, y),
+                kernel[4],
+            ),
+            main::weight_color(
+                image_sampler::fetch(input, math::add(x, 1), y),
+                kernel[5],
+            ),
+            main::weight_color(
+                image_sampler::fetch(input, math::sub(x, 1), math::add(y, 1)),
+                kernel[6],
+            ),
+            main::weight_color(
+                image_sampler::fetch(input, x, math::add(y, 1)),
+                kernel[7],
+            ),
+            main::weight_color(
+                image_sampler::fetch(input, math::add(x, 1), math::add(y, 1)),
+                kernel[8],
+            ),
+        ];
+    }
+
+    func weight_color(color, factor) {
+        return color::Color {
+            r: math::mul(color.r, factor),
+            g: math::mul(color.g, factor),
+            b: math::mul(color.b, factor),
+            a: 1.0,
+        };
+    }
+
+    func sum_colors(colors) {
+        var result = color::Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        };
+        for color in array::iter(colors, false) {
+            result.r = math::add(result.r, color.r);
+            result.g = math::add(result.g, color.g);
+            result.b = math::add(result.b, color.b);
+        }
+        return result;
+    }
+}

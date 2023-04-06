@@ -11,6 +11,7 @@ members = [
     "frontends/simpleton",
     "frontends/vault",
     "runners/simpleton",
+    "runners/alchemyst",
     "demos/tetra",
     "demos/emu",
 ]
