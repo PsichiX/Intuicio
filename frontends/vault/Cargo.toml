@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-vault"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Vault frontend module for Intuicio scripting platform"
@@ -11,10 +11,10 @@ documentation = "https://docs.rs/intuicio-frontend-vault"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-data = { version = "0.4", path = "../../data" }
-intuicio-core = { version = "0.4", path = "../../core" }
+intuicio-data = { version = "0.5", path = "../../data" }
+intuicio-core = { version = "0.5", path = "../../core" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde-lexpr = "0.1"
 
 [dev-dependencies]
-intuicio-backend-vm = { version = "0.4", path = "../../backends/vm" }
+intuicio-backend-vm = { version = "0.5", path = "../../backends/vm" }

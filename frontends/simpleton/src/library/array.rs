@@ -39,9 +39,9 @@ pub fn clear(mut array: Reference) -> Reference {
 }
 
 #[intuicio_function(module_name = "array", use_registry)]
-pub fn contains(registry: &Registry, mut map: Reference, value: Reference) -> Reference {
+pub fn contains(registry: &Registry, map: Reference, value: Reference) -> Reference {
     let result = map
-        .write::<Array>()
+        .read::<Array>()
         .unwrap()
         .iter()
         .any(|item| value.does_share_reference(item, true));
@@ -51,13 +51,13 @@ pub fn contains(registry: &Registry, mut map: Reference, value: Reference) -> Re
 #[intuicio_function(module_name = "array", use_registry)]
 pub fn find(
     registry: &Registry,
-    mut array: Reference,
+    array: Reference,
     value: Reference,
     reverse: Reference,
 ) -> Reference {
     if *reverse.read::<Boolean>().unwrap() {
         array
-            .write::<Array>()
+            .read::<Array>()
             .unwrap()
             .iter()
             .rev()
@@ -66,7 +66,7 @@ pub fn find(
             .unwrap_or_default()
     } else {
         array
-            .write::<Array>()
+            .read::<Array>()
             .unwrap()
             .iter()
             .position(|item| value.does_share_reference(item, true))
@@ -114,9 +114,9 @@ pub fn set(mut array: Reference, index: Reference, value: Reference) -> Referenc
 }
 
 #[intuicio_function(module_name = "array")]
-pub fn get(mut array: Reference, index: Reference) -> Reference {
+pub fn get(array: Reference, index: Reference) -> Reference {
     array
-        .write::<Array>()
+        .read::<Array>()
         .unwrap()
         .get(*index.read::<Integer>().unwrap() as usize)
         .cloned()

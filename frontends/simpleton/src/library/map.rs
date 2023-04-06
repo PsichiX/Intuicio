@@ -35,18 +35,18 @@ pub fn clear(mut map: Reference) -> Reference {
 }
 
 #[intuicio_function(module_name = "map", use_registry)]
-pub fn contains_key(registry: &Registry, mut map: Reference, key: Reference) -> Reference {
+pub fn contains_key(registry: &Registry, map: Reference, key: Reference) -> Reference {
     let result = map
-        .write::<Map>()
+        .read::<Map>()
         .unwrap()
         .contains_key(key.read::<Text>().unwrap().as_str());
     Reference::new_boolean(result, registry)
 }
 
 #[intuicio_function(module_name = "map", use_registry)]
-pub fn contains_value(registry: &Registry, mut map: Reference, value: Reference) -> Reference {
+pub fn contains_value(registry: &Registry, map: Reference, value: Reference) -> Reference {
     let result = map
-        .write::<Map>()
+        .read::<Map>()
         .unwrap()
         .values()
         .any(|item| value.does_share_reference(item, true));
@@ -54,8 +54,8 @@ pub fn contains_value(registry: &Registry, mut map: Reference, value: Reference)
 }
 
 #[intuicio_function(module_name = "map", use_registry)]
-pub fn find_key(registry: &Registry, mut map: Reference, value: Reference) -> Reference {
-    map.write::<Map>()
+pub fn find_key(registry: &Registry, map: Reference, value: Reference) -> Reference {
+    map.read::<Map>()
         .unwrap()
         .iter()
         .find(|(_, item)| value.does_share_reference(item, true))
@@ -80,8 +80,8 @@ pub fn set(mut map: Reference, key: Reference, value: Reference) -> Reference {
 }
 
 #[intuicio_function(module_name = "map")]
-pub fn get(mut map: Reference, key: Reference) -> Reference {
-    map.write::<Map>()
+pub fn get(map: Reference, key: Reference) -> Reference {
+    map.read::<Map>()
         .unwrap()
         .get(key.read::<Text>().unwrap().as_str())
         .cloned()
@@ -115,9 +115,9 @@ pub fn zip(registry: &Registry, keys: Reference, values: Reference) -> Reference
 }
 
 #[intuicio_function(module_name = "map", use_registry)]
-pub fn keys(registry: &Registry, mut map: Reference) -> Reference {
+pub fn keys(registry: &Registry, map: Reference) -> Reference {
     Reference::new_array(
-        map.write::<Map>()
+        map.read::<Map>()
             .unwrap()
             .keys()
             .map(|key| Reference::new_text(key.to_owned(), registry))
@@ -127,9 +127,9 @@ pub fn keys(registry: &Registry, mut map: Reference) -> Reference {
 }
 
 #[intuicio_function(module_name = "map", use_registry)]
-pub fn values(registry: &Registry, mut map: Reference) -> Reference {
+pub fn values(registry: &Registry, map: Reference) -> Reference {
     Reference::new_array(
-        map.write::<Map>()
+        map.read::<Map>()
             .unwrap()
             .values()
             .cloned()
