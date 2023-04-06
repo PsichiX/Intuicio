@@ -206,6 +206,23 @@ pub fn round(registry: &Registry, value: Reference) -> Reference {
 }
 
 #[intuicio_function(module_name = "math", use_registry)]
+pub fn clamp(registry: &Registry, value: Reference, from: Reference, to: Reference) -> Reference {
+    if let (Some(value), Some(from), Some(to)) = (
+        value.read::<Integer>(),
+        from.read::<Integer>(),
+        to.read::<Integer>(),
+    ) {
+        return Reference::new_integer(value.clamp(*from, *to), registry);
+    }
+    if let (Some(value), Some(from), Some(to)) =
+        (value.read::<Real>(), from.read::<Real>(), to.read::<Real>())
+    {
+        return Reference::new_real(value.clamp(*from, *to), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
 pub fn fract(registry: &Registry, value: Reference) -> Reference {
     if let Some(value) = value.read::<Real>() {
         return Reference::new_real(value.fract(), registry);
@@ -389,6 +406,7 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(floor::define_function(registry));
     registry.add_function(ceil::define_function(registry));
     registry.add_function(round::define_function(registry));
+    registry.add_function(clamp::define_function(registry));
     registry.add_function(fract::define_function(registry));
     registry.add_function(and::define_function(registry));
     registry.add_function(or::define_function(registry));
