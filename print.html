@@ -530,7 +530,7 @@ impl ScriptExpression for CustomExpression {
 </li>
 <li>
 <p><strong>Continue scope conditionally</strong></p>
-<p>Does what pop scope does, but first takes <code>bool</code> from the stack and if it is <code>false</code>, scope gets dropperd.</p>
+<p>Does what pop scope does, but first takes <code>bool</code> from the stack and if it is <code>false</code>, scope gets dropped.</p>
 </li>
 </ul>
 <p>Usually we leave producing script operations to frontends, but one can create them at any time by any means. One can even create them at runtime and call newly created function in place, without adding it to registry:</p>
