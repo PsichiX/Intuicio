@@ -296,7 +296,7 @@ assert_eq!(result, 42);
     context.stack().push(2_i32);
     add(context, registry);
 }</code></pre></pre>
-<p>And this is basically exactly how and why Intuicio doesn't care about which side (script or native) calls what side - both script and native sides are calling each other the same way, and <code>VmScope</code> is just a container for script operations in the middle of interactions to make script side look the same as native side to host.</p>
+<p>And this is basically exactly how and why Intuicio doesn't care about which side (script or native) calls what side - both script and native sides are calling each other the same way, and <code>VmScope</code> is just a container for script operations in the middle of interactions to make script side look the same as native side to host - this opens quite interesting opportunity, if expression type matches, to use different frontends together in one applicaiton. You can think of it as something like <code>.NET</code> platform for Rust.</p>
 <h1 id="conclusion"><a class="header" href="#conclusion">Conclusion</a></h1>
 <p>To summarize, Intuicio is actually <strong><em>just</em></strong> an engine to move data from place to place via stack, it doesn't care what is the data, it doesn't specify limits on the types of data (other than data has to be owned), it also doesn't care what is the place this data moves to, all it does is moves the data and both script and native side tells it when to move what data - simple as that!</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="building-custom-frontend"><a class="header" href="#building-custom-frontend">Building custom frontend</a></h1>
