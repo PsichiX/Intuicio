@@ -1,0 +1,11 @@
+[package]
+name = "stack-operator"
+version = "0.5.2"
+edition = "2021"
+publish = false
+
+[dependencies]
+intuicio-data = { version = "0.5", path = "../../data" }
+intuicio-core = { version = "0.5", path = "../../core" }
+intuicio-derive = { version = "0.5", path = "../../derive" }
+intuicio-backend-vm = { version = "0.5", path = "../../backends/vm" }

@@ -9,6 +9,7 @@ Now let's pick some building blocks. For backend we will use `intuicio-backend-v
 Create new Cargo project and add these dependencies:
 ```toml
 [dependencies]
+intuicio-data = "*"
 intuicio-core = "*"
 intuicio-derive = "*"
 intuicio-backend-vm = "*"
