@@ -404,7 +404,7 @@ registers.pop_to_register(&amp;mut register);
 stack.push_from_register(&amp;mut register);
 assert_eq!(stack.pop::&lt;i32&gt;().unwrap(), 42);
 <span class="boring">}</span></code></pre></pre>
-<p>Please remember that registers just like stack, data can be only moved in and out of registers, registers operations does not copy/clone their data - this design choice was dictated by master rule of Intuicio: &quot;data can only be moved&quot;, copy/clone is a special operation that structure has to provide a dedicated function for it to push duplicated source data into stack, from which original data gets moved back to register and its clone stays on the stack - this is how for example <code>simpleton</code> frontend does when has to copy <code>Reference</code> from local variable.</p>
+<p>Please remember that with registers, just like with stack, data can be only moved in and out of registers, registers operations does not copy/clone their data - this design choice was dictated by master rule of Intuicio: &quot;data can only be moved&quot;, copy/clone is a special operation that given structure has to provide a dedicated function for it to push duplicated source data into stack, from which original data gets moved back to register and its clone stays on the stack - this is what for example <code>simpleton</code> frontend does when it has to copy <code>Reference</code> from local variable to stack for later use.</p>
 </li>
 <li>
 <p><strong>Heap</strong></p>
