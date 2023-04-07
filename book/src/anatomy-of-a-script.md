@@ -86,7 +86,7 @@ Intuicio scripts by default have a very limited set of operations, because of be
 
 - **Continue scope conditionally**
 
-    Does what pop scope does, but first takes `bool` from the stack and if it is `false`, scope gets dropperd.
+    Does what pop scope does, but first takes `bool` from the stack and if it is `false`, scope gets dropped.
 
 Usually we leave producing script operations to frontends, but one can create them at any time by any means. One can even create them at runtime and call newly created function in place, without adding it to registry:
 ```rust
