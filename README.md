@@ -1,4 +1,6 @@
 # Intuicio
+![crates-io version](https://raster.shields.io/crates/v/intuicio-core.png)
+
 Modular scripting solution for Rust
 
 ## The Book
