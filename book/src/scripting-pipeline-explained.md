@@ -106,7 +106,7 @@ We can see all this script is doing is pushing data on stack and calling a funct
 
 ## How data moves
 
-Let's start with showing how our `add` function looks actually looks like to `Host`:
+Let's start with showing how our `add` function actually looks like to `Host`:
 ```rust
 fn add(context: &mut Context, registry: &Registry) {
     let a = context.stack().pop::<i32>().unwrap();
