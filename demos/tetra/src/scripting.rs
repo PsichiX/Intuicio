@@ -2,7 +2,7 @@ use crate::library::engine::Engine;
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_data::prelude::*;
-use intuicio_frontend_simpleton::prelude::*;
+use intuicio_frontend_simpleton::prelude::{jobs::Jobs, *};
 use tetra::{time::get_delta_time, Context as TetraContext};
 
 pub struct Scripting {
@@ -26,28 +26,32 @@ impl Scripting {
         entry: &str,
         tetra_context: &mut TetraContext,
     ) -> Self {
-        let mut registry = Registry::default();
-        intuicio_frontend_simpleton::library::install(&mut registry);
-        crate::library::install(&mut registry);
         let entry = format!("{}/{}", assets, entry);
         let mut content_provider = FileContentProvider::new("simp", SimpletonContentParser);
-        SimpletonPackage::new(&entry, &mut content_provider)
-            .unwrap()
-            .compile()
-            .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
+        let package = SimpletonPackage::new(&entry, &mut content_provider).unwrap();
+        let host_producer = HostProducer::new(move || {
+            let mut registry = Registry::default();
+            intuicio_frontend_simpleton::library::install(&mut registry);
+            crate::library::install(&mut registry);
+            let package = package.compile();
+            package.install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
+            let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);
+            Host::new(context, registry.into())
+        });
+        let mut host = host_producer.produce();
+        host.context()
+            .set_custom(Jobs::HOST_PRODUCER_CUSTOM, host_producer);
         let context_lifetime = Lifetime::default();
         let tetra_context =
             ManagedRefMut::new(tetra_context, context_lifetime.borrow_mut().unwrap());
-        let engine = Reference::new(Engine::new(assets, tetra_context), &registry);
-        let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);
+        let engine = Reference::new(Engine::new(assets, tetra_context), host.registry());
         let state = Reference::new_map(
             map! {
                 engine: engine,
-                assets: Reference::new_text(assets.to_owned(), &registry),
+                assets: Reference::new_text(assets.to_owned(), host.registry()),
             },
-            &registry,
+            host.registry(),
         );
-        let host = Host::new(context, registry.into());
         Self {
             host,
             state,
