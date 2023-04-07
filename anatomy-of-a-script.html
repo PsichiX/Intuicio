@@ -3,8 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Page not found - Intuicio - Modular scripting platform for Rust</title>
-        <base href="/">
+        <title>Anatomy of a Script - Intuicio - Modular scripting platform for Rust</title>
 
 
         <!-- Custom HTML head -->
@@ -84,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-host.html"><strong aria-hidden="true">3.</strong> Anatomy of a Host</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-script.html"><strong aria-hidden="true">4.</strong> Anatomy of a Script</a></li><li class="chapter-item expanded "><a href="building-custom-frontend.html"><strong aria-hidden="true">5.</strong> Building custom frontend</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-host.html"><strong aria-hidden="true">3.</strong> Anatomy of a Host</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-script.html" class="active"><strong aria-hidden="true">4.</strong> Anatomy of a Script</a></li><li class="chapter-item expanded "><a href="building-custom-frontend.html"><strong aria-hidden="true">5.</strong> Building custom frontend</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -145,14 +144,147 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="document-not-found-404"><a class="header" href="#document-not-found-404">Document not found (404)</a></h1>
-<p>This URL is invalid, sorry. Please use the navigation bar or search to continue.</p>
+                        <h1 id="anatomy-of-a-script"><a class="header" href="#anatomy-of-a-script">Anatomy of a Script</a></h1>
+<p>Entire <code>Script</code> structure is split into package, modules, functions/structures and at it's core: operations.</p>
+<p>Example:</p>
+<ul>
+<li>Package:
+<ul>
+<li>module: <code>test</code>
+<ul>
+<li>struct: <code>Foo</code>
+<ul>
+<li>field: <code>a</code>: <code>bool</code></li>
+</ul>
+</li>
+<li>function: <code>main</code>
+<ul>
+<li>output: <code>result</code>: <code>i32</code></li>
+<li>operations:
+<ul>
+<li>literal: <code>40</code>: <code>i32</code></li>
+<li>literal: <code>2</code>: <code>i32</code></li>
+<li>call function: <code>lib::add</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="operations"><a class="header" href="#operations">Operations</a></h2>
+<p>Intuicio scripts by default have a very limited set of operations, because of being an universal interface between frontends and backends, these operations have to be the lowest denominator across most possible frontend and backend designs, therefore operations it hives are:</p>
+<ul>
+<li>
+<p><strong>Expression</strong></p>
+<p>This is an additional set of possible operations defined by frontends. It accepts types that implement <code>ScriptExpression</code> that allows to evaluate additional operation using only context and registry.
+Common example of script expression is pushing literals onto stack - stack manipulation is not part of the script operations set, because Intuicio is completely generic over the data it moves, and specific frontends most likely do have very specific assumptions about the data they allow to use, so it's better to leave this kind of operations to be provided by them.</p>
+<p>Example of custom script expression:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum CustomExpression {
+    Literal(i32),
+    StackDrop,
+}
+
+impl ScriptExpression for CustomExpression {
+    fn evaluate(&amp;self, context: &amp;mut Context, _: &amp;Registry) {
+        match self {
+            Self::Literal(value) =&gt; {
+                context.stack().push(*value);
+            }
+            Self::StackDrop =&gt; {
+                context.stack().drop();
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+</li>
+<li>
+<p><strong>Define register</strong></p>
+<p>Allocates space for new register of given type defined by <code>StructQuery</code>. Remember to always define register before it gets used! Registers gets removed when scope where they were defined gets dropped.</p>
+</li>
+<li>
+<p><strong>Drop register</strong></p>
+<p>Drops data behind given register.</p>
+</li>
+<li>
+<p><strong>Push from register</strong></p>
+<p>Takes data from given register and pushes it onto stack.</p>
+</li>
+<li>
+<p><strong>Pop to register</strong></p>
+<p>Takes data from stack and moves it to given register.</p>
+</li>
+<li>
+<p><strong>Move register</strong></p>
+<p>Moves data between two registers.</p>
+</li>
+<li>
+<p><strong>Call function</strong></p>
+<p>Uses associated <code>FunctionQuery</code> to find and invoke function from registry.</p>
+</li>
+<li>
+<p><strong>Branch scope</strong></p>
+<p>Takes <code>bool</code> from stack and if it's <code>true</code>, it will execute Success operations set, otherwise Failure operations set if present.</p>
+</li>
+<li>
+<p><strong>Loop scope</strong></p>
+<p>Executes set of operations in an loop so that before start of iteration it takes <code>bool</code> from stack, then if it's <code>true</code>, set of operations gets executed. Important note here is to remember to always push <code>bool</code> value (telling if next iteration should be executed), before we exit child scope.</p>
+</li>
+<li>
+<p><strong>Push scope</strong></p>
+<p>Pushes new set of operations for execution, returning further execution to its parent only when child scope stops its execution.</p>
+</li>
+<li>
+<p><strong>Pop scope</strong></p>
+<p>Closest analogue can be <code>return</code> keyword, which forces scope to stop further operations execution.</p>
+</li>
+<li>
+<p><strong>Continue scope conditionally</strong></p>
+<p>Does what pop scope does, but first takes <code>bool</code> from the stack and if it is <code>false</code>, scope gets dropperd.</p>
+</li>
+</ul>
+<p>Usually we leave producing script operations to frontends, but one can create them at any time by any means. One can even create them at runtime and call newly created function in place, without adding it to registry:</p>
+<pre><pre class="playground"><code class="language-rust">let function = VmScope::&lt;AsmExpression&gt;::generate_function(
+    &amp;ScriptFunction {
+        signature: function_signature! {
+            registry =&gt; mod test fn main() -&gt; (result: i32)
+        },
+        script: ScriptBuilder::&lt;AsmExpression&gt;::default()
+            .literal(AsmExpression::Literal(AsmLiteral::I32(2)))
+            .literal(AsmExpression::Literal(AsmLiteral::I32(40)))
+            .call_function(FunctionQuery {
+                name: Some(&quot;add&quot;.into()),
+                module_name: Some(&quot;lib&quot;.into()),
+                ..Default::default()
+            })
+            .build(),
+    },
+    &amp;registry,
+    None,
+)
+.unwrap()
+.0;
+
+function.invoke(&amp;mut context, &amp;registry);
+assert_eq!(context.stack().pop::&lt;i32&gt;().unwrap(), 42);</code></pre></pre>
+<p>This example shows precisely how short is the path between scripts and backends - backends constructing script functions directly from script operations, and in case of <code>VmScope</code> every time we call function generated by it, we directly execute these operations.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="anatomy-of-a-host.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
 
+                            <a rel="next" href="building-custom-frontend.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -160,7 +292,13 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="anatomy-of-a-host.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
 
+                    <a rel="next" href="building-custom-frontend.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
             </nav>
 
         </div>

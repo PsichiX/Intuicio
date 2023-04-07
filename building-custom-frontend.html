@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="building-custom-frontend.html" class="active"><strong aria-hidden="true">3.</strong> Building custom frontend</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-host.html"><strong aria-hidden="true">3.</strong> Anatomy of a Host</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-script.html"><strong aria-hidden="true">4.</strong> Anatomy of a Script</a></li><li class="chapter-item expanded "><a href="building-custom-frontend.html" class="active"><strong aria-hidden="true">5.</strong> Building custom frontend</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -145,13 +145,172 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="building-custom-frontend"><a class="header" href="#building-custom-frontend">Building custom frontend</a></h1>
-<p><em>TODO</em></p>
+<p>Here we will create a very simple frontend to put in use all what we have learned before.</p>
+<p>This is gonna be basically a pretty much stripped down version of <code>asembler</code> frontend jsut to get intuicion on creating frontends. For more advanced examples of frontends please take a look at frontends already made, located in <code>frontends</code> folder on repository.</p>
+<hr />
+<p>Let's start with defining goals for this frontend to achieve:</p>
+<ul>
+<li>scripts operate only on <code>i32</code> values.</li>
+<li>scripts will have two operations:
+<ul>
+<li>push value on stack.</li>
+<li>call functions that takes values from stack, performs operations on them and push results back on stack.</li>
+</ul>
+</li>
+<li>syntax of this language has to be simple, so that:
+<ul>
+<li>each line is an operation.</li>
+<li>we put operations in reverse order so it is easier to read script as a hierarchy of function calls with its arguments indented and in ascending order.</li>
+</ul>
+</li>
+</ul>
+<p>So now let's create new project, import dependencies and define frontend's expression type:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use intuicio_backend_vm::prelude::*;
+use intuicio_core::prelude::*;
+use intuicio_derive::*;
+
+#[derive(Debug)]
+pub enum CustomExpression {
+    Literal(i32),
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Now implement <code>ScriptExpression</code> trait with its <code>ecaluate</code> method that will perform pushing literal onto stack:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl ScriptExpression for CustomExpression {
+    fn evaluate(&amp;self, context: &amp;mut Context, _: &amp;Registry) {
+        match self {
+            Self::Literal(value) =&gt; {
+                context.stack().push(*value);
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Next step is to create a function that will parse text content and convert it into Intuicio script operations:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn compile_script(content: &amp;str) -&gt; ScriptHandle&lt;CustomExpression&gt; {
+    // use script builder to ease adding next operations.
+    let mut result = ScriptBuilder::&lt;CustomExpression&gt;::default();
+    // reverse lines order for parsing to turn human-readable version
+    // of stack operations into computer-readable stack operations.
+    for line in content.lines().rev() {
+        if line.is_empty() {
+            continue;
+        }
+        let mut tokens = line.split_ascii_whitespace();
+        match tokens.next() {
+            Some(&quot;push&quot;) =&gt; {
+                let value = tokens.next().unwrap().parse::&lt;i32&gt;().unwrap();
+                result = result.expression(CustomExpression::Literal(value));
+            }
+            Some(&quot;call&quot;) =&gt; {
+                let module_name = tokens.next().unwrap();
+                let name = tokens.next().unwrap();
+                result = result.call_function(FunctionQuery {
+                    name: Some(name.into()),
+                    module_name: Some(module_name.into()),
+                    ..Default::default()
+                });
+            }
+            // treat any line that doesn't start with expected name
+            // as comment.
+            _ =&gt; {}
+        }
+    }
+    result.build()
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Now let's create few native-side functions to operate on <code>i32</code> values for our script to call:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[intuicio_function(module_name = &quot;lib&quot;)]
+fn add(a: i32, b: i32) -&gt; i32 {
+    a + b
+}
+
+#[intuicio_function(module_name = &quot;lib&quot;)]
+fn sub(a: i32, b: i32) -&gt; i32 {
+    a - b
+}
+
+#[intuicio_function(module_name = &quot;lib&quot;)]
+fn mul(a: i32, b: i32) -&gt; i32 {
+    a * b
+}
+
+#[intuicio_function(module_name = &quot;lib&quot;)]
+fn div(a: i32, b: i32) -&gt; i32 {
+    a / b
+}
+<span class="boring">}</span></code></pre></pre>
+<hr />
+<p>At this point all what's left is to make <code>main</code> function and compile some script:</p>
+<pre><pre class="playground"><code class="language-rust">fn main() {
+    let script = compile_script(
+        r#&quot;
+        call lib div
+            call lib mul
+                push 3
+                call lib sub
+                    call lib add
+                        push 40
+                        push 2
+                    push 10
+            push 2
+        &quot;#,
+    );
+
+    // next steps gonna land here.
+}</code></pre></pre>
+<p>Next we create registry and install native functions there:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut registry = Registry::default().with_basic_types();
+registry.add_function(add::define_function(&amp;registry));
+registry.add_function(sub::define_function(&amp;registry));
+registry.add_function(mul::define_function(&amp;registry));
+registry.add_function(div::define_function(&amp;registry));
+<span class="boring">}</span></code></pre></pre>
+<p>You might notice that our scripts doesn't quite look like typical scripts, we do not see defining functions there, only expressions, so we will have to create and register a dedicated function that will use compiled script operations as its body:</p>
+<pre><pre class="playground"><code class="language-rust">registry.add_function(Function::new(
+    function_signature! {
+        registry =&gt; mod main fn main() -&gt; (result: i32)
+    },
+    VmScope::&lt;CustomExpression&gt;::generate_function_body(script, None)
+        .unwrap()
+        .0,
+));</code></pre></pre>
+<p>And finally once we have our registry filled, let's create a host and call that main function and get results of calculations:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut host = Host::new(
+    Context::new(
+        1024, // stack byte size.
+        0, // we don't use registers.
+        0, // we don't use heap.
+    ),
+    registry.into(),
+);
+let (result,) = host
+    .call_function::&lt;(i32,), _&gt;(&quot;main&quot;, &quot;main&quot;, None)
+    .unwrap()
+    .run(());
+assert_eq!(result, 48);
+<span class="boring">}</span></code></pre></pre>
+<hr />
+<p>And that's all for demonstration of how to make simple custom frontend!</p>
+<p>Typical scripting languages do have much more complex definition and use intermediate data structures that define their proper script structure which is a result of more complex parsing (frontends in repository do use <code>pest</code> for that), then these intermediate script data gets compield into Intuicio script data and that gets installed into the registry.</p>
+<p>We might tackle more complex example later, but for now feel free to get inspired by crates in <code>frontends</code> folder of this repository, especially <code>simpleton</code> if you are searching for how dynamically typed languages can be defined.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="scripting-pipeline-explained.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="anatomy-of-a-script.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -162,7 +321,7 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="scripting-pipeline-explained.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="anatomy-of-a-script.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

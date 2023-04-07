@@ -84,7 +84,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="building-custom-frontend.html"><strong aria-hidden="true">3.</strong> Building custom frontend</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-host.html"><strong aria-hidden="true">3.</strong> Anatomy of a Host</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-script.html"><strong aria-hidden="true">4.</strong> Anatomy of a Script</a></li><li class="chapter-item expanded "><a href="building-custom-frontend.html"><strong aria-hidden="true">5.</strong> Building custom frontend</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -177,6 +177,7 @@
 <p>Now let's pick some building blocks. For backend we will use <code>intuicio-backend-vm</code>, and for frontend we will use <code>intuicio-frontend-assembler</code> (this may look quite unintuitive but it will allow us better explain how bindings work with scripts, so please bare with me for a little).</p>
 <p>Create new Cargo project and add these dependencies:</p>
 <pre><code class="language-toml">[dependencies]
+intuicio-data = &quot;*&quot;
 intuicio-core = &quot;*&quot;
 intuicio-derive = &quot;*&quot;
 intuicio-backend-vm = &quot;*&quot;
@@ -299,8 +300,423 @@ assert_eq!(result, 42);
 <p>And this is basically exactly how and why Intuicio doesn't care about which side (script or native) calls what side - both script and native sides are calling each other the same way, and <code>VmScope</code> is just a container for script operations in the middle of interactions to make script side look the same as native side to host - this opens quite interesting opportunity, if expression type matches, to use different frontends together in one application. You can think of it as something like <code>.NET</code> platform for Rust.</p>
 <h1 id="conclusion"><a class="header" href="#conclusion">Conclusion</a></h1>
 <p>To summarize, Intuicio is actually <strong><em>just</em></strong> an engine to move data from place to place via stack, it doesn't care what is the data, it doesn't specify limits on the types of data (other than data has to be owned), it also doesn't care what is the place this data moves to, all it does is moves the data and both script and native side tells it when to move what data - simple as that!</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="anatomy-of-a-host"><a class="header" href="#anatomy-of-a-host">Anatomy of a Host</a></h1>
+<p><code>Host</code> is just a handy container for <code>Context</code> and <code>Registry</code> that simplifies calling functions registered in <code>Registry</code> within given <code>Context</code>.</p>
+<h2 id="registry"><a class="header" href="#registry">Registry</a></h2>
+<h3 id="setup"><a class="header" href="#setup">Setup</a></h3>
+<p><code>Registry</code> contains all structures and functions that both scripting and native side expose for scripting to interact with.</p>
+<p>Here is an example of how to register functions both from native and script sides:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[intuicio_function(module_name = &quot;lib&quot;)]
+fn add(a: i32, b: i32) -&gt; i32 {
+    a + b
+}
+
+let mut registry = Registry::default().with_basic_types();
+registry.add_function(add::define_function());
+let mut content_provider = FileContentProvider::new(&quot;iasm&quot;, AsmContentParser);
+AsmPackage::new(&quot;main.iasm&quot;, &amp;mut content_provider)
+    .unwrap()
+    .compile()
+    .install::&lt;VmScope&lt;AsmExpression&gt;&gt;(&amp;mut registry, None);
+<span class="boring">}</span></code></pre></pre>
+<p>Of course we don't actually require frontends to register script-side functions and structures, here is an example of how one could create raw scripted function, knowing the backend it's gonna use (<code>VmScope</code> here):</p>
+<pre><pre class="playground"><code class="language-rust">registry.add_function(
+    VmScope::&lt;AsmExpression&gt;::generate_function(
+        &amp;ScriptFunction {
+            signature: function_signature! {
+                registry =&gt; mod test fn main() -&gt; (result: i32)
+            },
+            script: ScriptBuilder::&lt;AsmExpression&gt;::default()
+                .literal(AsmExpression::Literal(AsmLiteral::I32(2)))
+                .literal(AsmExpression::Literal(AsmLiteral::I32(40)))
+                .call_function(FunctionQuery {
+                    name: Some(&quot;add&quot;.into()),
+                    module_name: Some(&quot;lib&quot;.into()),
+                    ..Default::default()
+                })
+                .build(),
+        },
+        &amp;registry,
+        None,
+    )
+    .unwrap()
+    .0,
+);</code></pre></pre>
+<p>And as we can see above, we can use completely different backends for each function we want to register, therefore in principle, one application can run multiple backends, not forcing user to use only one.</p>
+<blockquote>
+<p>Also remember that since Intuicio is all about moving data into and out of function calls, every function that we want to call, has to be always registered in the registry and registry cannot be modified when used in function calls!</p>
+</blockquote>
+<h3 id="queries"><a class="header" href="#queries">Queries</a></h3>
+<p>If user wants to call function from registry, user has to find it first and to do that we use <code>FunctionQuery</code> that defines search parameters for registry to filter functions with:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let (result,) = registry.find_function(FunctionQuery {
+    name: Some(&quot;add&quot;.into()),
+    module_name: Some(&quot;lib&quot;.into()),
+    ..Default::default()
+})
+.expect(&quot;`lib::add` function not found!&quot;)
+.call::&lt;(i32,), _&gt;(&amp;mut context, &amp;registry, (40_i32, 2_i32), true);
+assert_eq!(result, 42);
+<span class="boring">}</span></code></pre></pre>
+<p>When we want to find and call registered function from within another native function, we should be able as long as native-side function has access to context and registry:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[intuicio_function(module_name = &quot;script&quot;, use_context, use_registry)]
+fn script_add(context: &amp;mut Context, registry: &amp;Registry, a: i32, b: i32) -&gt; i32 {
+    context.stack().push(b);
+    context.stack().push(a);
+    registry.find_function(FunctionQuery {
+        name: Some(&quot;add&quot;.into()),
+        module_name: Some(&quot;lib&quot;.into()),
+        ..Default::default()
+    })
+    .expect(&quot;`lib::add` function not found!&quot;)
+    .invoke(context, registry);
+    context.stack().pop::&lt;i32&gt;().expect(&quot;Expected to return `i32`!&quot;)
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Btw. in snippet above we perform function onvoke instead of call, and notice order of pushing values into stack - by design native functions expect to pop their arguments from first to last argument, and push its result in reverse order to match later function calls proper argument pop order. For convienience it is advised to perform function calls instead of invokes, because function calls keep proper stack push and pop order on their own.</p>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p><code>Context</code> is a container that holds:</p>
+<ul>
+<li>
+<p><strong>Stack</strong></p>
+<p>Used to move data between function calls.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>context.stack().push(42_i32);
+assert_eq!(context.stack().pop::&lt;i32&gt;().unwrap(), 42);
+<span class="boring">}</span></code></pre></pre>
+</li>
+<li>
+<p><strong>Registers</strong></p>
+<p>Indexed data storage, the closest analogue for local function variables.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let (stack, registers) = context.stack_and_registers();
+let index = registers.push_register().unwrap();
+stack.push(42_i32);
+let mut register = registers.access_register(index).unwrap();;
+registers.pop_to_register(&amp;mut register);
+stack.push_from_register(&amp;mut register);
+assert_eq!(stack.pop::&lt;i32&gt;().unwrap(), 42);
+<span class="boring">}</span></code></pre></pre>
+<p>Please remember that registers just like stack, data can be only moved in and out of registers, registers operations does not copy/clone their data - this design choice was dictated by master rule of Intuicio: &quot;data can only be moved&quot;, copy/clone is a special operation that structure has to provide a dedicated function for it to push duplicated source data into stack, from which original data gets moved back to register and its clone stays on the stack - this is how for example <code>simpleton</code> frontend does when has to copy <code>Reference</code> from local variable.</p>
+</li>
+<li>
+<p><strong>Heap</strong></p>
+<p>Used to store dynamically allocated data in case user wants to ensure that data lifetime to be bound to the context (die along with context death). To be honest, this is not widely used piece of context, since data stored in any of the other pieces of context has no requirement to come from context's heap, it works perfectly fine with data allocated purely on rust-side, although at some point there might be a scenario where having boxed data owned by context is beneficial, therefore it is exposed to the user.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut value = context.heap().alloc(0_i32);
+*value.write().uwnrap() = 42;
+assert_eq!(*value.read().unwrap(), 42);
+<span class="boring">}</span></code></pre></pre>
+<p>It's worth noting that memory allocated by heap box gets automatically returned to the heap once heap box drops, so there is no explicit heap box deallocation.</p>
+</li>
+<li>
+<p><strong>Custom data</strong></p>
+<p>Now this is the interesting bit, it is basically a hash map of <code>Box&lt;Any + Send + Sync&gt;</code> objects that does not fit to any of the other context pieces. It is useful for storing any meta information. For example <code>simpleton</code> frontend stores there its <code>HostProducer</code> that is used to construct new <code>Host</code> for any spawned <code>Jobs</code> worker thread, so each worker thread can execute closures pased into it.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>context.set_custom(&quot;foo&quot;, 42_i32);
+assert_eq!(*context.custom::&lt;i32&gt;().unwrap(), 42);
+<span class="boring">}</span></code></pre></pre>
+</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="anatomy-of-a-script"><a class="header" href="#anatomy-of-a-script">Anatomy of a Script</a></h1>
+<p>Entire <code>Script</code> structure is split into package, modules, functions/structures and at it's core: operations.</p>
+<p>Example:</p>
+<ul>
+<li>Package:
+<ul>
+<li>module: <code>test</code>
+<ul>
+<li>struct: <code>Foo</code>
+<ul>
+<li>field: <code>a</code>: <code>bool</code></li>
+</ul>
+</li>
+<li>function: <code>main</code>
+<ul>
+<li>output: <code>result</code>: <code>i32</code></li>
+<li>operations:
+<ul>
+<li>literal: <code>40</code>: <code>i32</code></li>
+<li>literal: <code>2</code>: <code>i32</code></li>
+<li>call function: <code>lib::add</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="operations"><a class="header" href="#operations">Operations</a></h2>
+<p>Intuicio scripts by default have a very limited set of operations, because of being an universal interface between frontends and backends, these operations have to be the lowest denominator across most possible frontend and backend designs, therefore operations it hives are:</p>
+<ul>
+<li>
+<p><strong>Expression</strong></p>
+<p>This is an additional set of possible operations defined by frontends. It accepts types that implement <code>ScriptExpression</code> that allows to evaluate additional operation using only context and registry.
+Common example of script expression is pushing literals onto stack - stack manipulation is not part of the script operations set, because Intuicio is completely generic over the data it moves, and specific frontends most likely do have very specific assumptions about the data they allow to use, so it's better to leave this kind of operations to be provided by them.</p>
+<p>Example of custom script expression:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum CustomExpression {
+    Literal(i32),
+    StackDrop,
+}
+
+impl ScriptExpression for CustomExpression {
+    fn evaluate(&amp;self, context: &amp;mut Context, _: &amp;Registry) {
+        match self {
+            Self::Literal(value) =&gt; {
+                context.stack().push(*value);
+            }
+            Self::StackDrop =&gt; {
+                context.stack().drop();
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+</li>
+<li>
+<p><strong>Define register</strong></p>
+<p>Allocates space for new register of given type defined by <code>StructQuery</code>. Remember to always define register before it gets used! Registers gets removed when scope where they were defined gets dropped.</p>
+</li>
+<li>
+<p><strong>Drop register</strong></p>
+<p>Drops data behind given register.</p>
+</li>
+<li>
+<p><strong>Push from register</strong></p>
+<p>Takes data from given register and pushes it onto stack.</p>
+</li>
+<li>
+<p><strong>Pop to register</strong></p>
+<p>Takes data from stack and moves it to given register.</p>
+</li>
+<li>
+<p><strong>Move register</strong></p>
+<p>Moves data between two registers.</p>
+</li>
+<li>
+<p><strong>Call function</strong></p>
+<p>Uses associated <code>FunctionQuery</code> to find and invoke function from registry.</p>
+</li>
+<li>
+<p><strong>Branch scope</strong></p>
+<p>Takes <code>bool</code> from stack and if it's <code>true</code>, it will execute Success operations set, otherwise Failure operations set if present.</p>
+</li>
+<li>
+<p><strong>Loop scope</strong></p>
+<p>Executes set of operations in an loop so that before start of iteration it takes <code>bool</code> from stack, then if it's <code>true</code>, set of operations gets executed. Important note here is to remember to always push <code>bool</code> value (telling if next iteration should be executed), before we exit child scope.</p>
+</li>
+<li>
+<p><strong>Push scope</strong></p>
+<p>Pushes new set of operations for execution, returning further execution to its parent only when child scope stops its execution.</p>
+</li>
+<li>
+<p><strong>Pop scope</strong></p>
+<p>Closest analogue can be <code>return</code> keyword, which forces scope to stop further operations execution.</p>
+</li>
+<li>
+<p><strong>Continue scope conditionally</strong></p>
+<p>Does what pop scope does, but first takes <code>bool</code> from the stack and if it is <code>false</code>, scope gets dropperd.</p>
+</li>
+</ul>
+<p>Usually we leave producing script operations to frontends, but one can create them at any time by any means. One can even create them at runtime and call newly created function in place, without adding it to registry:</p>
+<pre><pre class="playground"><code class="language-rust">let function = VmScope::&lt;AsmExpression&gt;::generate_function(
+    &amp;ScriptFunction {
+        signature: function_signature! {
+            registry =&gt; mod test fn main() -&gt; (result: i32)
+        },
+        script: ScriptBuilder::&lt;AsmExpression&gt;::default()
+            .literal(AsmExpression::Literal(AsmLiteral::I32(2)))
+            .literal(AsmExpression::Literal(AsmLiteral::I32(40)))
+            .call_function(FunctionQuery {
+                name: Some(&quot;add&quot;.into()),
+                module_name: Some(&quot;lib&quot;.into()),
+                ..Default::default()
+            })
+            .build(),
+    },
+    &amp;registry,
+    None,
+)
+.unwrap()
+.0;
+
+function.invoke(&amp;mut context, &amp;registry);
+assert_eq!(context.stack().pop::&lt;i32&gt;().unwrap(), 42);</code></pre></pre>
+<p>This example shows precisely how short is the path between scripts and backends - backends constructing script functions directly from script operations, and in case of <code>VmScope</code> every time we call function generated by it, we directly execute these operations.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="building-custom-frontend"><a class="header" href="#building-custom-frontend">Building custom frontend</a></h1>
-<p><em>TODO</em></p>
+<p>Here we will create a very simple frontend to put in use all what we have learned before.</p>
+<p>This is gonna be basically a pretty much stripped down version of <code>asembler</code> frontend jsut to get intuicion on creating frontends. For more advanced examples of frontends please take a look at frontends already made, located in <code>frontends</code> folder on repository.</p>
+<hr />
+<p>Let's start with defining goals for this frontend to achieve:</p>
+<ul>
+<li>scripts operate only on <code>i32</code> values.</li>
+<li>scripts will have two operations:
+<ul>
+<li>push value on stack.</li>
+<li>call functions that takes values from stack, performs operations on them and push results back on stack.</li>
+</ul>
+</li>
+<li>syntax of this language has to be simple, so that:
+<ul>
+<li>each line is an operation.</li>
+<li>we put operations in reverse order so it is easier to read script as a hierarchy of function calls with its arguments indented and in ascending order.</li>
+</ul>
+</li>
+</ul>
+<p>So now let's create new project, import dependencies and define frontend's expression type:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use intuicio_backend_vm::prelude::*;
+use intuicio_core::prelude::*;
+use intuicio_derive::*;
+
+#[derive(Debug)]
+pub enum CustomExpression {
+    Literal(i32),
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Now implement <code>ScriptExpression</code> trait with its <code>ecaluate</code> method that will perform pushing literal onto stack:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl ScriptExpression for CustomExpression {
+    fn evaluate(&amp;self, context: &amp;mut Context, _: &amp;Registry) {
+        match self {
+            Self::Literal(value) =&gt; {
+                context.stack().push(*value);
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Next step is to create a function that will parse text content and convert it into Intuicio script operations:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn compile_script(content: &amp;str) -&gt; ScriptHandle&lt;CustomExpression&gt; {
+    // use script builder to ease adding next operations.
+    let mut result = ScriptBuilder::&lt;CustomExpression&gt;::default();
+    // reverse lines order for parsing to turn human-readable version
+    // of stack operations into computer-readable stack operations.
+    for line in content.lines().rev() {
+        if line.is_empty() {
+            continue;
+        }
+        let mut tokens = line.split_ascii_whitespace();
+        match tokens.next() {
+            Some(&quot;push&quot;) =&gt; {
+                let value = tokens.next().unwrap().parse::&lt;i32&gt;().unwrap();
+                result = result.expression(CustomExpression::Literal(value));
+            }
+            Some(&quot;call&quot;) =&gt; {
+                let module_name = tokens.next().unwrap();
+                let name = tokens.next().unwrap();
+                result = result.call_function(FunctionQuery {
+                    name: Some(name.into()),
+                    module_name: Some(module_name.into()),
+                    ..Default::default()
+                });
+            }
+            // treat any line that doesn't start with expected name
+            // as comment.
+            _ =&gt; {}
+        }
+    }
+    result.build()
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Now let's create few native-side functions to operate on <code>i32</code> values for our script to call:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[intuicio_function(module_name = &quot;lib&quot;)]
+fn add(a: i32, b: i32) -&gt; i32 {
+    a + b
+}
+
+#[intuicio_function(module_name = &quot;lib&quot;)]
+fn sub(a: i32, b: i32) -&gt; i32 {
+    a - b
+}
+
+#[intuicio_function(module_name = &quot;lib&quot;)]
+fn mul(a: i32, b: i32) -&gt; i32 {
+    a * b
+}
+
+#[intuicio_function(module_name = &quot;lib&quot;)]
+fn div(a: i32, b: i32) -&gt; i32 {
+    a / b
+}
+<span class="boring">}</span></code></pre></pre>
+<hr />
+<p>At this point all what's left is to make <code>main</code> function and compile some script:</p>
+<pre><pre class="playground"><code class="language-rust">fn main() {
+    let script = compile_script(
+        r#&quot;
+        call lib div
+            call lib mul
+                push 3
+                call lib sub
+                    call lib add
+                        push 40
+                        push 2
+                    push 10
+            push 2
+        &quot;#,
+    );
+
+    // next steps gonna land here.
+}</code></pre></pre>
+<p>Next we create registry and install native functions there:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut registry = Registry::default().with_basic_types();
+registry.add_function(add::define_function(&amp;registry));
+registry.add_function(sub::define_function(&amp;registry));
+registry.add_function(mul::define_function(&amp;registry));
+registry.add_function(div::define_function(&amp;registry));
+<span class="boring">}</span></code></pre></pre>
+<p>You might notice that our scripts doesn't quite look like typical scripts, we do not see defining functions there, only expressions, so we will have to create and register a dedicated function that will use compiled script operations as its body:</p>
+<pre><pre class="playground"><code class="language-rust">registry.add_function(Function::new(
+    function_signature! {
+        registry =&gt; mod main fn main() -&gt; (result: i32)
+    },
+    VmScope::&lt;CustomExpression&gt;::generate_function_body(script, None)
+        .unwrap()
+        .0,
+));</code></pre></pre>
+<p>And finally once we have our registry filled, let's create a host and call that main function and get results of calculations:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut host = Host::new(
+    Context::new(
+        1024, // stack byte size.
+        0, // we don't use registers.
+        0, // we don't use heap.
+    ),
+    registry.into(),
+);
+let (result,) = host
+    .call_function::&lt;(i32,), _&gt;(&quot;main&quot;, &quot;main&quot;, None)
+    .unwrap()
+    .run(());
+assert_eq!(result, 48);
+<span class="boring">}</span></code></pre></pre>
+<hr />
+<p>And that's all for demonstration of how to make simple custom frontend!</p>
+<p>Typical scripting languages do have much more complex definition and use intermediate data structures that define their proper script structure which is a result of more complex parsing (frontends in repository do use <code>pest</code> for that), then these intermediate script data gets compield into Intuicio script data and that gets installed into the registry.</p>
+<p>We might tackle more complex example later, but for now feel free to get inspired by crates in <code>frontends</code> folder of this repository, especially <code>simpleton</code> if you are searching for how dynamically typed languages can be defined.</p>
 
                     </main>
 
