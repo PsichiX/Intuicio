@@ -189,7 +189,7 @@ fn add(a: i32, b: i32) -&gt; i32 {
 </span>let mut registry = Registry::default().with_basic_types();
 registry.add_function(add::define_function());
 <span class="boring">}</span></code></pre></pre>
-<p>Like we sait before, registry should hold all the structures and functions information that scripts can interact with, and because Registry turns immutable once it gets into execution phase, better to do that from the get go - you won't be able to modify registry later.</p>
+<p>Like we have said before, registry should hold all the structures and functions information that scripts can interact with, and because Registry turns immutable once it gets into execution phase, better to do that from the get go - you won't be able to modify registry later.</p>
 <hr />
 <p>Next step is to load, parse, compile and install assembly script into registry:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
