@@ -25,7 +25,7 @@ use intuicio_frontend_assembler::*;
 
 ---
 
-Now let's define a simple function that our script will run:
+Now let's define a simple native function that our script will call:
 ```rust
 #[intuicio_function(module_name = "lib")]
 fn add(a: i32, b: i32) -> i32 {
