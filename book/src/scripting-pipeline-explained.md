@@ -141,7 +141,7 @@ fn main(context: &mut Context, registry: &Registry) {
     add(context, registry);
 }
 ```
-And this is basically exactly how and why Intuicio doesn't care about which side (script or native) calls what side - both script and native sides are calling each other the same way, and `VmScope` is just a container for script operations in the middle of interactions to make script side look the same as native side to host.
+And this is basically exactly how and why Intuicio doesn't care about which side (script or native) calls what side - both script and native sides are calling each other the same way, and `VmScope` is just a container for script operations in the middle of interactions to make script side look the same as native side to host - this opens quite interesting opportunity, if expression type matches, to use different frontends together in one applicaiton. You can think of it as something like `.NET` platform for Rust.
 
 # Conclusion
 
