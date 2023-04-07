@@ -38,6 +38,6 @@ Another example of backend can be "nativizer" - nativizers are units that transp
 
 ## Host
 
-Host is basically an application-space of scripts, where user creates libraries of functions and structs to bind into `Registry`, which later can be called or accessed by script operations withing given `Context` that are shared between scripting and native side.
+Host is basically an application-space (native side) of scripting logic, where user creates libraries of native functions and structs to bind into `Registry`, which later can be called or accessed by script operations or other native side code within given `Context`, shared between scripting and native side and treated equally as same.
 
 The goal here is to allow for seamless interoperability between scripting and native sides of program logic, not forcing users to focus all their effort onto one particular side, something that is quite unique for scripting solutions, and this design decision was borrowed from Unreal Engine where it proven to be at least quite useful.
