@@ -266,7 +266,7 @@ assert_eq!(result, 42);
 </code></pre>
 <p>We can see all this script is doing is pushing data on stack and calling a function - this will help us explain what is happening much easier.</p>
 <h2 id="how-data-moves"><a class="header" href="#how-data-moves">How data moves</a></h2>
-<p>Let's start with showing how our <code>add</code> function looks actually looks like to <code>Host</code>:</p>
+<p>Let's start with showing how our <code>add</code> function actually looks like to <code>Host</code>:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn add(context: &amp;mut Context, registry: &amp;Registry) {
