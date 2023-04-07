@@ -107,7 +107,7 @@ Btw. in snippet above we perform function invoke instead of a call, and notice o
     stack.push_from_register(&mut register);
     assert_eq!(stack.pop::<i32>().unwrap(), 42);
     ```
-    Please remember that registers just like stack, data can be only moved in and out of registers, registers operations does not copy/clone their data - this design choice was dictated by master rule of Intuicio: "data can only be moved", copy/clone is a special operation that structure has to provide a dedicated function for it to push duplicated source data into stack, from which original data gets moved back to register and its clone stays on the stack - this is how for example `simpleton` frontend does when has to copy `Reference` from local variable.
+    Please remember that with registers, just like with stack, data can be only moved in and out of registers, registers operations does not copy/clone their data - this design choice was dictated by master rule of Intuicio: "data can only be moved", copy/clone is a special operation that given structure has to provide a dedicated function for it to push duplicated source data into stack, from which original data gets moved back to register and its clone stays on the stack - this is what for example `simpleton` frontend does when it has to copy `Reference` from local variable to stack for later use.
 
 - **Heap**
 
