@@ -82,7 +82,7 @@ fn script_add(context: &mut Context, registry: &Registry, a: i32, b: i32) -> i32
     context.stack().pop::<i32>().expect("Expected to return `i32`!")
 }
 ```
-Btw. in snippet above we perform function onvoke instead of call, and notice order of pushing values into stack - by design native functions expect to pop their arguments from first to last argument, and push its result in reverse order to match later function calls proper argument pop order. For convienience it is advised to perform function calls instead of invokes, because function calls keep proper stack push and pop order on their own.
+Btw. in snippet above we perform function invoke instead of a call, and notice order of pushing values into stack - by design native functions expect to pop their arguments from first to last argument, and push its result in reverse order to match later function calls proper argument pop order. For convienience it is advised to perform function calls instead of invokes, because function calls keep proper stack push and pop order on their own.
 
 ## Context
 
