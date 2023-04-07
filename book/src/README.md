@@ -1,6 +1,8 @@
 # Introduction
 
-Project repository: https://github.com/PsichiX/Intuicio ![crates-io version](https://raster.shields.io/crates/v/intuicio-core.png)
+**Project repository**: [github.com/PsichiX/Intuicio](https://github.com/PsichiX/Intuicio)
+
+![crates-io version](https://raster.shields.io/crates/v/intuicio-core.png)
 
 ## What is Intuicio?
 
