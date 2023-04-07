@@ -263,7 +263,7 @@ assert_eq!(*value.read().unwrap(), 42);
 </li>
 <li>
 <p><strong>Custom data</strong></p>
-<p>Now this is the interesting bit, it is basically a hash map of <code>Box&lt;Any + Send + Sync&gt;</code> objects that does not fit to any of the other context pieces. It is useful for storing any meta information. For example <code>simpleton</code> frontend stores there its <code>HostProducer</code> that is used to construct new <code>Host</code> for any spawned <code>Jobs</code> worker thread, so each worker thread can execute closures pased into it.</p>
+<p>Now this is the interesting bit, it is basically a hash map of <code>Box&lt;Any + Send + Sync&gt;</code> objects that does not fit to any of the other context pieces. It is useful for storing any meta information. For example <code>simpleton</code> frontend stores there its <code>HostProducer</code> that is used to construct new <code>Host</code> for any spawned <code>Jobs</code> worker thread, so each worker thread can execute closures passed into it.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>context.set_custom(&quot;foo&quot;, 42_i32);
