@@ -49,7 +49,7 @@ Then in `main` function first thing we should create is `Registry` to store all 
 let mut registry = Registry::default().with_basic_types();
 registry.add_function(add::define_function());
 ```
-Like we sait before, registry should hold all the structures and functions information that scripts can interact with, and because Registry turns immutable once it gets into execution phase, better to do that from the get go - you won't be able to modify registry later.
+Like we have said before, registry should hold all the structures and functions information that scripts can interact with, and because Registry turns immutable once it gets into execution phase, better to do that from the get go - you won't be able to modify registry later.
 
 ---
 
