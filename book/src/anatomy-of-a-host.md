@@ -121,7 +121,7 @@ Btw. in snippet above we perform function invoke instead of a call, and notice o
 
 - **Custom data**
 
-    Now this is the interesting bit, it is basically a hash map of `Box<Any + Send + Sync>` objects that does not fit to any of the other context pieces. It is useful for storing any meta information. For example `simpleton` frontend stores there its `HostProducer` that is used to construct new `Host` for any spawned `Jobs` worker thread, so each worker thread can execute closures pased into it.
+    Now this is the interesting bit, it is basically a hash map of `Box<Any + Send + Sync>` objects that does not fit to any of the other context pieces. It is useful for storing any meta information. For example `simpleton` frontend stores there its `HostProducer` that is used to construct new `Host` for any spawned `Jobs` worker thread, so each worker thread can execute closures passed into it.
     ```rust
     context.set_custom("foo", 42_i32);
     assert_eq!(*context.custom::<i32>().unwrap(), 42);

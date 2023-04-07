@@ -16,7 +16,7 @@ Example:
 
 ## Operations
 
-Intuicio scripts by default have a very limited set of operations, because of being an universal interface between frontends and backends, these operations have to be the lowest denominator across most possible frontend and backend designs, therefore operations it hives are:
+Intuicio scripts by default have a very limited set of operations, because of being an universal interface between frontends and backends, these operations have to be the lowest denominator across most possible frontend and backend designs, therefore operations it haves are:
 
 - **Expression**
 
