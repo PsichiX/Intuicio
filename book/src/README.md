@@ -1,5 +1,7 @@
 # Introduction
 
+Project repository: https://github.com/PsichiX/Intuicio ![crates-io version](https://raster.shields.io/crates/v/intuicio-core.png)
+
 ## What is Intuicio?
 
 In short words: Intuicio is a set of building blocks designed to build your own scripting solution in Rust.
