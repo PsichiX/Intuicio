@@ -222,7 +222,7 @@ fn script_add(context: &amp;mut Context, registry: &amp;Registry, a: i32, b: i32
     context.stack().pop::&lt;i32&gt;().expect(&quot;Expected to return `i32`!&quot;)
 }
 <span class="boring">}</span></code></pre></pre>
-<p>Btw. in snippet above we perform function onvoke instead of call, and notice order of pushing values into stack - by design native functions expect to pop their arguments from first to last argument, and push its result in reverse order to match later function calls proper argument pop order. For convienience it is advised to perform function calls instead of invokes, because function calls keep proper stack push and pop order on their own.</p>
+<p>Btw. in snippet above we perform function invoke instead of a call, and notice order of pushing values into stack - by design native functions expect to pop their arguments from first to last argument, and push its result in reverse order to match later function calls proper argument pop order. For convienience it is advised to perform function calls instead of invokes, because function calls keep proper stack push and pop order on their own.</p>
 <h2 id="context"><a class="header" href="#context">Context</a></h2>
 <p><code>Context</code> is a container that holds:</p>
 <ul>
