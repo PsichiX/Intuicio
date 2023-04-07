@@ -2,7 +2,7 @@
 
 Here we will create a very simple frontend to put in use all what we have learned before.
 
-This is gonna be basically a pretty much stripped down version of `asembler` frontend jsut to get intuicion on creating frontends. For more advanced examples of frontends please take a look at frontends already made, located in `frontends` folder on repository.
+This is gonna be basically a pretty much stripped down version of `assembler` frontend jsut to get intuicion on creating frontends. For more advanced examples of frontends please take a look at frontends already made, located in `frontends` folder on repository.
 
 ---
 
