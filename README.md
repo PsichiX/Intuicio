@@ -3,7 +3,7 @@ Modular scripting solution for Rust
 
 ## The Book
 Here is Intuicio Bible - book explaining what Intuicio is, how it works and
-how to use it: **https://github.com/PsichiX/Intuicio**
+how to use it: **https://psichix.github.io/Intuicio/**
 
 ## Important note ⚠
 This is highly experimental ecosystem that will evolve in time!
