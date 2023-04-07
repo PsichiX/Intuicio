@@ -1,7 +1,11 @@
 # Intuicio
-Virtual and Native scripting solution for Rust
+Modular scripting solution for Rust
 
-## Important note
+## The Book
+Here is Intuicio Bible - book explaining what Intuicio is, how it works and
+how to use it: **https://github.com/PsichiX/Intuicio**
+
+## Important note ⚠
 This is highly experimental ecosystem that will evolve in time!
 
 Important things missing in curent version that will get eventually addressed:
