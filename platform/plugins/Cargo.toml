@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
 documentation = "https://docs.rs/intuicio-plugins"
-readme = "../README.md"
+readme = "../../README.md"
 
 [dependencies]
 intuicio-core = { version = "0.6", path = "../core" }
