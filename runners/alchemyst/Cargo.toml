@@ -1,6 +1,6 @@
 [package]
 name = "alchemyst"
-version = "0.5.2"
+version = "0.6.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Alchemyst PCG tool of Intuicio scripting platform"
@@ -24,15 +24,15 @@ fs = ["intuicio-frontend-simpleton/fs"]
 jobs = ["intuicio-frontend-simpleton/jobs"]
 
 [dependencies]
-intuicio-data = { version = "0.5", path = "../../data" }
-intuicio-core = { version = "0.5", path = "../../core" }
-intuicio-derive = { version = "0.5", path = "../../derive" }
-intuicio-backend-vm = { version = "0.5", path = "../../backends/vm" }
+intuicio-data = { version = "0.6", path = "../../data" }
+intuicio-core = { version = "0.6", path = "../../core" }
+intuicio-derive = { version = "0.6", path = "../../derive" }
+intuicio-backend-vm = { version = "0.6", path = "../../backends/vm" }
 image = "0.24"
 vek = "0.15"
 clap = { version = "4", features = ["derive"] }
 
 [dependencies.intuicio-frontend-simpleton]
-version = "0.5"
+version = "0.6"
 path = "../../frontends/simpleton"
 default-features = false
