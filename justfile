@@ -44,13 +44,13 @@ install:
   cargo install --path ./runners/alchemyst
 
 publish:
-  cargo publish --no-verify --manifest-path ./data/Cargo.toml
+  cargo publish --no-verify --manifest-path ./platform/data/Cargo.toml
   sleep 15
-  cargo publish --no-verify --manifest-path ./core/Cargo.toml
+  cargo publish --no-verify --manifest-path ./platform/core/Cargo.toml
   sleep 15
-  cargo publish --no-verify --manifest-path ./plugins/Cargo.toml
+  cargo publish --no-verify --manifest-path ./platform/plugins/Cargo.toml
   sleep 15
-  cargo publish --no-verify --manifest-path ./derive/Cargo.toml
+  cargo publish --no-verify --manifest-path ./platform/derive/Cargo.toml
   sleep 15
   cargo publish --no-verify --manifest-path ./backends/vm/Cargo.toml
   sleep 15
