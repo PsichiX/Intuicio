@@ -442,10 +442,18 @@ pub trait ScriptContentProvider<T> {
     fn join_paths(&self, parent: &str, relative: &str) -> Result<String, Box<dyn Error>>;
 }
 
-#[derive(Default)]
 pub struct ExtensionContentProvider<S> {
     default_extension: Option<String>,
     extension_providers: HashMap<String, Box<dyn ScriptContentProvider<S>>>,
+}
+
+impl<S> Default for ExtensionContentProvider<S> {
+    fn default() -> Self {
+        Self {
+            default_extension: None,
+            extension_providers: Default::default(),
+        }
+    }
 }
 
 impl<S> ExtensionContentProvider<S> {

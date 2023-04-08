@@ -11,16 +11,18 @@ documentation = "https://docs.rs/intuicio-frontend-simpleton"
 readme = "../../README.md"
 
 [features]
-default = ["console", "fs", "process", "net", "jobs"]
+default = ["console", "fs", "process", "net", "jobs", "plugins"]
 console = []
 fs = []
 process = []
 net = []
 jobs = []
+plugins = []
 
 [dependencies]
 intuicio-data = { version = "0.5", path = "../../data" }
 intuicio-core = { version = "0.5", path = "../../core" }
+intuicio-plugins = { version = "0.5", path = "../../plugins" }
 intuicio-derive = { version = "0.5", path = "../../derive" }
 pest = "2.5"
 pest_derive = "2.5"

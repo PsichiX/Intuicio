@@ -12,7 +12,7 @@ use intuicio_core::{
     struct_type::StructQuery,
     Visibility,
 };
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, env::consts::DLL_EXTENSION, error::Error, path::PathBuf};
 
 const CLOSURES: &str = "_closures";
 
@@ -1162,6 +1162,31 @@ impl SimpletonPackage {
             functions: closure_functions,
         });
         ScriptPackage { modules }
+    }
+
+    #[cfg(feature = "plugins")]
+    pub fn install_plugins(&self, registry: &mut Registry, search_paths: &[&str]) {
+        use intuicio_plugins::install_plugin;
+
+        for module in self.modules.values() {
+            'plugin: for path in &module.dependencies {
+                let mut path = PathBuf::from(path);
+                if path
+                    .extension()
+                    .map(|extension| extension == "plugin")
+                    .unwrap_or_default()
+                {
+                    path.set_extension(DLL_EXTENSION);
+                    for search_path in search_paths {
+                        let path = PathBuf::from(search_path).join(&path);
+                        if install_plugin(path.to_string_lossy().as_ref(), registry).is_ok() {
+                            continue 'plugin;
+                        }
+                    }
+                    panic!("Could not load plugin: {:?}", path);
+                }
+            }
+        }
     }
 }
 

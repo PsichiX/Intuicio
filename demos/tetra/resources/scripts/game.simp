@@ -1,6 +1,7 @@
 mod game {
     import "ui";
     import "story/main";
+    import "plugin.plugin";
 
     func initialize(state) {
         console::log_line(

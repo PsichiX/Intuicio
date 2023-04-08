@@ -3,7 +3,6 @@ use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_data::prelude::*;
 use intuicio_frontend_simpleton::prelude::{jobs::Jobs, *};
-use intuicio_plugins::install_plugin;
 use tetra::{time::get_delta_time, Context as TetraContext};
 
 pub struct Scripting {
@@ -28,13 +27,19 @@ impl Scripting {
         tetra_context: &mut TetraContext,
     ) -> Self {
         let entry = format!("{}/{}", assets, entry);
-        let mut content_provider = FileContentProvider::new("simp", SimpletonContentParser);
+        let mut content_provider = ExtensionContentProvider::<SimpletonModule>::default()
+            .extension(
+                "simp",
+                FileContentProvider::new("simp", SimpletonContentParser),
+            )
+            .extension("plugin", IgnoreContentProvider)
+            .default_extension("simp");
         let package = SimpletonPackage::new(&entry, &mut content_provider).unwrap();
         let host_producer = HostProducer::new(move || {
             let mut registry = Registry::default();
             intuicio_frontend_simpleton::library::install(&mut registry);
             crate::library::install(&mut registry);
-            install_plugin("../../target/debug/plugin.dll", &mut registry).unwrap();
+            package.install_plugins(&mut registry, &["./", "../../target/debug"]);
             package
                 .compile()
                 .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);

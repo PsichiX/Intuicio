@@ -47,6 +47,8 @@ publish:
   sleep 15
   cargo publish --no-verify --manifest-path ./core/Cargo.toml
   sleep 15
+  cargo publish --no-verify --manifest-path ./plugins/Cargo.toml
+  sleep 15
   cargo publish --no-verify --manifest-path ./derive/Cargo.toml
   sleep 15
   cargo publish --no-verify --manifest-path ./backends/vm/Cargo.toml
