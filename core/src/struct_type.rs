@@ -1,6 +1,6 @@
 use crate::{prelude::RuntimeObject, Visibility};
-use intuicio_data::{Finalize, Initialize};
-use std::{alloc::Layout, any::TypeId, borrow::Cow, sync::Arc};
+use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
+use std::{alloc::Layout, borrow::Cow, sync::Arc};
 
 pub type StructHandle = Arc<Struct>;
 
@@ -8,7 +8,7 @@ pub struct RuntimeStructBuilder {
     name: String,
     module_name: Option<String>,
     visibility: Visibility,
-    type_id: TypeId,
+    type_id: TypeHash,
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
@@ -22,7 +22,7 @@ impl RuntimeStructBuilder {
             name: name.to_string(),
             module_name: None,
             visibility: Visibility::default(),
-            type_id: TypeId::of::<RuntimeObject>(),
+            type_id: TypeHash::of::<RuntimeObject>(),
             type_name: std::any::type_name::<RuntimeObject>().to_owned(),
             fields: vec![],
             layout: Layout::from_size_align(0, 1).unwrap(),
@@ -89,7 +89,7 @@ pub struct NativeStructBuilder {
     name: String,
     module_name: Option<String>,
     visibility: Visibility,
-    type_id: TypeId,
+    type_id: TypeHash,
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
@@ -103,7 +103,7 @@ impl NativeStructBuilder {
             name: std::any::type_name::<T>().to_owned(),
             module_name: None,
             visibility: Visibility::default(),
-            type_id: TypeId::of::<T>(),
+            type_id: TypeHash::of::<T>(),
             type_name: std::any::type_name::<T>().to_owned(),
             fields: vec![],
             layout: Layout::new::<T>(),
@@ -117,7 +117,7 @@ impl NativeStructBuilder {
             name: name.to_string(),
             module_name: None,
             visibility: Visibility::default(),
-            type_id: TypeId::of::<T>(),
+            type_id: TypeHash::of::<T>(),
             type_name: std::any::type_name::<T>().to_owned(),
             fields: vec![],
             layout: Layout::new::<T>(),
@@ -233,7 +233,7 @@ pub struct Struct {
     pub name: String,
     pub module_name: Option<String>,
     pub visibility: Visibility,
-    type_id: TypeId,
+    type_id: TypeHash,
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
@@ -243,14 +243,14 @@ pub struct Struct {
 
 impl Struct {
     pub fn is_runtime(&self) -> bool {
-        self.type_id == TypeId::of::<RuntimeObject>()
+        self.type_id == TypeHash::of::<RuntimeObject>()
     }
 
     pub fn is_native(&self) -> bool {
         !self.is_runtime()
     }
 
-    pub fn type_id(&self) -> TypeId {
+    pub fn type_hash(&self) -> TypeHash {
         self.type_id
     }
 
@@ -337,7 +337,7 @@ impl<'a> StructFieldQuery<'a> {
 pub struct StructQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub module_name: Option<Cow<'a, str>>,
-    pub type_id: Option<TypeId>,
+    pub type_id: Option<TypeHash>,
     pub type_name: Option<Cow<'a, str>>,
     pub visibility: Option<Visibility>,
     pub fields: Cow<'a, [StructFieldQuery<'a>]>,
@@ -353,7 +353,7 @@ impl<'a> StructQuery<'a> {
 
     pub fn of<T: 'static>() -> Self {
         Self {
-            type_id: Some(TypeId::of::<T>()),
+            type_id: Some(TypeHash::of::<T>()),
             ..Default::default()
         }
     }
@@ -361,7 +361,7 @@ impl<'a> StructQuery<'a> {
     pub fn of_named<T: 'static>(name: &'a str) -> Self {
         Self {
             name: Some(name.into()),
-            type_id: Some(TypeId::of::<T>()),
+            type_id: Some(TypeHash::of::<T>()),
             ..Default::default()
         }
     }

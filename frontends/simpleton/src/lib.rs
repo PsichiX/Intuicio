@@ -14,9 +14,8 @@ use intuicio_core::{
     struct_type::{NativeStructBuilder, StructHandle, StructQuery},
     IntuicioVersion,
 };
-use intuicio_data::shared::Shared;
+use intuicio_data::{shared::Shared, type_hash::TypeHash};
 use std::{
-    any::TypeId,
     cell::{Ref, RefMut},
     collections::HashMap,
 };
@@ -52,7 +51,7 @@ impl Type {
 
     pub fn of<T: 'static>(registry: &Registry) -> Option<Self> {
         Some(Self::new(registry.find_struct(StructQuery {
-            type_id: Some(TypeId::of::<T>()),
+            type_id: Some(TypeHash::of::<T>()),
             ..Default::default()
         })?))
     }
@@ -68,7 +67,7 @@ impl Type {
     pub fn is<T: 'static>(&self) -> bool {
         self.data
             .as_ref()
-            .map(|data| data.type_id() == TypeId::of::<T>())
+            .map(|data| data.type_hash() == TypeHash::of::<T>())
             .unwrap_or(false)
     }
 
@@ -80,8 +79,8 @@ impl Type {
         }
     }
 
-    pub fn type_id(&self) -> Option<TypeId> {
-        Some(self.data.as_ref()?.type_id())
+    pub fn type_id(&self) -> Option<TypeHash> {
+        Some(self.data.as_ref()?.type_hash())
     }
 }
 
@@ -207,7 +206,7 @@ impl Reference {
 
     pub fn read<T: 'static>(&self) -> Option<Ref<T>> {
         let result = self.data.as_ref()?.read()?;
-        if result.struct_handle().type_id() == TypeId::of::<T>() {
+        if result.struct_handle().type_hash() == TypeHash::of::<T>() {
             Some(Ref::map(result, |data| data.read::<T>().unwrap()))
         } else {
             None
@@ -216,7 +215,7 @@ impl Reference {
 
     pub fn write<T: 'static>(&mut self) -> Option<RefMut<T>> {
         let result = self.data.as_mut()?.write()?;
-        if result.struct_handle().type_id() == TypeId::of::<T>() {
+        if result.struct_handle().type_hash() == TypeHash::of::<T>() {
             Some(RefMut::map(result, |data| data.write::<T>().unwrap()))
         } else {
             None

@@ -4,9 +4,9 @@ use intuicio_core::{
     registry::Registry,
     script::{ScriptExpression, ScriptOperation},
 };
+use intuicio_data::type_hash::TypeHash;
 use serde::{Deserialize, Serialize};
 use std::{
-    any::TypeId,
     collections::HashMap,
     io::Write,
     sync::{Arc, RwLock},
@@ -116,7 +116,7 @@ pub struct PrintDebugger {
     pub step_through: bool,
     pub mode: PrintDebuggerMode,
     #[allow(clippy::type_complexity)]
-    printable: HashMap<TypeId, (&'static str, Box<dyn Fn(&[u8]) -> String>)>,
+    printable: HashMap<TypeHash, (&'static str, Box<dyn Fn(&[u8]) -> String>)>,
     step: usize,
 }
 
@@ -185,7 +185,7 @@ impl PrintDebugger {
 
     pub fn printable<T: std::fmt::Debug + 'static>(mut self) -> Self {
         self.printable.insert(
-            TypeId::of::<T>(),
+            TypeHash::of::<T>(),
             (
                 std::any::type_name::<T>(),
                 Box::new(|bytes| unsafe {

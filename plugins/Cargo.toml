@@ -1,0 +1,15 @@
+[package]
+name = "intuicio-plugins"
+version = "0.5.2"
+edition = "2021"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Plugins module for Intuicio scripting platform"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/intuicio"
+repository = "https://github.com/PsichiX/intuicio"
+documentation = "https://docs.rs/intuicio-plugins"
+readme = "../README.md"
+
+[dependencies]
+intuicio-core = { version = "0.5", path = "../core" }
+libloading = "0.7"

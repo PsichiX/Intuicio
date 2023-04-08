@@ -3,6 +3,7 @@ use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_data::prelude::*;
 use intuicio_frontend_simpleton::prelude::{jobs::Jobs, *};
+use intuicio_plugins::install_plugin;
 use tetra::{time::get_delta_time, Context as TetraContext};
 
 pub struct Scripting {
@@ -33,8 +34,10 @@ impl Scripting {
             let mut registry = Registry::default();
             intuicio_frontend_simpleton::library::install(&mut registry);
             crate::library::install(&mut registry);
-            let package = package.compile();
-            package.install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
+            install_plugin("../../target/debug/plugin.dll", &mut registry).unwrap();
+            package
+                .compile()
+                .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
             let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);
             Host::new(context, registry.into())
         });

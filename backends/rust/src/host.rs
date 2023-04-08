@@ -860,7 +860,7 @@ mod tests {
         struct_type::StructQuery,
         Visibility,
     };
-    use std::any::TypeId;
+    use intuicio_data::type_hash::TypeHash;
 
     #[test]
     fn test_rust_host_nativization() {
@@ -875,7 +875,7 @@ mod tests {
                     name: "a".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
-                        type_id: Some(TypeId::of::<bool>()),
+                        type_id: Some(TypeHash::of::<bool>()),
                         ..Default::default()
                     },
                 },
@@ -883,7 +883,7 @@ mod tests {
                     name: "b".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
-                        type_id: Some(TypeId::of::<usize>()),
+                        type_id: Some(TypeHash::of::<usize>()),
                         ..Default::default()
                     },
                 },
@@ -891,7 +891,7 @@ mod tests {
                     name: "c".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
-                        type_id: Some(TypeId::of::<f32>()),
+                        type_id: Some(TypeHash::of::<f32>()),
                         ..Default::default()
                     },
                 },
@@ -914,14 +914,14 @@ mod tests {
                     ScriptFunctionParameter {
                         name: "a".to_owned(),
                         struct_query: StructQuery {
-                            type_id: Some(TypeId::of::<bool>()),
+                            type_id: Some(TypeHash::of::<bool>()),
                             ..Default::default()
                         },
                     },
                     ScriptFunctionParameter {
                         name: "b".to_owned(),
                         struct_query: StructQuery {
-                            type_id: Some(TypeId::of::<usize>()),
+                            type_id: Some(TypeHash::of::<usize>()),
                             ..Default::default()
                         },
                     },
@@ -929,7 +929,7 @@ mod tests {
                 outputs: vec![ScriptFunctionParameter {
                     name: "c".to_owned(),
                     struct_query: StructQuery {
-                        type_id: Some(TypeId::of::<f32>()),
+                        type_id: Some(TypeHash::of::<f32>()),
                         ..Default::default()
                     },
                 }],

@@ -2,8 +2,9 @@
 members = [
     "data",
     "core",
-    "tests",
+    "plugins",
     "derive",
+    "tests",
     "backends/vm",
     "backends/rust",
     "frontends/serde",
@@ -13,6 +14,7 @@ members = [
     "runners/simpleton",
     "runners/alchemyst",
     "demos/tetra",
+    "demos/plugin",
     "demos/emu",
     "demos/stack-operator",
 ]

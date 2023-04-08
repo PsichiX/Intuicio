@@ -12,5 +12,6 @@ documentation = "https://docs.rs/intuicio-backend-rust"
 readme = "../../README.md"
 
 [dependencies]
+intuicio-data = { version = "0.5", path = "../../data" }
 intuicio-core = { version = "0.5", path = "../../core" }
 serde = { version = "1", features = ["derive", "rc"] }

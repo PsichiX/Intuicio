@@ -3,6 +3,13 @@ mod game {
     import "story/main";
 
     func initialize(state) {
+        console::log_line(
+            text::combine(
+                "fib 20 = ",
+                reflect::to_text(plugin::fib(20)),
+            ),
+        );
+
         var engine = state{"engine"};
 
         var story = fs::read_file(text::combine(state{"assets"}, "/data/story.json"));

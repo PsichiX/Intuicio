@@ -1,7 +1,6 @@
-use crate::Finalize;
+use crate::{type_hash::TypeHash, Finalize};
 use std::{
     alloc::Layout,
-    any::TypeId,
     collections::{hash_map::Entry, HashMap},
     ops::Range,
 };
@@ -14,7 +13,7 @@ struct DataStackFinalizer {
 
 #[derive(Debug, Copy, Clone)]
 struct DataStackRegisterTag {
-    type_id: TypeId,
+    type_id: TypeHash,
     layout: Layout,
     finalizer: Option<unsafe fn(*mut ())>,
 }
@@ -34,7 +33,7 @@ pub struct DataStackRegisterAccess<'a> {
 }
 
 impl<'a> DataStackRegisterAccess<'a> {
-    pub fn type_id(&self) -> TypeId {
+    pub fn type_id(&self) -> TypeHash {
         unsafe {
             self.stack
                 .memory
@@ -58,7 +57,7 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
-    pub fn type_id_layout(&self) -> (TypeId, Layout) {
+    pub fn type_id_layout(&self) -> (TypeHash, Layout) {
         unsafe {
             let tag = self
                 .stack
@@ -93,7 +92,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == TypeId::of::<T>() && tag.finalizer.is_some() {
+            if tag.type_id == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 self.stack
                     .memory
                     .as_ptr()
@@ -115,7 +114,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == TypeId::of::<T>() && tag.finalizer.is_some() {
+            if tag.type_id == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 self.stack
                     .memory
                     .as_mut_ptr()
@@ -137,7 +136,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == TypeId::of::<T>() && tag.finalizer.is_some() {
+            if tag.type_id == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 tag.finalizer = None;
                 self.stack
                     .memory
@@ -199,7 +198,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == TypeId::of::<T>() {
+            if tag.type_id == TypeHash::of::<T>() {
                 if let Some(finalizer) = tag.finalizer {
                     (finalizer)(
                         self.stack
@@ -301,7 +300,7 @@ pub struct DataStack {
     memory: Vec<u8>,
     position: usize,
     mode: DataStackMode,
-    finalizers: HashMap<TypeId, DataStackFinalizer>,
+    finalizers: HashMap<TypeHash, DataStackFinalizer>,
     registers: Vec<usize>,
     drop: bool,
 }
@@ -343,8 +342,8 @@ impl DataStack {
         &self.memory[0..self.position]
     }
 
-    pub fn visit(&self, mut f: impl FnMut(TypeId, Layout, &[u8], Range<usize>, bool)) {
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+    pub fn visit(&self, mut f: impl FnMut(TypeHash, Layout, &[u8], Range<usize>, bool)) {
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
         let mut position = self.position;
         while position > 0 {
@@ -352,8 +351,8 @@ impl DataStack {
                 return;
             }
             position -= type_layout.size();
-            let type_id = unsafe { self.memory.as_ptr().add(position).cast::<TypeId>().read() };
-            if type_id == TypeId::of::<DataStackRegisterTag>() {
+            let type_id = unsafe { self.memory.as_ptr().add(position).cast::<TypeHash>().read() };
+            if type_id == TypeHash::of::<DataStackRegisterTag>() {
                 if position < tag_layout.size() {
                     return;
                 }
@@ -399,11 +398,11 @@ impl DataStack {
             return false;
         }
         let value_layout = Layout::new::<T>().pad_to_align();
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         if self.position + value_layout.size() + type_layout.size() > self.size() {
             return false;
         }
-        let type_id = TypeId::of::<T>();
+        let type_id = TypeHash::of::<T>();
         self.finalizers
             .entry(type_id)
             .or_insert(DataStackFinalizer {
@@ -420,7 +419,7 @@ impl DataStack {
             self.memory
                 .as_mut_ptr()
                 .add(self.position)
-                .cast::<TypeId>()
+                .cast::<TypeHash>()
                 .write(type_id);
             self.position += type_layout.size();
         }
@@ -428,7 +427,7 @@ impl DataStack {
     }
 
     pub fn push_register<T: Finalize + 'static>(&mut self) -> Option<usize> {
-        unsafe { self.push_register_raw(TypeId::of::<T>(), Layout::new::<T>()) }
+        unsafe { self.push_register_raw(TypeHash::of::<T>(), Layout::new::<T>()) }
     }
 
     pub fn push_register_value<T: Finalize + 'static>(&mut self, value: T) -> Option<usize> {
@@ -441,14 +440,14 @@ impl DataStack {
     /// # Safety
     pub unsafe fn push_register_raw(
         &mut self,
-        type_id: TypeId,
+        type_id: TypeHash,
         value_layout: Layout,
     ) -> Option<usize> {
         if !self.mode.allows_registers() {
             return None;
         }
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         if self.position + value_layout.size() + tag_layout.size() + type_layout.size()
             > self.size()
         {
@@ -470,8 +469,8 @@ impl DataStack {
             self.memory
                 .as_mut_ptr()
                 .add(self.position)
-                .cast::<TypeId>()
-                .write(TypeId::of::<DataStackRegisterTag>());
+                .cast::<TypeHash>()
+                .write(TypeHash::of::<DataStackRegisterTag>());
             self.position += type_layout.size();
             self.registers.push(position);
             Some(self.registers.len() - 1)
@@ -503,7 +502,7 @@ impl DataStack {
         if !self.mode.allows_values() {
             return false;
         }
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let mut tag = unsafe {
             register
                 .stack
@@ -537,7 +536,7 @@ impl DataStack {
             self.memory
                 .as_mut_ptr()
                 .add(self.position)
-                .cast::<TypeId>()
+                .cast::<TypeHash>()
                 .write(tag.type_id);
             self.position += type_layout.size();
             register
@@ -555,7 +554,7 @@ impl DataStack {
         if !self.mode.allows_values() {
             return None;
         }
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let value_layout = Layout::new::<T>().pad_to_align();
         if self.position < type_layout.size() + value_layout.size() {
             return None;
@@ -564,10 +563,10 @@ impl DataStack {
             self.memory
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
-                .cast::<TypeId>()
+                .cast::<TypeHash>()
                 .read()
         };
-        if type_id != TypeId::of::<T>() || type_id == TypeId::of::<DataStackRegisterTag>() {
+        if type_id != TypeHash::of::<T>() || type_id == TypeHash::of::<DataStackRegisterTag>() {
             return None;
         }
         self.position -= type_layout.size();
@@ -586,16 +585,16 @@ impl DataStack {
         if !self.mode.allows_values() {
             return false;
         }
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         self.position -= type_layout.size();
         let type_id = unsafe {
             self.memory
                 .as_ptr()
                 .add(self.position)
-                .cast::<TypeId>()
+                .cast::<TypeHash>()
                 .read()
         };
-        if type_id == TypeId::of::<DataStackRegisterTag>() {
+        if type_id == TypeHash::of::<DataStackRegisterTag>() {
             return false;
         }
         if let Some(finalizer) = self.finalizers.get(&type_id) {
@@ -612,15 +611,15 @@ impl DataStack {
             return false;
         }
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         unsafe {
             let type_id = self
                 .memory
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
-                .cast::<TypeId>()
+                .cast::<TypeHash>()
                 .read();
-            if type_id != TypeId::of::<DataStackRegisterTag>() {
+            if type_id != TypeHash::of::<DataStackRegisterTag>() {
                 return false;
             }
             self.position -= type_layout.size();
@@ -641,7 +640,7 @@ impl DataStack {
     }
 
     pub fn pop_stack(&mut self, mut data_count: usize, capacity: Option<usize>) -> Self {
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let mut size = 0;
         let mut position = self.position;
         let mut finalizers = HashMap::new();
@@ -653,7 +652,7 @@ impl DataStack {
                 self.memory
                     .as_mut_ptr()
                     .add(position)
-                    .cast::<TypeId>()
+                    .cast::<TypeHash>()
                     .read()
             };
             if let Some(finalizer) = self.finalizers.get(&type_id) {
@@ -680,7 +679,7 @@ impl DataStack {
         if !self.mode.allows_values() {
             return false;
         }
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         if self.position < type_layout.size() {
             return false;
         }
@@ -688,7 +687,7 @@ impl DataStack {
             self.memory
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
-                .cast::<TypeId>()
+                .cast::<TypeHash>()
                 .read()
         };
         let mut tag = unsafe {
@@ -700,7 +699,7 @@ impl DataStack {
                 .cast::<DataStackRegisterTag>()
                 .read()
         };
-        if type_id != tag.type_id || type_id == TypeId::of::<DataStackRegisterTag>() {
+        if type_id != tag.type_id || type_id == TypeHash::of::<DataStackRegisterTag>() {
             return false;
         }
         if self.position < type_layout.size() + tag.layout.size() {
@@ -750,16 +749,16 @@ impl DataStack {
     }
 
     pub fn restore(&mut self, token: DataStackToken) {
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
-        let tag_type_id = TypeId::of::<DataStackRegisterTag>();
+        let tag_type_id = TypeHash::of::<DataStackRegisterTag>();
         while self.position > token.0 {
             self.position -= type_layout.size();
             let type_id = unsafe {
                 self.memory
                     .as_ptr()
                     .add(self.position)
-                    .cast::<TypeId>()
+                    .cast::<TypeHash>()
                     .read()
             };
             if type_id == tag_type_id {
@@ -795,9 +794,9 @@ impl DataStack {
         memory.copy_from_slice(&self.memory[token.0..self.position]);
         let mut meta_data = vec![];
         let mut meta_registers = 0;
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
-        let tag_type_id = TypeId::of::<DataStackRegisterTag>();
+        let tag_type_id = TypeHash::of::<DataStackRegisterTag>();
         let mut position = self.position;
         while position > token.0 {
             position -= type_layout.size();
@@ -805,7 +804,7 @@ impl DataStack {
                 self.memory
                     .as_mut_ptr()
                     .add(position)
-                    .cast::<TypeId>()
+                    .cast::<TypeHash>()
                     .read()
             };
             if type_id == tag_type_id {
@@ -841,16 +840,16 @@ impl DataStack {
         self.registers[start..].reverse();
     }
 
-    pub fn peek(&self) -> Option<TypeId> {
+    pub fn peek(&self) -> Option<TypeHash> {
         if self.position == 0 {
             return None;
         }
-        let type_layout = Layout::new::<TypeId>().pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
         Some(unsafe {
             self.memory
                 .as_ptr()
                 .add(self.position - type_layout.size())
-                .cast::<TypeId>()
+                .cast::<TypeHash>()
                 .read()
         })
     }
@@ -908,7 +907,7 @@ pub trait DataStackPack: Sized {
 
     fn stack_pop(stack: &mut DataStack) -> Self;
 
-    fn pack_types() -> Vec<TypeId>;
+    fn pack_types() -> Vec<TypeHash>;
 }
 
 impl DataStackPack for () {
@@ -916,7 +915,7 @@ impl DataStackPack for () {
 
     fn stack_pop(_: &mut DataStack) -> Self {}
 
-    fn pack_types() -> Vec<TypeId> {
+    fn pack_types() -> Vec<TypeHash> {
         vec![]
     }
 }
@@ -936,8 +935,8 @@ macro_rules! impl_data_stack_tuple {
             }
 
             #[allow(non_snake_case)]
-            fn pack_types() -> Vec<TypeId> {
-                vec![ $( TypeId::of::<$type>() ),+ ]
+            fn pack_types() -> Vec<TypeHash> {
+                vec![ $( TypeHash::of::<$type>() ),+ ]
             }
         }
     };

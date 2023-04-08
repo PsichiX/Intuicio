@@ -84,24 +84,22 @@ pub fn bench() {
                 (n.sqrt(),)
             }
         });
-        let sqrt = registry.add_function(
-            VmScope::<()>::generate_function(
-                ScriptFunction {
-                    signature: function_signature! {
-                        registry => fn sqrt(n: f32) -> (result: f32)
-                    },
-                    script: ScriptBuilder::<()>::default()
-                        .call_function(FunctionQuery {
-                            name: Some("sqrt".into()),
-                            ..Default::default()
-                        })
-                        .build(),
-                },
+        let sqrt = registry.add_function(Function::new(
+            function_signature! {
+                registry => fn sqrt(n: f32) -> (result: f32)
+            },
+            VmScope::<()>::generate_function_body(
+                ScriptBuilder::<()>::default()
+                    .call_function(FunctionQuery {
+                        name: Some("sqrt".into()),
+                        ..Default::default()
+                    })
+                    .build(),
                 None,
             )
             .unwrap()
             .0,
-        );
+        ));
         let mut context = Context::new(1024, 1024, 1024);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "vm sqrt",
@@ -122,9 +120,11 @@ pub fn bench() {
                 (n.sqrt(),)
             }
         });
-        VaultPackage::new("../resources/package.vault", &mut FileContentProvider)
+        let mut content_provider = FileContentProvider::new("vault", VaultContentParser);
+        VaultPackage::new("../resources/package.vault", &mut content_provider)
             .unwrap()
-            .compile::<VmScope<VaultScriptExpression>>(&mut registry, None);
+            .compile()
+            .install::<VmScope<VaultScriptExpression>>(&mut registry, None);
         let sqrt = registry
             .find_function(FunctionQuery {
                 name: Some("sqrt".into()),

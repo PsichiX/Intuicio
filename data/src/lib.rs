@@ -3,10 +3,12 @@ pub mod data_stack;
 pub mod lifetime;
 pub mod managed;
 pub mod shared;
+pub mod type_hash;
 
 pub mod prelude {
     pub use crate::{
-        data_heap::*, data_stack::*, lifetime::*, managed::*, shared::*, Finalize, Initialize,
+        data_heap::*, data_stack::*, lifetime::*, managed::*, shared::*, type_hash::*, Finalize,
+        Initialize,
     };
 }
 

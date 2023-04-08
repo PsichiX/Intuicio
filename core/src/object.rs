@@ -1,6 +1,6 @@
 use crate::struct_type::{StructFieldQuery, StructHandle, StructQuery};
-use intuicio_data::Initialize;
-use std::{any::TypeId, collections::HashMap};
+use intuicio_data::{type_hash::TypeHash, Initialize};
+use std::collections::HashMap;
 
 pub struct RuntimeObject;
 
@@ -100,7 +100,7 @@ impl Object {
     }
 
     pub fn read<T: 'static>(&self) -> Option<&T> {
-        if self.handle.type_id() == TypeId::of::<T>() {
+        if self.handle.type_hash() == TypeHash::of::<T>() {
             unsafe { self.memory.as_ptr().cast::<T>().as_ref() }
         } else {
             None
@@ -108,7 +108,7 @@ impl Object {
     }
 
     pub fn write<T: 'static>(&mut self) -> Option<&mut T> {
-        if self.handle.type_id() == TypeId::of::<T>() {
+        if self.handle.type_hash() == TypeHash::of::<T>() {
             unsafe { self.memory.as_mut_ptr().cast::<T>().as_mut() }
         } else {
             None
@@ -119,7 +119,7 @@ impl Object {
         let field = self.handle.find_field(StructFieldQuery {
             name: Some(field.into()),
             struct_query: Some(StructQuery {
-                type_id: Some(TypeId::of::<T>()),
+                type_id: Some(TypeHash::of::<T>()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -137,7 +137,7 @@ impl Object {
         let field = self.handle.find_field(StructFieldQuery {
             name: Some(field.into()),
             struct_query: Some(StructQuery {
-                type_id: Some(TypeId::of::<T>()),
+                type_id: Some(TypeHash::of::<T>()),
                 ..Default::default()
             }),
             ..Default::default()

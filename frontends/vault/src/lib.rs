@@ -11,8 +11,9 @@ use intuicio_core::{
     struct_type::StructQuery,
     IntuicioVersion, Visibility,
 };
+use intuicio_data::type_hash::TypeHash;
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error};
 
 pub fn frontend_vault_version() -> IntuicioVersion {
     crate_version!()
@@ -420,7 +421,7 @@ impl VaultFunction {
                     }
                 } else {
                     StructQuery {
-                        type_id: Some(TypeId::of::<()>()),
+                        type_id: Some(TypeHash::of::<()>()),
                         ..Default::default()
                     }
                 },

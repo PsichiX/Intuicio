@@ -212,7 +212,7 @@ impl Function {
                 );
             }
             for (parameter, type_id) in self.signature.inputs.iter().zip(input_types) {
-                if parameter.struct_handle.type_id() != type_id {
+                if parameter.struct_handle.type_hash() != type_id {
                     panic!(
                         "Function: {} input parameter: {} got wrong value type!",
                         self.signature.name, parameter.name
@@ -220,7 +220,7 @@ impl Function {
                 }
             }
             for (parameter, type_id) in self.signature.outputs.iter().zip(output_types) {
-                if parameter.struct_handle.type_id() != type_id {
+                if parameter.struct_handle.type_hash() != type_id {
                     panic!(
                         "Function: {} output parameter: {} got wrong value type!",
                         self.signature.name, parameter.name

@@ -125,24 +125,22 @@ pub fn bench() {
             },
             FunctionBody::pointer(processing),
         ));
-        let processing = registry.add_function(
-            VmScope::<()>::generate_function(
-                ScriptFunction {
-                    signature: function_signature! {
-                        registry => fn processing_script(data: Vec<usize>) -> (result: usize)
-                    },
-                    script: ScriptBuilder::<()>::default()
-                        .call_function(FunctionQuery {
-                            name: Some("processing".into()),
-                            ..Default::default()
-                        })
-                        .build(),
-                },
+        let processing = registry.add_function(Function::new(
+            function_signature! {
+                registry => fn processing_script(data: Vec<usize>) -> (result: usize)
+            },
+            VmScope::<()>::generate_function_body(
+                ScriptBuilder::<()>::default()
+                    .call_function(FunctionQuery {
+                        name: Some("processing".into()),
+                        ..Default::default()
+                    })
+                    .build(),
                 None,
             )
             .unwrap()
             .0,
-        );
+        ));
         let mut context = Context::new(1024, 1024, 1024);
         let data = (0..PROCESSING_N).collect::<Vec<_>>();
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(

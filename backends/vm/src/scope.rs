@@ -94,7 +94,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                     unsafe {
                         context
                             .registers()
-                            .push_register_raw(handle.type_id(), *handle.layout())
+                            .push_register_raw(handle.type_hash(), *handle.layout())
                     };
                     self.position += 1;
                     true
@@ -256,10 +256,9 @@ impl<SE: ScriptExpression + 'static> ScriptFunctionGenerator<SE> for VmScope<'st
 
 #[cfg(test)]
 mod tests {
-    use std::any::TypeId;
-
     use crate::scope::*;
     use intuicio_core::prelude::*;
+    use intuicio_data::type_hash::TypeHash;
 
     #[test]
     fn test_vm_scope() {
@@ -288,14 +287,14 @@ mod tests {
                             ScriptFunctionParameter {
                                 name: "a".to_owned(),
                                 struct_query: StructQuery {
-                                    type_id: Some(TypeId::of::<i32>()),
+                                    type_id: Some(TypeHash::of::<i32>()),
                                     ..Default::default()
                                 },
                             },
                             ScriptFunctionParameter {
                                 name: "b".to_owned(),
                                 struct_query: StructQuery {
-                                    type_id: Some(TypeId::of::<i32>()),
+                                    type_id: Some(TypeHash::of::<i32>()),
                                     ..Default::default()
                                 },
                             },
@@ -303,7 +302,7 @@ mod tests {
                         outputs: vec![ScriptFunctionParameter {
                             name: "result".to_owned(),
                             struct_query: StructQuery {
-                                type_id: Some(TypeId::of::<i32>()),
+                                type_id: Some(TypeHash::of::<i32>()),
                                 ..Default::default()
                             },
                         }],
