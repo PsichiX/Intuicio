@@ -4,7 +4,9 @@ use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_frontend_simpleton::{
     library::jobs::Jobs,
-    script::{SimpletonContentParser, SimpletonPackage, SimpletonScriptExpression},
+    script::{
+        SimpletonContentParser, SimpletonModule, SimpletonPackage, SimpletonScriptExpression,
+    },
     Integer, Reference,
 };
 use std::path::Path;
@@ -26,7 +28,13 @@ pub fn execute(entry: &str, config: Config, args: impl IntoIterator<Item = Strin
     } else {
         entry.to_owned()
     };
-    let mut content_provider = FileContentProvider::new("simp", SimpletonContentParser);
+    let mut content_provider = ExtensionContentProvider::<SimpletonModule>::default()
+        .extension(
+            "simp",
+            FileContentProvider::new("simp", SimpletonContentParser),
+        )
+        .extension("plugin", IgnoreContentProvider)
+        .default_extension("simp");
     let package = SimpletonPackage::new(&entry, &mut content_provider).unwrap();
     if let Some(path) = &config.into_code {
         std::fs::write(path, format!("{:#?}", package)).unwrap();
@@ -44,6 +52,21 @@ pub fn execute(entry: &str, config: Config, args: impl IntoIterator<Item = Strin
         let mut registry = Registry::default();
         intuicio_frontend_simpleton::library::install(&mut registry);
         crate::library::install(&mut registry);
+        let packages_dir = dirs::data_dir()
+            .unwrap()
+            .join(".simpleton")
+            .join("packages")
+            .to_string_lossy()
+            .to_string();
+        package.install_plugins(
+            &mut registry,
+            &[
+                #[cfg(test)]
+                "../../target/debug/",
+                "./",
+                packages_dir.as_str(),
+            ],
+        );
         let package = package.compile();
         package.install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
         let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);

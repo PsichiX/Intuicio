@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-intuicio-data = { version = "0.6", path = "../../data" }
-intuicio-core = { version = "0.6", path = "../../core" }
-intuicio-derive = { version = "0.6", path = "../../derive" }
+intuicio-data = { version = "0.6", path = "../../platform/data" }
+intuicio-core = { version = "0.6", path = "../../platform/core" }
+intuicio-derive = { version = "0.6", path = "../../platform/derive" }
 intuicio-backend-vm = { version = "0.6", path = "../../backends/vm" }

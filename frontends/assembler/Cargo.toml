@@ -11,8 +11,8 @@ documentation = "https://docs.rs/intuicio-frontend-assembler"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-data = { version = "0.6", path = "../../data" }
-intuicio-core = { version = "0.6", path = "../../core" }
+intuicio-data = { version = "0.6", path = "../../platform/data" }
+intuicio-core = { version = "0.6", path = "../../platform/core" }
 intuicio-frontend-serde = { version = "0.6", path = "../serde" }
 pest = "2.5"
 pest_derive = "2.5"

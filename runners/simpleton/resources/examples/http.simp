@@ -1,0 +1,39 @@
+mod example_http {
+    import "simpleton_http.plugin";
+
+    func main(args) {
+        var jobs = jobs::new(null);
+
+        var job_json = example_http::async_get_text(jobs, "https://httpbin.org/json");
+        var job_png = example_http::async_get_bytes(jobs, "https://httpbin.org/image/png");
+        var job_jpeg = example_http::async_get_bytes(jobs, "https://httpbin.org/image/jpeg");
+        
+        var json = job::wait_then_consume(job_json);
+        var png = job::wait_then_consume(job_png);
+        var jpeg = job::wait_then_consume(job_jpeg);
+        
+        console::log_line(debug::debug(json::deserialize(json), true));
+        console::log_line(debug::debug(array::size(png), true));
+        console::log_line(debug::debug(array::size(jpeg), true));
+    }
+
+    func async_get_text(jobs, url) {
+        return jobs::schedule(
+            jobs,
+            @[](url) {
+                return http::text(http::get(url, null));
+            },
+            [url],
+        );
+    }
+
+    func async_get_bytes(jobs, url) {
+        return jobs::schedule(
+            jobs,
+            @[](url) {
+                return http::bytes(http::get(url, null));
+            },
+            [url],
+        );
+    }
+}

@@ -41,6 +41,7 @@ update:
 
 install:
   cargo install --path ./runners/simpleton
+  cargo install --path ./runners/alchemyst
 
 publish:
   cargo publish --no-verify --manifest-path ./data/Cargo.toml

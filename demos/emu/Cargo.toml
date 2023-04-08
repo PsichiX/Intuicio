@@ -13,9 +13,9 @@ name = "packager"
 path = "src/main_packager.rs"
 
 [dependencies]
-intuicio-data = { version = "0.6", path = "../../data" }
-intuicio-core = { version = "0.6", path = "../../core" }
-intuicio-derive = { version = "0.6", path = "../../derive" }
+intuicio-data = { version = "0.6", path = "../../platform/data" }
+intuicio-core = { version = "0.6", path = "../../platform/core" }
+intuicio-derive = { version = "0.6", path = "../../platform/derive" }
 intuicio-backend-vm = { version = "0.6", path = "../../backends/vm" }
 intuicio-frontend-assembler = { version = "0.6", path = "../../frontends/assembler" }
 tetra = { version = "0.7", features = ["sdl2_bundled"] }
