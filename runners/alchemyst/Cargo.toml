@@ -9,6 +9,7 @@ homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
 documentation = "https://docs.rs/intuicio-runner-simpleton"
 readme = "../../README.md"
+exclude = ["./resources"]
 
 [lib]
 path = "src/lib.rs"

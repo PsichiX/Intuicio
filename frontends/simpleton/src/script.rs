@@ -12,7 +12,7 @@ use intuicio_core::{
     struct_type::StructQuery,
     Visibility,
 };
-use std::{collections::HashMap, env::consts::DLL_EXTENSION, error::Error, path::PathBuf};
+use std::{collections::HashMap, error::Error};
 
 const CLOSURES: &str = "_closures";
 
@@ -1168,6 +1168,7 @@ impl SimpletonPackage {
     pub fn install_plugins(&self, registry: &mut Registry, search_paths: &[&str]) {
         use intuicio_core::core_version;
         use intuicio_plugins::install_plugin;
+        use std::{env::consts::DLL_EXTENSION, path::PathBuf};
 
         for module in self.modules.values() {
             'plugin: for path in &module.dependencies {

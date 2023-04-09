@@ -16,6 +16,12 @@ struct Cli {
 
 fn main() {
     let cli = Cli::parse();
-    let mut content_provider = FileContentProvider::new("simp", SimpletonContentParser);
+    let mut content_provider = ExtensionContentProvider::<SimpletonModule>::default()
+        .extension(
+            "simp",
+            FileContentProvider::new("simp", SimpletonContentParser),
+        )
+        .extension("plugin", IgnoreContentProvider)
+        .default_extension("simp");
     alchemyst::execute(&cli.entry, cli.args, &mut content_provider);
 }

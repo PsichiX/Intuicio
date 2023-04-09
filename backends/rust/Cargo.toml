@@ -2,7 +2,6 @@
 name = "intuicio-backend-rust"
 version = "0.8.0"
 edition = "2021"
-exclude = ["./resources/"]
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Rust backend module for Intuicio scripting platform"
 license = "MIT OR Apache-2.0"
@@ -10,6 +9,7 @@ homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
 documentation = "https://docs.rs/intuicio-backend-rust"
 readme = "../../README.md"
+exclude = ["./resources/"]
 
 [dependencies]
 intuicio-data = { version = "0.8", path = "../../platform/data" }
