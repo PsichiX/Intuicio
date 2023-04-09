@@ -84,7 +84,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-host.html"><strong aria-hidden="true">3.</strong> Anatomy of a Host</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-script.html"><strong aria-hidden="true">4.</strong> Anatomy of a Script</a></li><li class="chapter-item expanded "><a href="building-custom-frontend.html"><strong aria-hidden="true">5.</strong> Building custom frontend</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-host.html"><strong aria-hidden="true">3.</strong> Anatomy of a Host</a></li><li class="chapter-item expanded "><a href="anatomy-of-a-script.html"><strong aria-hidden="true">4.</strong> Anatomy of a Script</a></li><li class="chapter-item expanded "><a href="building-custom-frontend.html"><strong aria-hidden="true">5.</strong> Building custom frontend</a></li><li class="chapter-item expanded "><a href="official-frontends/index.html"><strong aria-hidden="true">6.</strong> Official frontends</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="official-frontends/simpleton/index.html"><strong aria-hidden="true">6.1.</strong> Simpleton</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="official-frontends/simpleton/language-reference.html"><strong aria-hidden="true">6.1.1.</strong> Language reference</a></li></ol></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -719,6 +719,304 @@ assert_eq!(result, 48);
 <p>And that's all for demonstration of how to make simple custom frontend!</p>
 <p>Typical scripting languages do have much more complex definition and use intermediate data structures that define their proper script structure which is a result of more complex parsing (frontends in repository do use <code>pest</code> for that), then these intermediate script data gets compield into Intuicio script data and that gets installed into the registry.</p>
 <p>We might tackle more complex example later, but for now feel free to get inspired by crates in <code>frontends</code> folder of this repository, especially <code>simpleton</code> if you are searching for how dynamically typed languages can be defined.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="official-frontends"><a class="header" href="#official-frontends">Official frontends</a></h1>
+<p>Intuicio platform provides set of official frontends both as languages dedicated to specific domains and serving as an example of how more complex frontends are being designed:</p>
+<ul>
+<li><strong>Serde</strong>
+Low level data-based language to supports scripts that can be defined in any format supported by <code>serde</code> (for example: json, yaml, toml, lexpr and more). Useful as intermediate stage between editors and scripting.</li>
+<li><strong>Assembler</strong>
+Low level text-based language that is the closest one to Intuicio script information data format. Useful for in-game operation systems.</li>
+<li><a href="official-frontends/./simpleton/index.html"><strong>Simpleton</strong></a></li>
+<li><strong>Vault</strong>
+An attempt to high level text-based strongly typed scripting language with lexpr syntax.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="simpleton"><a class="header" href="#simpleton">Simpleton</a></h1>
+<p>High level text-based scripting language.</p>
+<p>Key features:</p>
+<ul>
+<li>Dynamically typed.</li>
+<li>Influenced by <strong>JavaScript</strong> and <strong>Python</strong>.</li>
+<li>Simple to understand and learn.</li>
+<li>Rich standard library.</li>
+</ul>
+<p><strong>Useful for scripting tools and game logic, where simplicity and ergonomics is vastly more important than performance.</strong></p>
+<h2 id="goals"><a class="header" href="#goals">Goals</a></h2>
+<p>Simpleton was created for simplicity in mind as priority, mostly for allowing to create tools and simple game logic the easiest way possible.</p>
+<p>It also has an educational value to showcase Intuicio users how one can create fully fledged dynamically typed scripting language - something that might be counter intuitive since Intuicio is rather strongly typed scripting platform. We achieve that by introducing Reference, Type and Function as fundamental Simpleton types, so that entire frontend is built around interactions with these types.</p>
+<h2 id="syntax"><a class="header" href="#syntax">Syntax</a></h2>
+<pre><code class="language-javascript">mod main {
+    func main(args) {
+        console::log_line(&quot;Hello World!&quot;);
+        
+        var fib = main::fib(10);
+        console::log_line(debug::debug(fib, false));
+    }
+
+    func fib(n) {
+        if math::less_than(n, 2) {
+            return n;
+        } else {
+            return math::add(
+                main::fib(math::sub(n - 1)),
+                main::fib(math::sub(n - 2)),
+            );
+        }
+    }
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="language-reference"><a class="header" href="#language-reference">Language reference</a></h1>
+<p>Let's start with saying that <strong>Simpleton is not an OOP language</strong>, you won't also see any class methods, inheritance or dynamic method dispatch seen in other OOP scripting languages.</p>
+<p><strong>Simpleton is rather functional/procedural scripting language</strong> that operates on structures for data transformations.</p>
+<h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of contents:</a></h2>
+<ul>
+<li><a href="official-frontends/simpleton/language-reference.html#script-file-structure">Script file structure</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#structures">Structures</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#functions">Functions</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#closures">Closures</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#primitive-types">Primitive types</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#variables">Variables</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#if-else-branching">If-else branching</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#while-loops">While loops</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#for-loops">For loops</a></li>
+<li><a href="official-frontends/simpleton/language-reference.html#imports">Imports</a></li>
+</ul>
+<h2 id="script-file-structure"><a class="header" href="#script-file-structure">Script file structure</a></h2>
+<p>Every script file consists of module definition and module items such as structures and functions:</p>
+<pre><code class="language-javascript">mod vec2 {
+    struct Vec2 { x, y }
+
+    func new(x, y) {
+        return vec2::Vec2 { x, y };
+    }
+
+    func add(a, b) {
+        return vec2::Vec2 {
+            x: math::add(a.x, b.x),
+            y: math::add(a.y, b.y),
+        };
+    }
+}
+</code></pre>
+<p>General rule of thumb is that one file describes one module and preferably one structure (if any) so functions in that module are working in context of that structure (somewhat similarly to how GDscript treats its files to some extent).</p>
+<p>So later these module types are operated on like this:</p>
+<pre><code class="language-javascript">mod main {
+    func main() {
+        var a = vec2::new(0.0, 1.0);
+        var b = vec2::new(1.0, 0.0);
+        var c = vec2::add(a, b);
+        // vec2::Vec2 { x: 1.0, y: 1.0 }
+        console::log_line(debug::debug(c, false));
+    }
+}
+</code></pre>
+<p>First question that comes into mind is:</p>
+<blockquote>
+<p>Why there are <code>add</code> funciton calls instead of operators being used?</p>
+</blockquote>
+<p><strong>Simpleton does not have operators</strong> - Simpleton believes in being explicit. If something is doing what function calls does, it should be called as function.</p>
+<p>The only exceptions are array and map accessors:</p>
+<pre><code class="language-javascript">var array = [0, 1, 2];
+var array_item = array[1];
+
+var map = { a: 0, b: 1, c: 2 };
+var map_item = map{&quot;b&quot;};
+</code></pre>
+<h2 id="structures"><a class="header" href="#structures">Structures</a></h2>
+<p>Every structure is defined by its name and list of field names:</p>
+<pre><code class="language-javascript">struct Vec2 { x, y }
+</code></pre>
+<p>The reason for that is that structures defined in simpleton are concrete objects that take up space defined by number of references they hold, they aren't dynamically sized bags of properties like in many scripting languages.</p>
+<p>If we have an object of <code>vec2::Vec2</code> type and we want to access its <code>x</code> field for reads or writes, it is guaranteed this field exists in the object and we get or set its reference.</p>
+<p>And the opposite is true too - if we try to access object field that is not defined in its type, we will get runtime error.</p>
+<p>Since Simpleton is not an OOP language, we not only do not have class methods, but also we do not have constructors, therefore we construct objects in-place like this:</p>
+<pre><code class="language-javascript">var v = vec2::Vec2 { x: 42.0 };
+</code></pre>
+<p>What this does is Simpleton creates default object of type <code>vec2::Vec2</code> and then applies values to fields listed in brackets - this also means that if we omit some fields, object will have their references <code>null</code>ed.</p>
+<p>Therefore if object expects some specific constraints on the object fields, it's good practice to make functions that return new object in-place with fields filled with arguments validated by that function:</p>
+<pre><code class="language-javascript">func new(x, y) {
+    debug::assert(
+        math::equals(reflect::type_of(x), &lt;struct math::Real&gt;),
+        &quot;`x` is not a number!&quot;,
+    );
+    debug::assert(
+        math::equals(reflect::type_of(y), &lt;struct math::Real&gt;),
+        &quot;`y` is not a number!&quot;,
+    );
+    return vec2::Vec2 { x, y };
+}
+</code></pre>
+<p>Additionally in rare situations when we do not know object type at compile-time, we can construct objects by <code>Type</code> object found at runtime:</p>
+<pre><code class="language-javascript">var v = reflect::new(&lt;struct vec2::Vec2&gt;, { x: 42 });
+</code></pre>
+<p>This is useful especially in case of deserialization, where type is part of deserialized data:</p>
+<pre><code class="language-javascript">var data = {
+    type_name: &quot;Vec2&quot;,
+    type_module_name: &quot;vec2&quot;,
+    properties: {
+        x: 42.0,
+    },
+};
+var type = reflect::find_type_by_name(data.type_name, data.type_module_name);
+var v = reflect::new(type, data.properties);
+</code></pre>
+<p>And finally to get or set value from object field we use <code>.</code> delimiter between object and its field name:</p>
+<pre><code class="language-javascript">var v = vec2::Vec2 { x: 42 };
+v.x = math::add(v.x, 10);
+</code></pre>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
+<p>Every function is defined by its name, arguments list and function statements as its body:</p>
+<pre><code class="language-javascript">func sum(a, b, c) {
+    console::log_line(
+        text::format(&quot;sum: {0}, {1}, {2}&quot;, [
+            reflect::to_text(a),
+            reflect::to_text(b),
+            reflect::to_text(c),
+        ]),
+    );
+
+    return math::add(
+        math::add(a, b),
+        c,
+    );
+}
+</code></pre>
+<p>As you can see there is <code>return</code> keyword - it is used to inform Simpleton that we want to exit current function with given value.</p>
+<p>Functions always return some reference, if function does not have <code>return</code> statement in there, it implicitly returns <code>null</code>. We can also <code>return null;</code> if we want to exit function without value.</p>
+<p>Later functions can be called by providing their module name, function name and arguments:</p>
+<pre><code class="language-javascript">var v = main::sum(1, 2, 3);
+</code></pre>
+<p>If we don't know funciton at compile-time, we can call it at runtime by <code>Function</code> object:</p>
+<pre><code class="language-javascript">var v = reflect::call(&lt;func main::sum&gt;, [1, 2, 3]);
+</code></pre>
+<p>We can also find function type by its name and module name:</p>
+<pre><code class="language-javascript">var function = reflect::find_function_by_name(&quot;sum&quot;, &quot;main&quot;);
+var v = reflect::call(function, [1, 2, 3]);
+</code></pre>
+<h2 id="closures"><a class="header" href="#closures">Closures</a></h2>
+<p>Closures are special anonymous functions that can also capture variables from outer scope:</p>
+<pre><code class="language-javascript">var a = 40;
+var closure = @[a](b) {
+    return math::add(a, b);
+};
+var v = closure::call(closure, [b]);
+</code></pre>
+<p>Under the hood, closures are objects that store reference to <code>Function</code> object and list of captured references, and are compiled into actual functions like this:</p>
+<pre><code class="language-javascript">mod _closures {
+    func _0(a, b) {
+        return math::add(a, b);
+    }
+}
+</code></pre>
+<h2 id="primitive-types"><a class="header" href="#primitive-types">Primitive types</a></h2>
+<ul>
+<li><code>null</code> - reference that points to nothing.</li>
+<li><code>Boolean</code> - can hold either <code>true</code> or <code>false</code>.</li>
+<li><code>Integer</code> - their literals are numbers without rational part: <code>42</code>. Additionally there are hex (<code>#A8</code>) and binary (<code>$1011</code>) integer literals.</li>
+<li><code>Real</code> - their literals are numbers with rational part: <code>4.2</code>.</li>
+<li><code>Text</code> - also known in other languages as strings of UTF8 characters: <code>&quot;Hello World!&quot;</code>.</li>
+<li><code>Array</code> - sequence of value references: <code>[0, 1, 2]</code>. We can access its items with: <code>array[0]</code>.</li>
+<li><code>Map</code> - unordered table of key-value pairs: <code>{ a: 0, b: 1, c: 2 }</code>. We can access its items with: <code>map{&quot;a&quot;}</code>.</li>
+</ul>
+<p>It's worth noting that all objects, even <code>Boolean</code>, <code>Integer</code> and <code>Real</code> are boxed object - choice made for the sake of simplicity of language implementation, but in the future they might endup unboxed to improve performance - <em>for now we don't mind them being boxed, at this point in development, performance is not the priority</em>.</p>
+<h2 id="variables"><a class="header" href="#variables">Variables</a></h2>
+<p>Variables are local to the function, they are name aliases for references to values. You define variable with its value like this:</p>
+<pre><code class="language-javascript">var answer = 42;
+</code></pre>
+<p>You can also assign new values to existing variables:</p>
+<pre><code class="language-javascript">answer = 10;
+</code></pre>
+<p>Since variables are just named references local to given function, you can assign different type values to them than what was stored there at creation:</p>
+<pre><code class="language-javascript">var v = 42;
+v = &quot;Hello World!&quot;;
+</code></pre>
+<p>To get value behind variable you just use its name:</p>
+<pre><code class="language-javascript">var a = 42;
+console::log_line(reflect::to_text(a));
+</code></pre>
+<h2 id="if-else-branching"><a class="header" href="#if-else-branching">If-else branching</a></h2>
+<p>Branching allows to execute some scope if condition succeeds:</p>
+<pre><code class="language-javascript">if math::equals(a, 42) {
+    console::log_line(&quot;`a` equals 42!&quot;);
+}
+</code></pre>
+<p>One can also specify <code>else</code> scope in case condition fails:</p>
+<pre><code class="language-javascript">if math::equals(a, 42) {
+    console::log_line(&quot;`a` equals 42!&quot;);
+} else {
+    console::log_line(&quot;`a` does not equals 42!&quot;);
+}
+</code></pre>
+<h2 id="while-loops"><a class="header" href="#while-loops">While loops</a></h2>
+<p>While loops allows to execute some scope repeatedly as long as condition succeeds:</p>
+<pre><code class="language-javascript">var a = 0;
+while math::less_than(a, 42) {
+    a = math::add(a, 1);
+}
+</code></pre>
+<h2 id="for-loops"><a class="header" href="#for-loops">For loops</a></h2>
+<p>For loops combined with iterators allow to iterate on values yielded by them until <code>null</code> value is yielded, which signals end of iteration:</p>
+<pre><code class="language-javascript">// 2, 3, 4
+for value in iter::walk(2, 3) {
+    console::log_line(debug::debug(value, false));
+}
+
+// 0, 1, 2
+for value in iter::range(0, 3) {
+    console::log_line(debug::debug(value, false));
+}
+
+var v = [0, 1, 2];
+// 2, 1, 0
+for value in array::iter(v, true) {
+    console::log_line(debug::debug(value, false));
+}
+
+var v = { a: 0, b: 1, c: 2};
+// { key: &quot;a&quot;, value: 1 }, { key: &quot;b&quot;, value: 2 }, { key: &quot;c&quot;, value: 3 }
+for pair in map::iter(v) {
+    console::log_line(debug::debug(pair, false));
+}
+
+var iter = iter::build([
+    iter::range(0, 10),
+    [&lt;func iter::filter&gt;, @[](value) {
+        return math::equals(
+            math::modulo(value, 2),
+            0,
+        );
+    }],
+]);
+// 0, 2, 4, 6, 8
+for pair in iter {
+    console::log_line(debug::debug(pair, false));
+}
+</code></pre>
+<h2 id="imports"><a class="header" href="#imports">Imports</a></h2>
+<p>Packages are built by traversing modules tree - this tree is defined by entry module and its dependencies specified by imports:</p>
+<pre><code class="language-javascript">mod main {
+    import &quot;vec2.simp&quot;;
+
+    func main() {
+        var a = vec2::Vec2 { x: 1, y: 0 };
+        var b = vec2::Vec2 { x: 0, y: 1 };
+        // vec2::Vec2 { x: 1, y: 1 }
+        var c = vec2::add(a, b);
+    }
+}
+</code></pre>
+<pre><code class="language-javascript">mod vec2 {
+    struct Vec2 { x, y }
+
+    func add(a, b) {
+        return vec2::Vec2 {
+            x: math::add(a.x, b.x),
+            y: math::add(a.y, b.y),
+        };
+    }
+}
+</code></pre>
+<p>We provide relative path to another module file with <code>import</code> keyword.</p>
+<p>It's worth noting that file extensions can e omited there, compiler will assume <code>simp</code> extension then.</p>
 
                     </main>
 
