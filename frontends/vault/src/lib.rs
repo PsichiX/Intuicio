@@ -83,17 +83,17 @@ impl ScriptExpression for VaultScriptExpression {
                 context.stack().drop();
             }
             Self::StackProduce { name } => {
-                let type_id = context.stack().peek().unwrap();
+                let type_hash = context.stack().peek().unwrap();
                 registry
                     .find_function(FunctionQuery {
                         name: Some(name.into()),
                         struct_query: Some(StructQuery {
-                            type_id: Some(type_id),
+                            type_hash: Some(type_hash),
                             ..Default::default()
                         }),
                         inputs: [FunctionQueryParameter {
                             struct_query: Some(StructQuery {
-                                type_id: Some(type_id),
+                                type_hash: Some(type_hash),
                                 ..Default::default()
                             }),
                             ..Default::default()
@@ -421,7 +421,7 @@ impl VaultFunction {
                     }
                 } else {
                     StructQuery {
-                        type_id: Some(TypeHash::of::<()>()),
+                        type_hash: Some(TypeHash::of::<()>()),
                         ..Default::default()
                     }
                 },

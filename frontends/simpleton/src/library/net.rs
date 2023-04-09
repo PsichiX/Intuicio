@@ -1,4 +1,5 @@
-use crate::{Array, Boolean, Integer, Reference, Text};
+use super::bytes::Bytes;
+use crate::{Boolean, Integer, Reference, Text};
 use intuicio_core::{registry::Registry, IntuicioStruct};
 use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
 use std::{
@@ -107,15 +108,9 @@ impl Channel {
     pub fn read(registry: &Registry, mut channel: Reference, size: Reference) -> Reference {
         let mut channel = channel.write::<Channel>().unwrap();
         let size = *size.read::<Integer>().unwrap() as usize;
-        let mut buffer = vec![0; size];
-        if channel.stream.as_mut().unwrap().read(&mut buffer).is_ok() {
-            Reference::new_array(
-                buffer
-                    .into_iter()
-                    .map(|byte| Reference::new_integer(byte as Integer, registry))
-                    .collect(),
-                registry,
-            )
+        let mut result = vec![0; size];
+        if channel.stream.as_mut().unwrap().read(&mut result).is_ok() {
+            Reference::new(Bytes::new_raw(result), registry)
         } else {
             Reference::null()
         }
@@ -124,14 +119,14 @@ impl Channel {
     #[intuicio_method(use_registry)]
     pub fn write(registry: &Registry, mut channel: Reference, buffer: Reference) -> Reference {
         let mut channel = channel.write::<Channel>().unwrap();
-        let buffer = buffer
-            .read::<Array>()
-            .unwrap()
-            .iter()
-            .map(|byte| *byte.read::<Integer>().unwrap() as u8)
-            .collect::<Vec<u8>>();
+        let buffer = buffer.read::<Bytes>().unwrap();
         Reference::new_boolean(
-            channel.stream.as_mut().unwrap().write(&buffer).is_ok(),
+            channel
+                .stream
+                .as_mut()
+                .unwrap()
+                .write(buffer.get_ref())
+                .is_ok(),
             registry,
         )
     }

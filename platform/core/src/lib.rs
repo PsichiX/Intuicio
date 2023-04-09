@@ -57,6 +57,7 @@ pub trait IntuicioStruct {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(C)]
 pub struct IntuicioVersion {
     major: usize,
     minor: usize,

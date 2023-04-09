@@ -3,6 +3,8 @@ use intuicio_core::{define_native_struct, registry::Registry};
 use intuicio_derive::intuicio_function;
 use regex::{Captures, Regex};
 
+use super::bytes::Bytes;
+
 thread_local! {
     static FORMAT_REGEX: Regex = Regex::new(r#"\{(\d+)\}"#).unwrap();
 }
@@ -123,25 +125,17 @@ pub fn split(registry: &Registry, value: Reference, separator: Reference) -> Ref
 
 #[intuicio_function(module_name = "text", use_registry)]
 pub fn to_bytes(registry: &Registry, value: Reference) -> Reference {
-    let result = value
-        .read::<Text>()
-        .unwrap()
-        .as_bytes()
-        .iter()
-        .map(|byte| Reference::new_integer(*byte as Integer, registry))
-        .collect::<Array>();
-    Reference::new_array(result, registry)
+    let result = value.read::<Text>().unwrap().as_bytes().to_owned();
+    Reference::new(Bytes::new_raw(result), registry)
 }
 
 #[intuicio_function(module_name = "text", use_registry)]
 pub fn from_bytes(registry: &Registry, bytes: Reference) -> Reference {
-    let result = bytes
-        .read::<Array>()
-        .unwrap()
-        .iter()
-        .map(|byte| *byte.read::<Integer>().unwrap() as u8)
-        .collect::<Vec<_>>();
-    Reference::new_text(String::from_utf8_lossy(&result).to_string(), registry)
+    let result = bytes.read::<Bytes>().unwrap();
+    Reference::new_text(
+        String::from_utf8_lossy(result.get_ref()).to_string(),
+        registry,
+    )
 }
 
 #[intuicio_function(module_name = "text", use_registry)]

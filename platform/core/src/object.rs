@@ -119,7 +119,7 @@ impl Object {
         let field = self.handle.find_field(StructFieldQuery {
             name: Some(field.into()),
             struct_query: Some(StructQuery {
-                type_id: Some(TypeHash::of::<T>()),
+                type_hash: Some(TypeHash::of::<T>()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -137,7 +137,7 @@ impl Object {
         let field = self.handle.find_field(StructFieldQuery {
             name: Some(field.into()),
             struct_query: Some(StructQuery {
-                type_id: Some(TypeHash::of::<T>()),
+                type_hash: Some(TypeHash::of::<T>()),
                 ..Default::default()
             }),
             ..Default::default()

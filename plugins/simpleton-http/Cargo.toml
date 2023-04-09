@@ -1,6 +1,6 @@
 [package]
 name = "simpleton-http"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2021"
 publish = false
 
@@ -8,8 +8,8 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-intuicio-data = { version = "0.6", path = "../../platform/data" }
-intuicio-core = { version = "0.6", path = "../../platform/core" }
-intuicio-derive = { version = "0.6", path = "../../platform/derive" }
-intuicio-frontend-simpleton = { version = "0.6", path = "../../frontends/simpleton" }
+intuicio-data = { version = "0.7", path = "../../platform/data" }
+intuicio-core = { version = "0.7", path = "../../platform/core" }
+intuicio-derive = { version = "0.7", path = "../../platform/derive" }
+intuicio-frontend-simpleton = { version = "0.7", path = "../../frontends/simpleton" }
 reqwest = { version = "0.11", features = ["blocking", "json"] }

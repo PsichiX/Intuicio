@@ -1,6 +1,6 @@
-use intuicio_core::{registry::Registry, IntuicioStruct};
+use intuicio_core::{core_version, registry::Registry, IntuicioStruct, IntuicioVersion};
 use intuicio_derive::*;
-use intuicio_frontend_simpleton::prelude::*;
+use intuicio_frontend_simpleton::prelude::{bytes::Bytes, *};
 use reqwest::blocking::Client;
 use std::collections::HashMap;
 
@@ -65,12 +65,8 @@ impl HttpClient {
             }
             if let Some(body) = body.read::<Text>() {
                 request = request.body(body.to_string());
-            } else if let Some(body) = body.read::<Array>() {
-                let body = body
-                    .iter()
-                    .map(|byte| *byte.read::<Integer>().unwrap() as u8)
-                    .collect::<Vec<_>>();
-                request = request.body(body);
+            } else if let Some(body) = body.read::<Bytes>() {
+                request = request.body(body.get_ref().to_owned());
             }
             if let Ok(response) = request.send() {
                 return Reference::new(
@@ -104,15 +100,7 @@ impl HttpClient {
         client
             .content
             .as_ref()
-            .map(|bytes| {
-                Reference::new_array(
-                    bytes
-                        .iter()
-                        .map(|byte| Reference::new_integer(*byte as Integer, registry))
-                        .collect(),
-                    registry,
-                )
-            })
+            .map(|bytes| Reference::new(Bytes::new_raw(bytes.to_owned()), registry))
             .unwrap_or_default()
     }
 
@@ -125,6 +113,11 @@ impl HttpClient {
             .map(|bytes| Reference::new_text(Text::from_utf8_lossy(bytes).to_string(), registry))
             .unwrap_or_default()
     }
+}
+
+#[no_mangle]
+pub extern "C" fn version() -> IntuicioVersion {
+    core_version()
 }
 
 #[no_mangle]

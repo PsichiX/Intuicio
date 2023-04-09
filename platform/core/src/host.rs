@@ -117,9 +117,9 @@ impl Host {
     ) -> Option<HostFunctionCall<I, O>> {
         let inputs_query = I::pack_types()
             .into_iter()
-            .map(|type_id| FunctionQueryParameter {
+            .map(|type_hash| FunctionQueryParameter {
                 struct_query: Some(StructQuery {
-                    type_id: Some(type_id),
+                    type_hash: Some(type_hash),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -127,9 +127,9 @@ impl Host {
             .collect::<Vec<_>>();
         let outputs_query = O::pack_types()
             .into_iter()
-            .map(|type_id| FunctionQueryParameter {
+            .map(|type_hash| FunctionQueryParameter {
                 struct_query: Some(StructQuery {
-                    type_id: Some(type_id),
+                    type_hash: Some(type_hash),
                     ..Default::default()
                 }),
                 ..Default::default()

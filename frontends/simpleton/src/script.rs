@@ -1166,6 +1166,7 @@ impl SimpletonPackage {
 
     #[cfg(feature = "plugins")]
     pub fn install_plugins(&self, registry: &mut Registry, search_paths: &[&str]) {
+        use intuicio_core::core_version;
         use intuicio_plugins::install_plugin;
 
         for module in self.modules.values() {
@@ -1179,7 +1180,13 @@ impl SimpletonPackage {
                     path.set_extension(DLL_EXTENSION);
                     for search_path in search_paths {
                         let path = PathBuf::from(search_path).join(&path);
-                        if install_plugin(path.to_string_lossy().as_ref(), registry).is_ok() {
+                        if install_plugin(
+                            path.to_string_lossy().as_ref(),
+                            registry,
+                            Some(core_version()),
+                        )
+                        .is_ok()
+                        {
                             continue 'plugin;
                         }
                     }

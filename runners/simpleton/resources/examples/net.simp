@@ -15,16 +15,14 @@ mod example_net {
         var bytes = bytes::new();
         bytes::serialize(bytes, value);
 
-        var buffer = bytes::into(bytes);
         var server = net_server::new("127.0.0.1:8080");
         var client = net_channel::connect("127.0.0.1:8080");
         net_channel::set_no_delay(client, true);
-        net_channel::write(client, buffer);
+        net_channel::write(client, bytes);
 
         var connection = net_server::accept(server);
         net_channel::set_no_delay(connection, true);
-        buffer = net_channel::read(connection, array::size(buffer));
-        bytes = bytes::from(buffer);
+        bytes = net_channel::read(connection, bytes::size(bytes));
         value = bytes::deserialize(bytes);
         console::log_line(
             debug::debug(value, false),

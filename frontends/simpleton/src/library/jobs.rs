@@ -188,7 +188,7 @@ impl Worker {
                 arguments: captured
                     .iter()
                     .chain(arguments.iter())
-                    .map(|argument| argument.clone().transferable().ok().unwrap())
+                    .map(|argument| Transferable::from(argument.clone()))
                     .collect(),
                 result: result.result.clone(),
             });
@@ -256,16 +256,10 @@ impl Worker {
                         *result = JobState::Running;
                     }
                     for argument in request.arguments.into_iter().rev() {
-                        context.stack().push(argument.reference());
+                        context.stack().push(Reference::from(argument));
                     }
                     function.invoke(context, registry);
-                    let output = context
-                        .stack()
-                        .pop::<Reference>()
-                        .unwrap()
-                        .transferable()
-                        .ok()
-                        .unwrap();
+                    let output = Transferable::from(context.stack().pop::<Reference>().unwrap());
                     if let Ok(mut result) = request.result.write() {
                         *result = JobState::Done(output);
                     }
@@ -299,8 +293,8 @@ enum JobState {
 impl JobState {
     fn consume(&mut self) -> Reference {
         let state = std::mem::replace(self, JobState::Consumed);
-        if let Self::Done(value) = state {
-            value.reference()
+        if let Self::Done(transferable) = state {
+            Reference::from(transferable)
         } else {
             *self = state;
             Reference::null()

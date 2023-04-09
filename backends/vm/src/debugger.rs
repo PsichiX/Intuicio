@@ -233,9 +233,9 @@ impl PrintDebugger {
         }
         if self.visit_stack {
             let mut index = 0;
-            context.stack().visit(|type_id, layout, bytes, range, _| {
+            context.stack().visit(|type_hash, layout, bytes, range, _| {
                 assert_eq!(bytes.len(), layout.size());
-                if let Some((type_name, callback)) = self.printable.get(&type_id) {
+                if let Some((type_name, callback)) = self.printable.get(&type_hash) {
                     println!(
                         "- stack value #{} of type {}:\n{}",
                         index,
@@ -245,7 +245,7 @@ impl PrintDebugger {
                 } else {
                     println!(
                         "- stack value #{} of unknown type id {:?} and layout: {:?}",
-                        index, type_id, layout
+                        index, type_hash, layout
                     );
                 }
                 println!(
@@ -271,8 +271,8 @@ impl PrintDebugger {
             let registers_count = context.registers().registers_count();
             context
                 .registers()
-                .visit(|type_id, layout, bytes, range, valid| {
-                    if let Some((type_name, callback)) = self.printable.get(&type_id) {
+                .visit(|type_hash, layout, bytes, range, valid| {
+                    if let Some((type_name, callback)) = self.printable.get(&type_hash) {
                         if valid {
                             println!(
                                 "- register value #{} of type {}:\n{}",
@@ -291,7 +291,7 @@ impl PrintDebugger {
                         println!(
                             "- register value #{} of unknown type id {:?} and layout: {:?}",
                             registers_count - index - 1,
-                            type_id,
+                            type_hash,
                             layout
                         );
                     }

@@ -13,7 +13,7 @@ struct DataStackFinalizer {
 
 #[derive(Debug, Copy, Clone)]
 struct DataStackRegisterTag {
-    type_id: TypeHash,
+    type_hash: TypeHash,
     layout: Layout,
     finalizer: Option<unsafe fn(*mut ())>,
 }
@@ -33,7 +33,7 @@ pub struct DataStackRegisterAccess<'a> {
 }
 
 impl<'a> DataStackRegisterAccess<'a> {
-    pub fn type_id(&self) -> TypeHash {
+    pub fn type_hash(&self) -> TypeHash {
         unsafe {
             self.stack
                 .memory
@@ -41,7 +41,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read()
-                .type_id
+                .type_hash
         }
     }
 
@@ -57,7 +57,7 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
-    pub fn type_id_layout(&self) -> (TypeHash, Layout) {
+    pub fn type_hash_layout(&self) -> (TypeHash, Layout) {
         unsafe {
             let tag = self
                 .stack
@@ -66,7 +66,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            (tag.type_id, tag.layout)
+            (tag.type_hash, tag.layout)
         }
     }
 
@@ -92,7 +92,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == TypeHash::of::<T>() && tag.finalizer.is_some() {
+            if tag.type_hash == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 self.stack
                     .memory
                     .as_ptr()
@@ -114,7 +114,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == TypeHash::of::<T>() && tag.finalizer.is_some() {
+            if tag.type_hash == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 self.stack
                     .memory
                     .as_mut_ptr()
@@ -136,7 +136,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == TypeHash::of::<T>() && tag.finalizer.is_some() {
+            if tag.type_hash == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 tag.finalizer = None;
                 self.stack
                     .memory
@@ -198,7 +198,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == TypeHash::of::<T>() {
+            if tag.type_hash == TypeHash::of::<T>() {
                 if let Some(finalizer) = tag.finalizer {
                     (finalizer)(
                         self.stack
@@ -245,7 +245,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .read();
-            if tag.type_id == other_tag.type_id && tag.layout == other_tag.layout {
+            if tag.type_hash == other_tag.type_hash && tag.layout == other_tag.layout {
                 if let Some(finalizer) = other_tag.finalizer {
                     (finalizer)(
                         self.stack
@@ -351,8 +351,8 @@ impl DataStack {
                 return;
             }
             position -= type_layout.size();
-            let type_id = unsafe { self.memory.as_ptr().add(position).cast::<TypeHash>().read() };
-            if type_id == TypeHash::of::<DataStackRegisterTag>() {
+            let type_hash = unsafe { self.memory.as_ptr().add(position).cast::<TypeHash>().read() };
+            if type_hash == TypeHash::of::<DataStackRegisterTag>() {
                 if position < tag_layout.size() {
                     return;
                 }
@@ -370,20 +370,20 @@ impl DataStack {
                 position -= tag.layout.size();
                 let range = position..(position + tag.layout.size());
                 f(
-                    tag.type_id,
+                    tag.type_hash,
                     tag.layout,
                     &self.memory[range.clone()],
                     range,
                     tag.finalizer.is_some(),
                 );
-            } else if let Some(finalizer) = self.finalizers.get(&type_id) {
+            } else if let Some(finalizer) = self.finalizers.get(&type_hash) {
                 if position < finalizer.layout.size() {
                     return;
                 }
                 position -= finalizer.layout.size();
                 let range = position..(position + finalizer.layout.size());
                 f(
-                    type_id,
+                    type_hash,
                     finalizer.layout,
                     &self.memory[range.clone()],
                     range,
@@ -402,9 +402,9 @@ impl DataStack {
         if self.position + value_layout.size() + type_layout.size() > self.size() {
             return false;
         }
-        let type_id = TypeHash::of::<T>();
+        let type_hash = TypeHash::of::<T>();
         self.finalizers
-            .entry(type_id)
+            .entry(type_hash)
             .or_insert(DataStackFinalizer {
                 callback: T::finalize_raw,
                 layout: value_layout,
@@ -420,7 +420,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(self.position)
                 .cast::<TypeHash>()
-                .write(type_id);
+                .write(type_hash);
             self.position += type_layout.size();
         }
         true
@@ -440,7 +440,7 @@ impl DataStack {
     /// # Safety
     pub unsafe fn push_register_raw(
         &mut self,
-        type_id: TypeHash,
+        type_hash: TypeHash,
         value_layout: Layout,
     ) -> Option<usize> {
         if !self.mode.allows_registers() {
@@ -461,7 +461,7 @@ impl DataStack {
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
                 .write(DataStackRegisterTag {
-                    type_id,
+                    type_hash,
                     layout: value_layout,
                     finalizer: None,
                 });
@@ -515,7 +515,7 @@ impl DataStack {
         if self.position + tag.layout.size() + type_layout.size() > self.size() {
             return false;
         }
-        if let Entry::Vacant(e) = self.finalizers.entry(tag.type_id) {
+        if let Entry::Vacant(e) = self.finalizers.entry(tag.type_hash) {
             if let Some(finalizer) = tag.finalizer {
                 e.insert(DataStackFinalizer {
                     callback: finalizer,
@@ -537,7 +537,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(self.position)
                 .cast::<TypeHash>()
-                .write(tag.type_id);
+                .write(tag.type_hash);
             self.position += type_layout.size();
             register
                 .stack
@@ -559,14 +559,14 @@ impl DataStack {
         if self.position < type_layout.size() + value_layout.size() {
             return None;
         }
-        let type_id = unsafe {
+        let type_hash = unsafe {
             self.memory
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
                 .cast::<TypeHash>()
                 .read()
         };
-        if type_id != TypeHash::of::<T>() || type_id == TypeHash::of::<DataStackRegisterTag>() {
+        if type_hash != TypeHash::of::<T>() || type_hash == TypeHash::of::<DataStackRegisterTag>() {
             return None;
         }
         self.position -= type_layout.size();
@@ -587,17 +587,17 @@ impl DataStack {
         }
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         self.position -= type_layout.size();
-        let type_id = unsafe {
+        let type_hash = unsafe {
             self.memory
                 .as_ptr()
                 .add(self.position)
                 .cast::<TypeHash>()
                 .read()
         };
-        if type_id == TypeHash::of::<DataStackRegisterTag>() {
+        if type_hash == TypeHash::of::<DataStackRegisterTag>() {
             return false;
         }
-        if let Some(finalizer) = self.finalizers.get(&type_id) {
+        if let Some(finalizer) = self.finalizers.get(&type_hash) {
             self.position -= finalizer.layout.size();
             unsafe {
                 (finalizer.callback)(self.memory.as_mut_ptr().add(self.position).cast::<()>());
@@ -613,13 +613,13 @@ impl DataStack {
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         unsafe {
-            let type_id = self
+            let type_hash = self
                 .memory
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
                 .cast::<TypeHash>()
                 .read();
-            if type_id != TypeHash::of::<DataStackRegisterTag>() {
+            if type_hash != TypeHash::of::<DataStackRegisterTag>() {
                 return false;
             }
             self.position -= type_layout.size();
@@ -648,18 +648,18 @@ impl DataStack {
             data_count -= 1;
             position -= type_layout.size();
             size += type_layout.size();
-            let type_id = unsafe {
+            let type_hash = unsafe {
                 self.memory
                     .as_mut_ptr()
                     .add(position)
                     .cast::<TypeHash>()
                     .read()
             };
-            if let Some(finalizer) = self.finalizers.get(&type_id) {
+            if let Some(finalizer) = self.finalizers.get(&type_hash) {
                 position -= finalizer.layout.size();
                 size += finalizer.layout.size();
                 finalizers.insert(
-                    type_id,
+                    type_hash,
                     DataStackFinalizer {
                         callback: finalizer.callback,
                         layout: finalizer.layout,
@@ -683,7 +683,7 @@ impl DataStack {
         if self.position < type_layout.size() {
             return false;
         }
-        let type_id = unsafe {
+        let type_hash = unsafe {
             self.memory
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
@@ -699,13 +699,13 @@ impl DataStack {
                 .cast::<DataStackRegisterTag>()
                 .read()
         };
-        if type_id != tag.type_id || type_id == TypeHash::of::<DataStackRegisterTag>() {
+        if type_hash != tag.type_hash || type_hash == TypeHash::of::<DataStackRegisterTag>() {
             return false;
         }
         if self.position < type_layout.size() + tag.layout.size() {
             return false;
         }
-        let finalizer = match self.finalizers.get(&type_id) {
+        let finalizer = match self.finalizers.get(&type_hash) {
             Some(finalizer) => finalizer.callback,
             None => return false,
         };
@@ -751,17 +751,17 @@ impl DataStack {
     pub fn restore(&mut self, token: DataStackToken) {
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
-        let tag_type_id = TypeHash::of::<DataStackRegisterTag>();
+        let tag_type_hash = TypeHash::of::<DataStackRegisterTag>();
         while self.position > token.0 {
             self.position -= type_layout.size();
-            let type_id = unsafe {
+            let type_hash = unsafe {
                 self.memory
                     .as_ptr()
                     .add(self.position)
                     .cast::<TypeHash>()
                     .read()
             };
-            if type_id == tag_type_id {
+            if type_hash == tag_type_hash {
                 unsafe {
                     let tag = self
                         .memory
@@ -776,7 +776,7 @@ impl DataStack {
                     }
                     self.registers.pop();
                 }
-            } else if let Some(finalizer) = self.finalizers.get(&type_id) {
+            } else if let Some(finalizer) = self.finalizers.get(&type_hash) {
                 self.position -= finalizer.layout.size();
                 unsafe {
                     (finalizer.callback)(self.memory.as_mut_ptr().add(self.position).cast::<()>());
@@ -796,18 +796,18 @@ impl DataStack {
         let mut meta_registers = 0;
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
-        let tag_type_id = TypeHash::of::<DataStackRegisterTag>();
+        let tag_type_hash = TypeHash::of::<DataStackRegisterTag>();
         let mut position = self.position;
         while position > token.0 {
             position -= type_layout.size();
-            let type_id = unsafe {
+            let type_hash = unsafe {
                 self.memory
                     .as_mut_ptr()
                     .add(position)
                     .cast::<TypeHash>()
                     .read()
             };
-            if type_id == tag_type_id {
+            if type_hash == tag_type_hash {
                 unsafe {
                     let tag = self
                         .memory
@@ -823,7 +823,7 @@ impl DataStack {
                     ));
                     meta_registers += 1;
                 }
-            } else if let Some(finalizer) = self.finalizers.get(&type_id) {
+            } else if let Some(finalizer) = self.finalizers.get(&type_hash) {
                 position -= finalizer.layout.size();
                 meta_data.push((
                     position - token.0,

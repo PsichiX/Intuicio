@@ -13,8 +13,8 @@ mod example_http {
         var jpeg = job::wait_then_consume(job_jpeg);
         
         console::log_line(debug::debug(json::deserialize(json), true));
-        console::log_line(debug::debug(array::size(png), true));
-        console::log_line(debug::debug(array::size(jpeg), true));
+        console::log_line(debug::debug(bytes::size(png), true));
+        console::log_line(debug::debug(bytes::size(jpeg), true));
     }
 
     func async_get_text(jobs, url) {

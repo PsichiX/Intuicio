@@ -8,7 +8,7 @@ pub struct RuntimeStructBuilder {
     name: String,
     module_name: Option<String>,
     visibility: Visibility,
-    type_id: TypeHash,
+    type_hash: TypeHash,
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
@@ -22,7 +22,7 @@ impl RuntimeStructBuilder {
             name: name.to_string(),
             module_name: None,
             visibility: Visibility::default(),
-            type_id: TypeHash::of::<RuntimeObject>(),
+            type_hash: TypeHash::of::<RuntimeObject>(),
             type_name: std::any::type_name::<RuntimeObject>().to_owned(),
             fields: vec![],
             layout: Layout::from_size_align(0, 1).unwrap(),
@@ -55,7 +55,7 @@ impl RuntimeStructBuilder {
             name: self.name,
             module_name: self.module_name,
             visibility: self.visibility,
-            type_id: self.type_id,
+            type_hash: self.type_hash,
             type_name: self.type_name,
             fields: self.fields,
             layout: self.layout.pad_to_align(),
@@ -75,7 +75,7 @@ impl From<Struct> for RuntimeStructBuilder {
             name: value.name,
             module_name: value.module_name,
             visibility: value.visibility,
-            type_id: value.type_id,
+            type_hash: value.type_hash,
             type_name: value.type_name,
             fields: value.fields,
             layout: value.layout,
@@ -89,7 +89,7 @@ pub struct NativeStructBuilder {
     name: String,
     module_name: Option<String>,
     visibility: Visibility,
-    type_id: TypeHash,
+    type_hash: TypeHash,
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
@@ -103,7 +103,7 @@ impl NativeStructBuilder {
             name: std::any::type_name::<T>().to_owned(),
             module_name: None,
             visibility: Visibility::default(),
-            type_id: TypeHash::of::<T>(),
+            type_hash: TypeHash::of::<T>(),
             type_name: std::any::type_name::<T>().to_owned(),
             fields: vec![],
             layout: Layout::new::<T>(),
@@ -117,7 +117,7 @@ impl NativeStructBuilder {
             name: name.to_string(),
             module_name: None,
             visibility: Visibility::default(),
-            type_id: TypeHash::of::<T>(),
+            type_hash: TypeHash::of::<T>(),
             type_name: std::any::type_name::<T>().to_owned(),
             fields: vec![],
             layout: Layout::new::<T>(),
@@ -148,7 +148,7 @@ impl NativeStructBuilder {
             name: self.name,
             module_name: self.module_name,
             visibility: self.visibility,
-            type_id: self.type_id,
+            type_hash: self.type_hash,
             type_name: self.type_name,
             fields: self.fields,
             layout: self.layout,
@@ -168,7 +168,7 @@ impl From<Struct> for NativeStructBuilder {
             name: value.name,
             module_name: value.module_name,
             visibility: value.visibility,
-            type_id: value.type_id,
+            type_hash: value.type_hash,
             type_name: value.type_name,
             fields: value.fields,
             layout: value.layout,
@@ -233,7 +233,7 @@ pub struct Struct {
     pub name: String,
     pub module_name: Option<String>,
     pub visibility: Visibility,
-    type_id: TypeHash,
+    type_hash: TypeHash,
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
@@ -243,7 +243,7 @@ pub struct Struct {
 
 impl Struct {
     pub fn is_runtime(&self) -> bool {
-        self.type_id == TypeHash::of::<RuntimeObject>()
+        self.type_hash == TypeHash::of::<RuntimeObject>()
     }
 
     pub fn is_native(&self) -> bool {
@@ -251,7 +251,7 @@ impl Struct {
     }
 
     pub fn type_hash(&self) -> TypeHash {
-        self.type_id
+        self.type_hash
     }
 
     pub fn type_name(&self) -> &str {
@@ -297,7 +297,7 @@ impl Struct {
 impl PartialEq for Struct {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
-            && self.type_id == other.type_id
+            && self.type_hash == other.type_hash
             && self.layout == other.layout
             && self.fields.len() == other.fields.len()
             && self
@@ -337,7 +337,7 @@ impl<'a> StructFieldQuery<'a> {
 pub struct StructQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub module_name: Option<Cow<'a, str>>,
-    pub type_id: Option<TypeHash>,
+    pub type_hash: Option<TypeHash>,
     pub type_name: Option<Cow<'a, str>>,
     pub visibility: Option<Visibility>,
     pub fields: Cow<'a, [StructFieldQuery<'a>]>,
@@ -353,7 +353,7 @@ impl<'a> StructQuery<'a> {
 
     pub fn of<T: 'static>() -> Self {
         Self {
-            type_id: Some(TypeHash::of::<T>()),
+            type_hash: Some(TypeHash::of::<T>()),
             ..Default::default()
         }
     }
@@ -361,7 +361,7 @@ impl<'a> StructQuery<'a> {
     pub fn of_named<T: 'static>(name: &'a str) -> Self {
         Self {
             name: Some(name.into()),
-            type_id: Some(TypeHash::of::<T>()),
+            type_hash: Some(TypeHash::of::<T>()),
             ..Default::default()
         }
     }
@@ -383,8 +383,8 @@ impl<'a> StructQuery<'a> {
                 })
                 .unwrap_or(true)
             && self
-                .type_id
-                .map(|type_id| struct_type.type_id == type_id)
+                .type_hash
+                .map(|type_hash| struct_type.type_hash == type_hash)
                 .unwrap_or(true)
             && self
                 .type_name

@@ -29,6 +29,20 @@ pub struct Bytes {
 
 #[intuicio_methods(module_name = "bytes")]
 impl Bytes {
+    pub fn new_raw(bytes: Vec<u8>) -> Self {
+        Self {
+            buffer: Cursor::new(bytes),
+        }
+    }
+
+    pub fn get_ref(&self) -> &[u8] {
+        self.buffer.get_ref().as_slice()
+    }
+
+    pub fn get_mut(&mut self) -> &mut [u8] {
+        self.buffer.get_mut().as_mut_slice()
+    }
+
     #[intuicio_method(use_registry)]
     pub fn new(registry: &Registry) -> Reference {
         Reference::new(Bytes::default(), registry)
@@ -42,12 +56,7 @@ impl Bytes {
             .iter()
             .map(|byte| *byte.read::<Integer>().unwrap() as u8)
             .collect();
-        Reference::new(
-            Bytes {
-                buffer: Cursor::new(buffer),
-            },
-            registry,
-        )
+        Reference::new(Self::new_raw(buffer), registry)
     }
 
     #[intuicio_method(use_registry)]
@@ -89,6 +98,67 @@ impl Bytes {
         let mut bytes = bytes.write::<Bytes>().unwrap();
         bytes.buffer.set_position(0);
         bytes.buffer.get_mut().clear();
+        Reference::null()
+    }
+
+    #[intuicio_method(use_registry)]
+    pub fn get_bit(registry: &Registry, bytes: Reference, index: Reference) -> Reference {
+        let bytes = bytes.read::<Bytes>().unwrap();
+        let index = *index.read::<Integer>().unwrap() as usize;
+        let offset = index % std::mem::size_of::<u8>();
+        let index = index / std::mem::size_of::<u8>();
+        let result = bytes.buffer.get_ref()[index] & (1 << offset);
+        Reference::new_boolean(result != 0, registry)
+    }
+
+    #[intuicio_method(use_registry)]
+    pub fn set_bit(mut bytes: Reference, index: Reference, value: Reference) -> Reference {
+        let mut bytes = bytes.write::<Bytes>().unwrap();
+        let index = *index.read::<Integer>().unwrap() as usize;
+        let value = *value.read::<Boolean>().unwrap();
+        let offset = index % std::mem::size_of::<u8>();
+        let index = index / std::mem::size_of::<u8>();
+        let byte = &mut bytes.buffer.get_mut()[index];
+        let enabled = (*byte & (1 << offset)) != 0;
+        if enabled != value {
+            *byte ^= 1 << offset;
+        }
+        Reference::null()
+    }
+
+    #[intuicio_method(use_registry)]
+    pub fn get_integer(registry: &Registry, bytes: Reference, index: Reference) -> Reference {
+        let bytes = bytes.read::<Bytes>().unwrap();
+        let index = *index.read::<Integer>().unwrap() as usize;
+        let buffer = unsafe { bytes.get_ref().align_to::<Integer>().1 };
+        Reference::new_integer(buffer[index], registry)
+    }
+
+    #[intuicio_method(use_registry)]
+    pub fn set_integer(mut bytes: Reference, index: Reference, value: Reference) -> Reference {
+        let mut bytes = bytes.write::<Bytes>().unwrap();
+        let index = *index.read::<Integer>().unwrap() as usize;
+        let value = *value.read::<Integer>().unwrap();
+        let buffer = unsafe { bytes.get_mut().align_to_mut::<Integer>().1 };
+        buffer[index] = value;
+        Reference::null()
+    }
+
+    #[intuicio_method(use_registry)]
+    pub fn get_real(registry: &Registry, bytes: Reference, index: Reference) -> Reference {
+        let bytes = bytes.read::<Bytes>().unwrap();
+        let index = *index.read::<Integer>().unwrap() as usize;
+        let buffer = unsafe { bytes.get_ref().align_to::<Real>().1 };
+        Reference::new_real(buffer[index], registry)
+    }
+
+    #[intuicio_method(use_registry)]
+    pub fn set_real(mut bytes: Reference, index: Reference, value: Reference) -> Reference {
+        let mut bytes = bytes.write::<Bytes>().unwrap();
+        let index = *index.read::<Integer>().unwrap() as usize;
+        let value = *value.read::<Real>().unwrap();
+        let buffer = unsafe { bytes.get_mut().align_to_mut::<Real>().1 };
+        buffer[index] = value;
         Reference::null()
     }
 
@@ -217,15 +287,7 @@ impl Bytes {
         bytes
             .buffer
             .read_exact(&mut result)
-            .map(|_| {
-                Reference::new_array(
-                    result
-                        .into_iter()
-                        .map(|byte| Reference::new_integer(byte as Integer, registry))
-                        .collect(),
-                    registry,
-                )
-            })
+            .map(|_| Reference::new(Self::new_raw(result), registry))
             .unwrap_or_default()
     }
 
@@ -342,14 +404,9 @@ impl Bytes {
     #[intuicio_method(use_registry)]
     pub fn write_bytes(registry: &Registry, mut bytes: Reference, value: Reference) -> Reference {
         let mut bytes = bytes.write::<Bytes>().unwrap();
-        let buffer = value
-            .read::<Array>()
-            .unwrap()
-            .iter()
-            .map(|byte| *byte.read::<Integer>().unwrap() as u8)
-            .collect::<Vec<_>>();
-        if bytes.buffer.write_all(&buffer).is_ok() {
-            Reference::new_integer(buffer.len() as Integer, registry)
+        let value = value.read::<Bytes>().unwrap();
+        if bytes.buffer.write_all(value.buffer.get_ref()).is_ok() {
+            Reference::new_integer(value.buffer.get_ref().len() as Integer, registry)
         } else {
             Reference::new_integer(0, registry)
         }
@@ -481,6 +538,12 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(Bytes::position__define_function(registry));
     registry.add_function(Bytes::set_position__define_function(registry));
     registry.add_function(Bytes::clear__define_function(registry));
+    registry.add_function(Bytes::get_bit__define_function(registry));
+    registry.add_function(Bytes::set_bit__define_function(registry));
+    registry.add_function(Bytes::get_integer__define_function(registry));
+    registry.add_function(Bytes::set_integer__define_function(registry));
+    registry.add_function(Bytes::get_real__define_function(registry));
+    registry.add_function(Bytes::set_real__define_function(registry));
     registry.add_function(Bytes::read_boolean__define_function(registry));
     registry.add_function(Bytes::read_u8__define_function(registry));
     registry.add_function(Bytes::read_u16__define_function(registry));

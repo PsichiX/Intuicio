@@ -141,7 +141,7 @@ impl<'a, SE: ScriptExpression> RustHostNativizer<'a, SE> {
             writeln!(output, "name: None,")?;
         }
         self.pad(output)?;
-        writeln!(output, "type_id: None,")?;
+        writeln!(output, "type_hash: None,")?;
         self.pad(output)?;
         if let Some(module_name) = input.module_name.as_ref() {
             writeln!(
@@ -602,7 +602,7 @@ impl<'a, SE: ScriptExpression> ScriptNativizer<SE> for RustHostNativizer<'a, SE>
         self.pad(output)?;
         writeln!(
             output,
-            "unsafe {{ context.registers().push_register_raw(handle.type_id(), *handle.layout()) }};"
+            "unsafe {{ context.registers().push_register_raw(handle.type_hash(), *handle.layout()) }};"
         )?;
         self.pop_indent();
         self.pad(output)?;
@@ -875,7 +875,7 @@ mod tests {
                     name: "a".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
-                        type_id: Some(TypeHash::of::<bool>()),
+                        type_hash: Some(TypeHash::of::<bool>()),
                         ..Default::default()
                     },
                 },
@@ -883,7 +883,7 @@ mod tests {
                     name: "b".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
-                        type_id: Some(TypeHash::of::<usize>()),
+                        type_hash: Some(TypeHash::of::<usize>()),
                         ..Default::default()
                     },
                 },
@@ -891,7 +891,7 @@ mod tests {
                     name: "c".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
-                        type_id: Some(TypeHash::of::<f32>()),
+                        type_hash: Some(TypeHash::of::<f32>()),
                         ..Default::default()
                     },
                 },
@@ -914,14 +914,14 @@ mod tests {
                     ScriptFunctionParameter {
                         name: "a".to_owned(),
                         struct_query: StructQuery {
-                            type_id: Some(TypeHash::of::<bool>()),
+                            type_hash: Some(TypeHash::of::<bool>()),
                             ..Default::default()
                         },
                     },
                     ScriptFunctionParameter {
                         name: "b".to_owned(),
                         struct_query: StructQuery {
-                            type_id: Some(TypeHash::of::<usize>()),
+                            type_hash: Some(TypeHash::of::<usize>()),
                             ..Default::default()
                         },
                     },
@@ -929,7 +929,7 @@ mod tests {
                 outputs: vec![ScriptFunctionParameter {
                     name: "c".to_owned(),
                     struct_query: StructQuery {
-                        type_id: Some(TypeHash::of::<f32>()),
+                        type_hash: Some(TypeHash::of::<f32>()),
                         ..Default::default()
                     },
                 }],

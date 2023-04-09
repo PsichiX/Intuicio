@@ -287,14 +287,14 @@ mod tests {
                             ScriptFunctionParameter {
                                 name: "a".to_owned(),
                                 struct_query: StructQuery {
-                                    type_id: Some(TypeHash::of::<i32>()),
+                                    type_hash: Some(TypeHash::of::<i32>()),
                                     ..Default::default()
                                 },
                             },
                             ScriptFunctionParameter {
                                 name: "b".to_owned(),
                                 struct_query: StructQuery {
-                                    type_id: Some(TypeHash::of::<i32>()),
+                                    type_hash: Some(TypeHash::of::<i32>()),
                                     ..Default::default()
                                 },
                             },
@@ -302,7 +302,7 @@ mod tests {
                         outputs: vec![ScriptFunctionParameter {
                             name: "result".to_owned(),
                             struct_query: StructQuery {
-                                type_id: Some(TypeHash::of::<i32>()),
+                                type_hash: Some(TypeHash::of::<i32>()),
                                 ..Default::default()
                             },
                         }],
