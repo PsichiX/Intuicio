@@ -5,7 +5,7 @@ use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
 use super::{closure::Closure, promise::Promise};
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "Event", module_name = "event")]
+#[intuicio(name = "Event", module_name = "event", override_send = false)]
 pub struct Event {
     #[intuicio(ignore)]
     pub persistent: Array,

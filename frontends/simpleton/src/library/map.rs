@@ -189,7 +189,7 @@ pub fn collect(context: &mut Context, registry: &Registry, iterator: Reference) 
 }
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "Pair", module_name = "map")]
+#[intuicio(name = "Pair", module_name = "map", override_send = true)]
 pub struct Pair {
     pub key: Reference,
     pub value: Reference,
@@ -237,6 +237,7 @@ impl MapIter {
 pub fn install(registry: &mut Registry) {
     registry.add_struct(define_native_struct! {
         registry => mod map struct Map (Map) {}
+        [override_send = true]
     });
     registry.add_function(new::define_function(registry));
     registry.add_function(reserve::define_function(registry));

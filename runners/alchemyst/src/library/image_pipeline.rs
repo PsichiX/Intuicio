@@ -60,7 +60,11 @@ impl Primitive {
 }
 
 #[derive(IntuicioStruct, Default, Clone)]
-#[intuicio(name = "Fragment", module_name = "image_pipeline")]
+#[intuicio(
+    name = "Fragment",
+    module_name = "image_pipeline",
+    override_send = true
+)]
 pub struct Fragment {
     pub index: Reference,
     pub col: Reference,
@@ -74,7 +78,11 @@ pub struct Fragment {
 }
 
 #[derive(IntuicioStruct, Default, Clone)]
-#[intuicio(name = "Pipeline", module_name = "image_pipeline")]
+#[intuicio(
+    name = "Pipeline",
+    module_name = "image_pipeline",
+    override_send = true
+)]
 pub struct Pipeline {
     pub width: Reference,
     pub height: Reference,

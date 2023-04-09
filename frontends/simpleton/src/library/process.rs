@@ -4,7 +4,7 @@ use intuicio_derive::{intuicio_function, IntuicioStruct};
 use std::process::Command;
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "CommandOutput", module_name = "process")]
+#[intuicio(name = "CommandOutput", module_name = "process", override_send = true)]
 pub struct CommandOutput {
     pub status: Reference,
     pub stdout: Reference,

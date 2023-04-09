@@ -275,6 +275,9 @@ impl Reference {
         if let Some(data) = data.read::<Transferred>() {
             return Some(Err(data.0));
         }
+        if !data.struct_handle().is_send() {
+            return None;
+        }
         let mut object =
             Object::new_uninitialized(TRANSFERRED_STRUCT_HANDLE.with(|handle| handle.clone()));
         object
@@ -485,20 +488,45 @@ mod tests {
     };
     use intuicio_backend_vm::prelude::*;
     use intuicio_core::prelude::*;
+    use intuicio_derive::IntuicioStruct;
     use std::thread::spawn;
 
     #[test]
     fn test_transfer() {
+        #[derive(IntuicioStruct, Default)]
+        #[intuicio(name = "Foo", module_name = "test", override_send = true)]
+        struct Foo {
+            pub v: Reference,
+        }
+
         let mut registry = Registry::default();
         crate::library::install(&mut registry);
+        let foo_type = registry.add_struct(Foo::define_struct(&registry));
+        let integer_type = registry
+            .find_struct(StructQuery {
+                name: Some("Integer".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(integer_type.is_send());
+        let reference_type = registry
+            .find_struct(StructQuery {
+                name: Some("Reference".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(reference_type.is_send());
+        assert!(foo_type.is_send());
 
         let a = Reference::new_integer(42, &registry);
         let b = Reference::new_array(vec![], &registry);
         array::push(b.clone(), a.clone());
         array::push(b.clone(), b.clone());
-        let transferable = Transferable::from(b.clone());
+        let c = Reference::new(Foo { v: b.clone() }, &registry);
+        let transferable = Transferable::from(c.clone());
         assert!(a.is_transferred());
         assert!(b.is_transferred());
+        assert!(c.is_transferred());
         let result = Reference::from(transferable);
         assert!(!result.is_null());
         assert!(!result.is_transferred());

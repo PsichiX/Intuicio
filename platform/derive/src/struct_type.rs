@@ -6,6 +6,8 @@ use syn::{parse_macro_input, Ident, ItemStruct, Lit, Meta, NestedMeta, Visibilit
 struct StructAttributes {
     pub name: Option<Ident>,
     pub module_name: Option<Ident>,
+    pub override_send: Option<bool>,
+    pub override_sync: Option<bool>,
     pub debug: bool,
 }
 
@@ -52,6 +54,20 @@ macro_rules! parse_struct_attributes {
                                                         &content.value(),
                                                         Span::call_site().into(),
                                                     ))
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if name_value.path.is_ident("override_send") {
+                                            match &name_value.lit {
+                                                Lit::Bool(content) => {
+                                                    result.override_send = Some(content.value)
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if name_value.path.is_ident("override_sync") {
+                                            match &name_value.lit {
+                                                Lit::Bool(content) => {
+                                                    result.override_sync = Some(content.value)
                                                 }
                                                 _ => {}
                                             }
@@ -129,6 +145,8 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     let StructAttributes {
         name,
         module_name,
+        override_send,
+        override_sync,
         debug,
     } = parse_struct_attributes!(attrs);
     let name = if let Some(name) = name {
@@ -196,6 +214,16 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
             })
         })
         .collect::<Vec<_>>();
+    let override_send = if let Some(override_send) = override_send {
+        quote! { result = unsafe { result.override_send(#override_send) }; }
+    } else {
+        quote! {}
+    };
+    let override_sync = if let Some(override_sync) = override_sync {
+        quote! { result = unsafe { result.override_sync(#override_sync) }; }
+    } else {
+        quote! {}
+    };
     let result = quote! {
         impl intuicio_core::IntuicioStruct for #ident {
             #[allow(dead_code)]
@@ -207,6 +235,8 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
                 #visibility
                 #module_name
                 #(#fields)*
+                #override_send
+                #override_sync
                 result.build()
             }
         }

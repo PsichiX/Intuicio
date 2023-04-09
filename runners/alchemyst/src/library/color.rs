@@ -4,7 +4,7 @@ use intuicio_derive::*;
 use intuicio_frontend_simpleton::prelude::*;
 
 #[derive(IntuicioStruct, Default, Clone)]
-#[intuicio(name = "Color", module_name = "color")]
+#[intuicio(name = "Color", module_name = "color", override_send = true)]
 pub struct Color {
     pub r: Reference,
     pub g: Reference,

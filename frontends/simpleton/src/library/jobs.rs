@@ -19,7 +19,7 @@ type WorkerQueue = Arc<RwLock<VecDeque<JobRequest>>>;
 type JobResult = Arc<RwLock<JobState>>;
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "Jobs", module_name = "jobs")]
+#[intuicio(name = "Jobs", module_name = "jobs", override_send = false)]
 pub struct Jobs {
     #[intuicio(ignore)]
     workers: Vec<Worker>,
@@ -303,7 +303,7 @@ impl JobState {
 }
 
 #[derive(IntuicioStruct, Default, Clone)]
-#[intuicio(name = "Job", module_name = "job")]
+#[intuicio(name = "Job", module_name = "job", override_send = false)]
 pub struct Job {
     #[intuicio(ignore)]
     result: JobResult,

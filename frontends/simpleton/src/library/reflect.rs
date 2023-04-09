@@ -420,6 +420,7 @@ pub fn heap_size(context: &mut Context, registry: &Registry) -> Reference {
 pub fn install(registry: &mut Registry) {
     registry.add_struct(define_native_struct! {
         registry => mod reflect struct Reference (Reference) {}
+        [override_send = true]
     });
     registry.add_struct(define_native_struct! {
         registry => mod reflect struct Type (Type) {}

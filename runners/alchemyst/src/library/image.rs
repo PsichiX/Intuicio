@@ -8,7 +8,11 @@ use intuicio_derive::*;
 use intuicio_frontend_simpleton::prelude::{closure::Closure, *};
 
 #[derive(IntuicioStruct, Default, Clone)]
-#[intuicio(name = "ImageProcessingConfig", module_name = "image")]
+#[intuicio(
+    name = "ImageProcessingConfig",
+    module_name = "image",
+    override_send = true
+)]
 pub struct ImageProcessingConfig {
     pub col: Reference,
     pub row: Reference,

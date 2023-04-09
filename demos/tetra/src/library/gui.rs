@@ -104,7 +104,7 @@ macro_rules! execute_gui_item {
 }
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "NineSlice", module_name = "gui")]
+#[intuicio(name = "NineSlice", module_name = "gui", override_send = true)]
 pub struct NineSlice {
     pub region: Reference,
     pub left: Reference,

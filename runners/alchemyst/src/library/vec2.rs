@@ -5,7 +5,7 @@ use intuicio_frontend_simpleton::prelude::*;
 type VekVec2 = vek::vec::repr_c::vec2::Vec2<f64>;
 
 #[derive(IntuicioStruct, Default, Clone)]
-#[intuicio(name = "Vec2", odule_name = "vec2")]
+#[intuicio(name = "Vec2", odule_name = "vec2", override_send = true)]
 pub struct Vec2 {
     pub x: Reference,
     pub y: Reference,

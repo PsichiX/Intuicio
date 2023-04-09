@@ -1,4 +1,4 @@
-use crate::{prelude::RuntimeObject, Visibility};
+use crate::{is_send, is_sync, prelude::RuntimeObject, Visibility};
 use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
 use std::{alloc::Layout, borrow::Cow, sync::Arc};
 
@@ -51,6 +51,8 @@ impl RuntimeStructBuilder {
 
     pub fn build(mut self) -> Struct {
         self.fields.sort_by(|a, b| a.offset.cmp(&b.offset));
+        let is_send = self.fields.iter().all(|field| field.struct_handle.is_send);
+        let is_sync = self.fields.iter().all(|field| field.struct_handle.is_sync);
         Struct {
             name: self.name,
             module_name: self.module_name,
@@ -61,6 +63,8 @@ impl RuntimeStructBuilder {
             layout: self.layout.pad_to_align(),
             initializer: self.initializer,
             finalizer: self.finalizer,
+            is_send,
+            is_sync,
         }
     }
 
@@ -95,6 +99,8 @@ pub struct NativeStructBuilder {
     layout: Layout,
     initializer: unsafe fn(*mut ()),
     finalizer: unsafe fn(*mut ()),
+    is_send: bool,
+    is_sync: bool,
 }
 
 impl NativeStructBuilder {
@@ -109,6 +115,8 @@ impl NativeStructBuilder {
             layout: Layout::new::<T>(),
             initializer: T::initialize_raw,
             finalizer: T::finalize_raw,
+            is_send: is_send::<T>(),
+            is_sync: is_sync::<T>(),
         }
     }
 
@@ -123,6 +131,8 @@ impl NativeStructBuilder {
             layout: Layout::new::<T>(),
             initializer: RuntimeObject::initialize_raw,
             finalizer: RuntimeObject::finalize_raw,
+            is_send: is_send::<T>(),
+            is_sync: is_sync::<T>(),
         }
     }
 
@@ -138,7 +148,19 @@ impl NativeStructBuilder {
 
     pub fn field(mut self, mut field: StructField, offset: usize) -> Self {
         field.offset = offset;
+        self.is_send = self.is_send && field.struct_handle.is_send;
+        self.is_sync = self.is_sync && field.struct_handle.is_sync;
         self.fields.push(field);
+        self
+    }
+
+    pub unsafe fn override_send(mut self, mode: bool) -> Self {
+        self.is_send = mode;
+        self
+    }
+
+    pub unsafe fn override_sync(mut self, mode: bool) -> Self {
+        self.is_sync = mode;
         self
     }
 
@@ -154,6 +176,8 @@ impl NativeStructBuilder {
             layout: self.layout,
             initializer: self.initializer,
             finalizer: self.finalizer,
+            is_send: self.is_send,
+            is_sync: self.is_sync,
         }
     }
 
@@ -174,6 +198,8 @@ impl From<Struct> for NativeStructBuilder {
             layout: value.layout,
             initializer: value.initializer,
             finalizer: value.finalizer,
+            is_send: value.is_send,
+            is_sync: value.is_sync,
         }
     }
 }
@@ -239,6 +265,8 @@ pub struct Struct {
     layout: Layout,
     pub(crate) initializer: unsafe fn(*mut ()),
     pub(crate) finalizer: unsafe fn(*mut ()),
+    is_send: bool,
+    is_sync: bool,
 }
 
 impl Struct {
@@ -248,6 +276,14 @@ impl Struct {
 
     pub fn is_native(&self) -> bool {
         !self.is_runtime()
+    }
+
+    pub fn is_send(&self) -> bool {
+        self.is_send
+    }
+
+    pub fn is_sync(&self) -> bool {
+        self.is_sync
     }
 
     pub fn type_hash(&self) -> TypeHash {
@@ -412,8 +448,20 @@ macro_rules! define_native_struct {
         struct $($name:ident)? ($type:ty) {
             $( $field_name:ident : $field_type:ty ),*
         }
+        $( [override_send = $override_send:literal] )?
+        $( [override_sync = $override_sync:literal] )?
     ) => {
         {
+            #[allow(unused_mut)]
+            let mut override_send = Option::<bool>::None;
+            $(
+                override_send = Some($override_send as bool);
+            )?
+            #[allow(unused_mut)]
+            let mut override_sync = Option::<bool>::None;
+            $(
+                override_sync = Some($override_sync as bool);
+            )?
             #[allow(unused_mut)]
             let mut name = std::any::type_name::<$type>().to_owned();
             $(
@@ -435,6 +483,12 @@ macro_rules! define_native_struct {
                     $crate::__internal::offset_of!($type, $field_name),
                 );
             )*
+            if let Some(mode) = override_send {
+                result = unsafe { result.override_send(mode) };
+            }
+            if let Some(mode) = override_sync {
+                result = unsafe { result.override_sync(mode) };
+            }
             result.build()
         }
     };

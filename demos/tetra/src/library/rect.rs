@@ -6,7 +6,7 @@ use intuicio_frontend_simpleton::*;
 pub type TetraRect = tetra::graphics::Rectangle;
 
 #[derive(Default, IntuicioStruct, Clone)]
-#[intuicio(name = "Rect", module_name = "rect")]
+#[intuicio(name = "Rect", module_name = "rect", override_send = true)]
 pub struct Rect {
     pub x: Reference,
     pub y: Reference,

@@ -3,7 +3,7 @@ use intuicio_core::{context::Context, registry::Registry, IntuicioStruct};
 use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "Promise", module_name = "promise")]
+#[intuicio(name = "Promise", module_name = "promise", override_send = false)]
 pub struct Promise {
     #[intuicio(ignore)]
     pub resolved: Reference,

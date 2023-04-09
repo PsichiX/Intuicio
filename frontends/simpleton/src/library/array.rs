@@ -218,6 +218,7 @@ impl ArrayIter {
 pub fn install(registry: &mut Registry) {
     registry.add_struct(define_native_struct! {
         registry => mod array struct Array (Array) {}
+        [override_send = true]
     });
     registry.add_function(new::define_function(registry));
     registry.add_function(reserve::define_function(registry));

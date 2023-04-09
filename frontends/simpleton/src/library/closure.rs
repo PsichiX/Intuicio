@@ -3,7 +3,7 @@ use intuicio_core::{context::Context, registry::Registry, IntuicioStruct};
 use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
 
 #[derive(IntuicioStruct, Default)]
-#[intuicio(name = "Closure", module_name = "closure")]
+#[intuicio(name = "Closure", module_name = "closure", override_send = false)]
 pub struct Closure {
     #[intuicio(ignore)]
     pub function: Function,

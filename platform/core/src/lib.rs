@@ -23,6 +23,7 @@ pub mod __internal {
 
 use crate::{registry::Registry, struct_type::Struct};
 use serde::{Deserialize, Serialize};
+use std::{cell::Cell, marker::PhantomData};
 
 #[derive(
     Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
@@ -124,6 +125,60 @@ macro_rules! crate_version {
 
 pub fn core_version() -> IntuicioVersion {
     crate_version!()
+}
+
+struct IsSend<'a, T> {
+    is_send: &'a Cell<bool>,
+    _marker: PhantomData<T>,
+}
+
+impl<T> Clone for IsSend<'_, T> {
+    fn clone(&self) -> Self {
+        self.is_send.set(false);
+        IsSend {
+            is_send: self.is_send,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T: Send> Copy for IsSend<'_, T> {}
+
+pub fn is_send<T>() -> bool {
+    let is_send = Cell::new(true);
+    let _ = [IsSend::<T> {
+        is_send: &is_send,
+        _marker: PhantomData,
+    }]
+    .clone();
+    is_send.get()
+}
+
+struct IsSync<'a, T> {
+    is_sync: &'a Cell<bool>,
+    _marker: PhantomData<T>,
+}
+
+impl<T> Clone for IsSync<'_, T> {
+    fn clone(&self) -> Self {
+        self.is_sync.set(false);
+        IsSync {
+            is_sync: self.is_sync,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T: Sync> Copy for IsSync<'_, T> {}
+
+pub fn is_sync<T>() -> bool {
+    let is_sync = Cell::new(true);
+    let _ = [IsSync::<T> {
+        is_sync: &is_sync,
+        _marker: PhantomData,
+    }]
+    .clone();
+    is_sync.get()
 }
 
 #[cfg(test)]

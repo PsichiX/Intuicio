@@ -5,7 +5,7 @@ use intuicio_frontend_simpleton::*;
 pub type TetraVec2 = tetra::math::Vec2<f32>;
 
 #[derive(Default, IntuicioStruct, Clone)]
-#[intuicio(name = "Vec2", module_name = "vec2")]
+#[intuicio(name = "Vec2", module_name = "vec2", override_send = true)]
 pub struct Vec2 {
     pub x: Reference,
     pub y: Reference,
