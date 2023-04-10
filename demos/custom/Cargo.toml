@@ -1,8 +1,20 @@
 [package]
-name = "stack-operator"
+name = "custom"
 version = "0.8.0"
 edition = "2021"
 publish = false
+
+[[bin]]
+name = "custom-frontend"
+path = "src/main_frontend.rs"
+
+[[bin]]
+name = "custom-backend"
+path = "src/main_backend.rs"
+
+[[bin]]
+name = "custom-runner"
+path = "src/main_runner.rs"
 
 [dependencies]
 intuicio-data = { version = "0.8", path = "../../platform/data" }

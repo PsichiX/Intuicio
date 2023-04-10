@@ -16,6 +16,6 @@ members = [
     "demos/tetra",
     "demos/plugin",
     "demos/emu",
-    "demos/stack-operator",
+    "demos/custom",
     "tests",
 ]
