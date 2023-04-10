@@ -13,6 +13,7 @@ members = [
     "plugins/simpleton-http",
     "runners/simpleton",
     "runners/alchemyst",
+    "essentials",
     "demos/tetra",
     "demos/plugin",
     "demos/emu",

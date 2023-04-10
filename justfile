@@ -9,6 +9,7 @@ build:
 
 test:
   cargo test --all --all-features
+  just alchemyst-run
 
 bench:
   cargo test --manifest-path ./tests/Cargo.toml --features=bench --release -- --nocapture
@@ -67,3 +68,5 @@ publish:
   cargo publish --no-verify --manifest-path ./runners/simpleton/Cargo.toml
   sleep 15
   cargo publish --no-verify --manifest-path ./runners/alchemyst/Cargo.toml
+  sleep 15
+  cargo publish --no-verify --manifest-path ./essentials/Cargo.toml
