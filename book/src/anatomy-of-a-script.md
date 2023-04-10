@@ -90,12 +90,12 @@ Intuicio scripts by default have a very limited set of operations, because of be
 
 Usually we leave producing script operations to frontends, but one can create them at any time by any means. One can even create them at runtime and call newly created function in place, without adding it to registry:
 ```rust
-let function = VmScope::<AsmExpression>::generate_function(
-    &ScriptFunction {
-        signature: function_signature! {
-            registry => mod test fn main() -> (result: i32)
-        },
-        script: ScriptBuilder::<AsmExpression>::default()
+let function = Function::new(
+    function_signature! {
+        registry => mod test fn main() -> (result: i32)
+    },
+    VmScope::<AsmExpression>::generate_function_body(
+        ScriptBuilder::<AsmExpression>::default()
             .literal(AsmExpression::Literal(AsmLiteral::I32(2)))
             .literal(AsmExpression::Literal(AsmLiteral::I32(40)))
             .call_function(FunctionQuery {
@@ -104,12 +104,12 @@ let function = VmScope::<AsmExpression>::generate_function(
                 ..Default::default()
             })
             .build(),
-    },
-    &registry,
-    None,
-)
-.unwrap()
-.0;
+        &registry,
+        None,
+    )
+    .unwrap()
+    .0
+);
 
 function.invoke(&mut context, &registry);
 assert_eq!(context.stack().pop::<i32>().unwrap(), 42);

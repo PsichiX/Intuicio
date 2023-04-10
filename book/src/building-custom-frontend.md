@@ -2,7 +2,7 @@
 
 Here we will create a very simple frontend to put in use all what we have learned before.
 
-This is gonna be basically a pretty much stripped down version of `assembler` frontend jsut to get intuicion on creating frontends. For more advanced examples of frontends please take a look at frontends already made, located in `frontends` folder on repository.
+This is gonna be basically a pretty much stripped down version of `assembler` frontend just to get intuition on creating frontends. For more advanced examples of frontends please take a look at frontends already made, located in `frontends` folder on repository.
 
 ---
 
@@ -15,19 +15,28 @@ Let's start with defining goals for this frontend to achieve:
     - each line is an operation.
     - we put operations in reverse order so it is easier to read script as a hierarchy of function calls with its arguments indented and in ascending order.
 
-So now let's create new project, import dependencies and define frontend's expression type:
+So now let's create new project and add Intuicio dependencies:
+```toml
+[dependencies]
+intuicio-data = "*"
+intuicio-core = "*"
+intuicio-derive = "*"
+intuicio-backend-vm = "*"
+```
+Then in `main.rs` import these dependencies:
 ```rust
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
+use intuicio_data::prelude::*;
 use intuicio_derive::*;
-
+```
+Now define frontend's expression type and implement `ScriptExpression` trait with its `evaluate` method that will perform pushing literal onto stack:
+```rust
 #[derive(Debug)]
 pub enum CustomExpression {
     Literal(i32),
 }
-```
-Now implement `ScriptExpression` trait with its `ecaluate` method that will perform pushing literal onto stack:
-```rust
+
 impl ScriptExpression for CustomExpression {
     fn evaluate(&self, context: &mut Context, _: &Registry) {
         match self {

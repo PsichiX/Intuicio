@@ -6,7 +6,7 @@
 
 ### Setup
 
-`Registry` contains all structures and functions that both scripting and native side expose for scripting to interact with.
+`Registry` contains all structures and functions that both scripting and native side expose for both sides to interact with.
 
 Here is an example of how to register functions both from native and script sides:
 ```rust
@@ -26,12 +26,12 @@ AsmPackage::new("main.iasm", &mut content_provider)
 Of course we don't actually require frontends to register script-side functions and structures, here is an example of how one could create raw scripted function, knowing the backend it's gonna use (`VmScope` here):
 ```rust
 registry.add_function(
-    VmScope::<AsmExpression>::generate_function(
-        &ScriptFunction {
-            signature: function_signature! {
-                registry => mod test fn main() -> (result: i32)
-            },
-            script: ScriptBuilder::<AsmExpression>::default()
+    Function::new(
+        function_signature! {
+            registry => mod test fn main() -> (result: i32)
+        },
+        VmScope::<AsmExpression>::generate_function_body(
+            ScriptBuilder::<AsmExpression>::default()
                 .literal(AsmExpression::Literal(AsmLiteral::I32(2)))
                 .literal(AsmExpression::Literal(AsmLiteral::I32(40)))
                 .call_function(FunctionQuery {
@@ -40,15 +40,15 @@ registry.add_function(
                     ..Default::default()
                 })
                 .build(),
-        },
-        &registry,
-        None,
-    )
-    .unwrap()
-    .0,
+            &registry,
+            None,
+        )
+        .unwrap()
+        .0,
+    ),
 );
 ```
-And as we can see above, we can use completely different backends for each function we want to register, therefore in principle, one application can run multiple backends, not forcing user to use only one.
+And as we can see above, we can use completely different backends for each function we want to register, therefore in principle, one application can run multiple backends, not forcing user to use only one, which is yet another deliberate design decision to allow interoperability between different backends.
 
 > Also remember that since Intuicio is all about moving data into and out of function calls, every function that we want to call, has to be always registered in the registry and registry cannot be modified when used in function calls!
 

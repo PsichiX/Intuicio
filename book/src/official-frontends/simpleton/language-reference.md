@@ -40,6 +40,8 @@ General rule of thumb is that one file describes one module and preferably one s
 So later these module types are operated on like this:
 ```javascript
 mod main {
+    import "vec2";
+
     func main() {
         var a = vec2::new(0.0, 1.0);
         var b = vec2::new(1.0, 0.0);
@@ -51,7 +53,7 @@ mod main {
 ```
 First question that comes into mind is:
 
-> Why there are `add` funciton calls instead of operators being used?
+> Why there are `add` function calls instead of operators being used?
 
 **Simpleton does not have operators** - Simpleton believes in being explicit. If something is doing what function calls does, it should be called as function.
 
@@ -147,7 +149,7 @@ Later functions can be called by providing their module name, function name and 
 ```javascript
 var v = main::sum(1, 2, 3);
 ```
-If we don't know funciton at compile-time, we can call it at runtime by `Function` object:
+If we don't know function at compile-time, we can call it at runtime by `Function` object:
 ```javascript
 var v = reflect::call(<func main::sum>, [1, 2, 3]);
 ```
