@@ -9,7 +9,7 @@ pub struct Context {
     registers: DataStack,
     registers_barriers: Vec<usize>,
     heap: DataHeap,
-    custom: HashMap<String, Box<dyn Any + Send + Sync>>,
+    custom: HashMap<String, Box<dyn Any>>,
 }
 
 impl Context {
@@ -100,7 +100,7 @@ impl Context {
         self.custom.get_mut(name)?.downcast_mut::<T>()
     }
 
-    pub fn set_custom<T: Send + Sync + 'static>(&mut self, name: impl ToString, data: T) {
+    pub fn set_custom<T: 'static>(&mut self, name: impl ToString, data: T) {
         self.custom.insert(name.to_string(), Box::new(data));
     }
 }
