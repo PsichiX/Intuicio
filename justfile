@@ -46,27 +46,27 @@ install:
 
 publish:
   cargo publish --no-verify --manifest-path ./platform/data/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./platform/core/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./platform/plugins/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./platform/derive/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./backends/vm/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./backends/rust/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./frontends/serde/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./frontends/assembler/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./frontends/vault/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./frontends/simpleton/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./runners/simpleton/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./runners/alchemyst/Cargo.toml
-  sleep 15
+  sleep 1
   cargo publish --no-verify --manifest-path ./essentials/Cargo.toml
