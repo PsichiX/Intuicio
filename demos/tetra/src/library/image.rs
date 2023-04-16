@@ -38,8 +38,8 @@ impl Image {
     ) -> Reference {
         let engine = &mut *engine.write::<Engine>().unwrap();
         let image = image.read::<Image>().unwrap();
-        let position = position.read::<Vec2>().unwrap().into_tetra();
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let position = position.read::<Vec2>().unwrap().to_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         image.texture.as_ref().unwrap().draw(
@@ -65,11 +65,11 @@ impl Image {
     ) -> Reference {
         let engine = &mut *engine.write::<Engine>().unwrap();
         let image = image.read::<Image>().unwrap();
-        let position = position.read::<Vec2>().unwrap().into_tetra();
-        let scale = scale.read::<Vec2>().unwrap().into_tetra();
-        let origin = origin.read::<Vec2>().unwrap().into_tetra();
+        let position = position.read::<Vec2>().unwrap().to_tetra();
+        let scale = scale.read::<Vec2>().unwrap().to_tetra();
+        let origin = origin.read::<Vec2>().unwrap().to_tetra();
         let rotation = *rotation.read::<Real>().unwrap() as f32;
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         image.texture.as_ref().unwrap().draw(
@@ -94,8 +94,8 @@ impl Image {
     ) -> Reference {
         let engine = &mut *engine.write::<Engine>().unwrap();
         let image = image.read::<Image>().unwrap();
-        let factor = factor.read::<Vec2>().unwrap().into_tetra();
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let factor = factor.read::<Vec2>().unwrap().to_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let screen_width = window::get_width(&ctx) as f32;
@@ -129,11 +129,11 @@ impl Image {
     ) -> Reference {
         let engine = &mut *engine.write::<Engine>().unwrap();
         let image = image.read::<Image>().unwrap();
-        let factor = factor.read::<Vec2>().unwrap().into_tetra();
-        let scale = scale.read::<Vec2>().unwrap().into_tetra();
-        let origin = origin.read::<Vec2>().unwrap().into_tetra();
+        let factor = factor.read::<Vec2>().unwrap().to_tetra();
+        let scale = scale.read::<Vec2>().unwrap().to_tetra();
+        let origin = origin.read::<Vec2>().unwrap().to_tetra();
         let rotation = *rotation.read::<Real>().unwrap() as f32;
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let screen_width = window::get_width(&ctx) as f32;

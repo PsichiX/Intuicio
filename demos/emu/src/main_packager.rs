@@ -120,7 +120,7 @@ fn main() {
             })
             .collect(),
     }
-    .into_bytes()
+    .to_bytes()
     .expect("Could not package cartridge!");
     if result.len() > MAX_SIZE {
         panic!(

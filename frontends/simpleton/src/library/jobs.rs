@@ -29,6 +29,7 @@ pub struct Jobs {
 impl Jobs {
     pub const HOST_PRODUCER_CUSTOM: &str = "Jobs::host_producer";
 
+    #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_context, use_registry)]
     pub fn new(context: &Context, registry: &Registry, workers_count: Reference) -> Reference {
         let host_producer = match context.custom::<HostProducer>(Self::HOST_PRODUCER_CUSTOM) {

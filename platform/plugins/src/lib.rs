@@ -30,7 +30,7 @@ pub fn install_plugin(
     host_version: Option<IntuicioVersion>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     unsafe {
-        let host_version = host_version.unwrap_or_else(|| plugins_version());
+        let host_version = host_version.unwrap_or_else(plugins_version);
         let library = Library::new(path)?;
         let version = library.get::<unsafe extern "C" fn() -> IntuicioVersion>(b"version\0")?;
         let plugin_version = version();

@@ -177,10 +177,7 @@ impl Reference {
     }
 
     pub fn new<T: 'static>(data: T, registry: &Registry) -> Self {
-        let struct_type = registry
-            .find_struct(StructQuery::of::<T>())
-            .unwrap()
-            .clone();
+        let struct_type = registry.find_struct(StructQuery::of::<T>()).unwrap();
         let mut value = unsafe { Object::new_uninitialized(struct_type) };
         unsafe { value.as_mut_ptr().cast::<T>().write(data) };
         Self::new_raw(value)
@@ -202,6 +199,7 @@ impl Reference {
         Self::new_raw(Object::new(ty.data.as_ref().unwrap().clone()))
     }
 
+    /// # Safety
     pub unsafe fn uninitialized(ty: &Type) -> Self {
         Self::new_raw(Object::new_uninitialized(ty.data.as_ref().unwrap().clone()))
     }
@@ -270,6 +268,7 @@ impl Reference {
         }
     }
 
+    /// # Safety
     pub unsafe fn transfer(&self) -> Option<Result<Object, usize>> {
         let mut data = self.data.as_ref()?.write()?;
         if let Some(data) = data.read::<Transferred>() {
@@ -423,10 +422,7 @@ impl TransferableTree {
                 references.insert(address, result.clone());
                 result
             }
-            Self::Link { address } => references
-                .get(&address)
-                .map(|value| value.clone())
-                .unwrap_or_default(),
+            Self::Link { address } => references.get(&address).cloned().unwrap_or_default(),
         }
     }
 }

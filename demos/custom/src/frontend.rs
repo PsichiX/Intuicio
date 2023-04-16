@@ -47,7 +47,7 @@ impl FromStr for CustomOperation {
                 content: "".to_owned(),
             });
         }
-        if line.starts_with("#") {
+        if line.starts_with('#') {
             return Ok(Self::Comment {
                 content: line.to_owned(),
             });
@@ -106,7 +106,7 @@ impl BytesContentParser<CustomScript> for CustomContentParser {
         Ok(String::from_utf8(bytes)?
             .lines()
             .filter(|line| !line.is_empty())
-            .map(|line| CustomOperation::from_str(line))
+            .map(CustomOperation::from_str)
             .collect::<Result<CustomScript, _>>()?)
     }
 }

@@ -26,7 +26,7 @@ impl Primitive {
         } else if let Some(value) = value.read::<Real>() {
             Self::Real(*value)
         } else if let Some(value) = value.read::<Array>() {
-            Self::Array(value.iter().map(|value| Self::from_value(value)).collect())
+            Self::Array(value.iter().map(Self::from_value).collect())
         } else if let Some(value) = value.read::<Map>() {
             Self::Map(
                 value
@@ -165,7 +165,7 @@ impl Pipeline {
         let captures = closure
             .captured
             .iter()
-            .map(|value| Primitive::from_value(value))
+            .map(Primitive::from_value)
             .collect::<Vec<_>>();
         let host_producer = match context.custom::<HostProducer>(Jobs::HOST_PRODUCER_CUSTOM) {
             Some(host_producer) => host_producer.clone(),
@@ -284,6 +284,7 @@ pub struct Sampler {
 
 #[intuicio_methods(module_name = "image_sampler")]
 impl Sampler {
+    #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_registry)]
     pub fn new(registry: &Registry, image: Reference) -> Reference {
         let image = image.read::<Image>().unwrap();

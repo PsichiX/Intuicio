@@ -15,6 +15,7 @@ pub struct Promise {
 
 #[intuicio_methods(module_name = "promise")]
 impl Promise {
+    #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_registry)]
     pub fn new(registry: &Registry, resolved: Reference, rejected: Reference) -> Reference {
         Reference::new(
@@ -80,7 +81,7 @@ impl Promise {
             promise.rejected.read::<Closure>().unwrap().invoke(
                 context,
                 registry,
-                &[promise.next.clone(), value.clone()],
+                &[promise.next.clone(), value],
             );
         }
         promise.resolved = Reference::null();

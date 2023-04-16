@@ -21,7 +21,7 @@ pub fn parse(content: &str) -> Result<SimpletonModule, String> {
                 rule => unreachable!("{:?}", rule),
             }
         }
-        Err(error) => return Err(format!("{}", error)),
+        Err(error) => Err(format!("{}", error)),
     }
 }
 
@@ -113,17 +113,10 @@ fn parse_statement(pair: Pair<Rule>) -> SimpletonStatement {
             for pair in pairs {
                 match pair.as_rule() {
                     Rule::if_else_success => {
-                        success = pair
-                            .into_inner()
-                            .map(|pair| parse_statement(pair))
-                            .collect();
+                        success = pair.into_inner().map(parse_statement).collect();
                     }
                     Rule::if_else_failure => {
-                        failure = Some(
-                            pair.into_inner()
-                                .map(|pair| parse_statement(pair))
-                                .collect(),
-                        );
+                        failure = Some(pair.into_inner().map(parse_statement).collect());
                     }
                     rule => unreachable!("{:?}", rule),
                 }
@@ -137,7 +130,7 @@ fn parse_statement(pair: Pair<Rule>) -> SimpletonStatement {
         Rule::while_loop => {
             let mut pairs = pair.into_inner();
             let condition = parse_expression_start(pairs.next().unwrap());
-            let statements = pairs.map(|pair| parse_statement(pair)).collect();
+            let statements = pairs.map(parse_statement).collect();
             SimpletonStatement::While {
                 condition,
                 statements,
@@ -147,7 +140,7 @@ fn parse_statement(pair: Pair<Rule>) -> SimpletonStatement {
             let mut pairs = pair.into_inner();
             let variable = parse_identifier(pairs.next().unwrap());
             let iterator = parse_expression_start(pairs.next().unwrap());
-            let statements = pairs.map(|pair| parse_statement(pair)).collect();
+            let statements = pairs.map(parse_statement).collect();
             SimpletonStatement::For {
                 variable,
                 iterator,
@@ -178,11 +171,7 @@ fn parse_expression_start(pair: Pair<Rule>) -> SimpletonExpressionStart {
         Rule::find_structure => {
             let mut pairs = pair.into_inner();
             let (name, module_name) = parse_path(pairs.next().unwrap());
-            let next = if let Some(pair) = pairs.next() {
-                Some(parse_expression_next(pair))
-            } else {
-                None
-            };
+            let next = pairs.next().map(parse_expression_next);
             SimpletonExpressionStart::FindStruct {
                 name,
                 module_name,
@@ -192,11 +181,7 @@ fn parse_expression_start(pair: Pair<Rule>) -> SimpletonExpressionStart {
         Rule::find_function => {
             let mut pairs = pair.into_inner();
             let (name, module_name) = parse_path(pairs.next().unwrap());
-            let next = if let Some(pair) = pairs.next() {
-                Some(parse_expression_next(pair))
-            } else {
-                None
-            };
+            let next = pairs.next().map(parse_expression_next);
             SimpletonExpressionStart::FindFunction {
                 name,
                 module_name,
@@ -236,21 +221,13 @@ fn parse_expression_start(pair: Pair<Rule>) -> SimpletonExpressionStart {
         Rule::literal => {
             let mut pairs = pair.into_inner();
             let literal = parse_literal(pairs.next().unwrap());
-            let next = if let Some(pair) = pairs.next() {
-                Some(parse_expression_next(pair))
-            } else {
-                None
-            };
+            let next = pairs.next().map(parse_expression_next);
             SimpletonExpressionStart::Literal { literal, next }
         }
         Rule::get_variable => {
             let mut pairs = pair.into_inner();
             let name = parse_identifier(pairs.next().unwrap());
-            let next = if let Some(pair) = pairs.next() {
-                Some(parse_expression_next(pair))
-            } else {
-                None
-            };
+            let next = pairs.next().map(parse_expression_next);
             SimpletonExpressionStart::GetVariable { name, next }
         }
         Rule::call_function => {
@@ -286,31 +263,25 @@ fn parse_expression_next(pair: Pair<Rule>) -> SimpletonExpressionNext {
         Rule::get_field => {
             let mut pairs = pair.into_inner();
             let name = parse_identifier(pairs.next().unwrap());
-            let next = if let Some(pair) = pairs.next() {
-                Some(Box::new(parse_expression_next(pair)))
-            } else {
-                None
-            };
+            let next = pairs
+                .next()
+                .map(|pair| Box::new(parse_expression_next(pair)));
             SimpletonExpressionNext::GetField { name, next }
         }
         Rule::get_array_item => {
             let mut pairs = pair.into_inner();
             let index = Box::new(parse_expression_start(pairs.next().unwrap()));
-            let next = if let Some(pair) = pairs.next() {
-                Some(Box::new(parse_expression_next(pair)))
-            } else {
-                None
-            };
+            let next = pairs
+                .next()
+                .map(|pair| Box::new(parse_expression_next(pair)));
             SimpletonExpressionNext::GetArrayItem { index, next }
         }
         Rule::get_map_item => {
             let mut pairs = pair.into_inner();
             let index = Box::new(parse_expression_start(pairs.next().unwrap()));
-            let next = if let Some(pair) = pairs.next() {
-                Some(Box::new(parse_expression_next(pair)))
-            } else {
-                None
-            };
+            let next = pairs
+                .next()
+                .map(|pair| Box::new(parse_expression_next(pair)));
             SimpletonExpressionNext::GetMapItem { index, next }
         }
         rule => unreachable!("{:?}", rule),
@@ -366,9 +337,7 @@ fn parse_text(pair: Pair<Rule>) -> Text {
 }
 
 fn parse_array(pair: Pair<Rule>) -> Vec<SimpletonExpressionStart> {
-    pair.into_inner()
-        .map(|pair| parse_expression_start(pair))
-        .collect()
+    pair.into_inner().map(parse_expression_start).collect()
 }
 
 fn parse_map(pair: Pair<Rule>) -> Vec<(String, SimpletonExpressionStart)> {

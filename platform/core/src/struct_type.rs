@@ -154,11 +154,13 @@ impl NativeStructBuilder {
         self
     }
 
+    /// # Safety
     pub unsafe fn override_send(mut self, mode: bool) -> Self {
         self.is_send = mode;
         self
     }
 
+    /// # Safety
     pub unsafe fn override_sync(mut self, mode: bool) -> Self {
         self.is_sync = mode;
         self

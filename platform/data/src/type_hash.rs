@@ -13,6 +13,7 @@ impl TypeHash {
         unsafe { Self::raw(std::any::type_name::<T>()) }
     }
 
+    /// # Safety
     pub unsafe fn raw(name: &str) -> Self {
         let mut hasher = DefaultHasher::default();
         name.hash(&mut hasher);

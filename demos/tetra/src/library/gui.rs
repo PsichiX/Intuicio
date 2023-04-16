@@ -42,7 +42,7 @@ macro_rules! read_deref {
 macro_rules! read_tetra {
     ($( $name:ident : $type:ty ),*) => {
         #[allow(unused_mut)]
-        let ( $( mut $name , )* ) = ( $( $name.read::<$type>().unwrap().into_tetra() , )* );
+        let ( $( mut $name , )* ) = ( $( $name.read::<$type>().unwrap().to_tetra() , )* );
     };
 }
 
@@ -122,11 +122,12 @@ pub struct Gui {
 
 #[intuicio_methods(module_name = "gui")]
 impl Gui {
+    #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_registry)]
     pub fn new(registry: &Registry, layout: Reference) -> Reference {
         Reference::new(
             Self {
-                layout: layout.read::<Rect>().unwrap().into_tetra(),
+                layout: layout.read::<Rect>().unwrap().to_tetra(),
             },
             registry,
         )
@@ -185,6 +186,7 @@ impl Gui {
         execute_gui!(layout, gui.input_consumed, executor, context, registry)
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[intuicio_method(use_context, use_registry)]
     pub fn freeform_at(
         context: &mut Context,
@@ -211,6 +213,7 @@ impl Gui {
         execute_gui!(layout, gui.input_consumed, executor, context, registry)
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[intuicio_method(use_context, use_registry)]
     pub fn margin(
         context: &mut Context,
@@ -285,8 +288,8 @@ impl Gui {
         let layout = TetraRect {
             x: gui.layout.x + horizontal_space * alignment.x,
             y: gui.layout.y + vertical_space * alignment.y,
-            width: width,
-            height: height,
+            width,
+            height,
         };
         execute_gui!(layout, gui.input_consumed, executor, context, registry)
     }
@@ -310,6 +313,7 @@ impl Gui {
         execute_gui!(layout, gui.input_consumed, executor, context, registry)
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[intuicio_method(use_context, use_registry)]
     pub fn vertical_list(
         context: &mut Context,
@@ -350,6 +354,7 @@ impl Gui {
         Reference::new(Self { layout: gui.layout }, registry)
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[intuicio_method(use_context, use_registry)]
     pub fn horizontal_list(
         context: &mut Context,
@@ -504,7 +509,7 @@ impl Gui {
                     region: nineslice
                         .region
                         .read::<Rect>()
-                        .map(|rect| rect.into_tetra())
+                        .map(|rect| rect.to_tetra())
                         .unwrap_or_else(|| TetraRect {
                             x: 0.0,
                             y: 0.0,

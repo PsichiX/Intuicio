@@ -24,20 +24,17 @@ macro_rules! parse_impl_attributes {
         let attributes = parse_macro_input!($attributes as AttributeArgs);
         for attribute in attributes {
             match attribute {
-                NestedMeta::Meta(meta) => match meta {
-                    Meta::NameValue(name_value) => {
-                        if name_value.path.is_ident("module_name") {
-                            match name_value.lit {
-                                Lit::Str(content) => {
-                                    result.module_name =
-                                        Some(Ident::new(&content.value(), Span::call_site().into()))
-                                }
-                                _ => {}
+                NestedMeta::Meta(Meta::NameValue(name_value)) => {
+                    if name_value.path.is_ident("module_name") {
+                        match name_value.lit {
+                            Lit::Str(content) => {
+                                result.module_name =
+                                    Some(Ident::new(&content.value(), Span::call_site().into()))
                             }
+                            _ => {}
                         }
                     }
-                    _ => {}
-                },
+                }
                 _ => {}
             }
         }

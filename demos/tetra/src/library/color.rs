@@ -24,7 +24,7 @@ impl Color {
         }
     }
 
-    pub fn into_tetra(&self) -> TetraColor {
+    pub fn to_tetra(&self) -> TetraColor {
         TetraColor {
             r: *self.r.read::<Real>().unwrap() as f32,
             g: *self.g.read::<Real>().unwrap() as f32,
@@ -73,13 +73,13 @@ impl Color {
 
     #[intuicio_method(use_registry)]
     pub fn saturate(registry: &Registry, color: Reference) -> Reference {
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         Reference::new(Color::from_tetra(color.clamp(), registry), registry)
     }
 
     #[intuicio_method(use_registry)]
     pub fn premultiply(registry: &Registry, color: Reference) -> Reference {
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         Reference::new(
             Color::from_tetra(color.to_premultiplied(), registry),
             registry,

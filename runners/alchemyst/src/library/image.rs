@@ -30,6 +30,7 @@ pub struct Image {
 
 #[intuicio_methods(module_name = "image")]
 impl Image {
+    #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_registry)]
     pub fn new(
         registry: &Registry,
@@ -213,33 +214,32 @@ impl Image {
                 .buffer
                 .get_pixel_checked(col, row)
                 .copied()
-                .unwrap_or_else(|| Rgba([0.0, 0.0, 0.0, 0.0]));
+                .unwrap_or(Rgba([0.0, 0.0, 0.0, 0.0]));
             let top_right = self
                 .buffer
                 .get_pixel_checked(col + 1, row)
                 .copied()
-                .unwrap_or_else(|| Rgba([0.0, 0.0, 0.0, 0.0]));
+                .unwrap_or(Rgba([0.0, 0.0, 0.0, 0.0]));
             let bottom_right = self
                 .buffer
                 .get_pixel_checked(col + 1, row + 1)
                 .copied()
-                .unwrap_or_else(|| Rgba([0.0, 0.0, 0.0, 0.0]));
+                .unwrap_or(Rgba([0.0, 0.0, 0.0, 0.0]));
             let bottom_left = self
                 .buffer
                 .get_pixel_checked(col, row + 1)
                 .copied()
-                .unwrap_or_else(|| Rgba([0.0, 0.0, 0.0, 0.0]));
+                .unwrap_or(Rgba([0.0, 0.0, 0.0, 0.0]));
             let top = top_left.map2(&top_right, |a, b| lerp(a, b, u));
             let bottom = bottom_left.map2(&bottom_right, |a, b| lerp(a, b, u));
-            let pixel = top.map2(&bottom, |a, b| lerp(a, b, v));
-            pixel
+            top.map2(&bottom, |a, b| lerp(a, b, v))
         } else {
             let col = col.round() as u32;
             let row = row.round() as u32;
             self.buffer
                 .get_pixel_checked(col, row)
                 .copied()
-                .unwrap_or_else(|| Rgba([0.0, 0.0, 0.0, 0.0]))
+                .unwrap_or(Rgba([0.0, 0.0, 0.0, 0.0]))
         }
     }
 
@@ -265,7 +265,7 @@ impl Image {
         self.buffer
             .get_pixel_checked(col, row)
             .copied()
-            .unwrap_or_else(|| Rgba([0.0, 0.0, 0.0, 0.0]))
+            .unwrap_or(Rgba([0.0, 0.0, 0.0, 0.0]))
     }
 
     #[intuicio_method(use_registry)]

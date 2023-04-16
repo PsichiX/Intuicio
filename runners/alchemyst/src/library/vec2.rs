@@ -15,15 +15,15 @@ pub struct Vec2 {
 impl Vec2 {
     pub fn from_vek(value: VekVec2, registry: &Registry) -> Self {
         Self {
-            x: Reference::new_real(value.x as f64, registry),
-            y: Reference::new_real(value.y as f64, registry),
+            x: Reference::new_real(value.x, registry),
+            y: Reference::new_real(value.y, registry),
         }
     }
 
     pub fn to_vek(&self) -> VekVec2 {
         VekVec2::new(
-            *self.x.read::<Real>().unwrap() as Real,
-            *self.y.read::<Real>().unwrap() as Real,
+            *self.x.read::<Real>().unwrap(),
+            *self.y.read::<Real>().unwrap(),
         )
     }
 

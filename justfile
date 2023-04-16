@@ -9,7 +9,8 @@ build:
 
 test:
   cargo test --all --all-features
-  just alchemyst-run
+  cd ./runners/simpleton && just run
+  cd ./runners/alchemyst && just run
 
 bench:
   cargo test --manifest-path ./tests/Cargo.toml --features=bench --release -- --nocapture
@@ -24,9 +25,6 @@ checks:
 
 demo:
   cd ./demos/tetra/ && cargo run --release
-
-alchemyst-run:
-  cd ./runners/alchemyst && just run
 
 clean:
   find . -name target -type d -exec rm -r {} +

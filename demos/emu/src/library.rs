@@ -430,10 +430,9 @@ pub fn install(registry: &mut Registry, memory: Shared<Memory>) {
         }
     });
 
-    let memory_ = memory.clone();
     registry.add_function(define_function! {
         registry => fn set_camera_offset(x: i16, y: i16) -> () {
-            if let Some(mut memory) = memory_.write() {
+            if let Some(mut memory) = memory.write() {
                 memory.camera_offset = (x, y);
             }
         }

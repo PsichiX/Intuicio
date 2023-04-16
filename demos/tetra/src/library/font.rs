@@ -49,8 +49,8 @@ impl Font {
         let engine = &mut *engine.write::<Engine>().unwrap();
         let font = font.read::<Font>().unwrap();
         let content = content.read::<Text>().unwrap();
-        let position = position.read::<Vec2>().unwrap().into_tetra();
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let position = position.read::<Vec2>().unwrap().to_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         TetraText::new(content.as_str(), font.font.as_ref().unwrap().clone()).draw(
@@ -79,11 +79,11 @@ impl Font {
         let engine = &mut *engine.write::<Engine>().unwrap();
         let font = font.read::<Font>().unwrap();
         let content = content.read::<Text>().unwrap();
-        let position = position.read::<Vec2>().unwrap().into_tetra();
-        let scale = scale.read::<Vec2>().unwrap().into_tetra();
-        let origin = origin.read::<Vec2>().unwrap().into_tetra();
+        let position = position.read::<Vec2>().unwrap().to_tetra();
+        let scale = scale.read::<Vec2>().unwrap().to_tetra();
+        let origin = origin.read::<Vec2>().unwrap().to_tetra();
         let rotation = *rotation.read::<Real>().unwrap() as f32;
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         TetraText::new(content.as_str(), font.font.as_ref().unwrap().clone()).draw(
@@ -110,8 +110,8 @@ impl Font {
         let engine = &mut *engine.write::<Engine>().unwrap();
         let font = font.read::<Font>().unwrap();
         let content = content.read::<Text>().unwrap();
-        let factor = factor.read::<Vec2>().unwrap().into_tetra();
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let factor = factor.read::<Vec2>().unwrap().to_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let mut text = TetraText::new(content.as_str(), font.font.as_ref().unwrap().clone());
@@ -147,11 +147,11 @@ impl Font {
         let engine = &mut *engine.write::<Engine>().unwrap();
         let font = font.read::<Font>().unwrap();
         let content = content.read::<Text>().unwrap();
-        let factor = factor.read::<Vec2>().unwrap().into_tetra();
-        let scale = scale.read::<Vec2>().unwrap().into_tetra();
-        let origin = origin.read::<Vec2>().unwrap().into_tetra();
+        let factor = factor.read::<Vec2>().unwrap().to_tetra();
+        let scale = scale.read::<Vec2>().unwrap().to_tetra();
+        let origin = origin.read::<Vec2>().unwrap().to_tetra();
         let rotation = *rotation.read::<Real>().unwrap() as f32;
-        let color = color.read::<Color>().unwrap().into_tetra();
+        let color = color.read::<Color>().unwrap().to_tetra();
         let ctx = engine.tetra_context.as_mut().unwrap();
         let mut ctx = ctx.write().unwrap();
         let mut text = TetraText::new(content.as_str(), font.font.as_ref().unwrap().clone());

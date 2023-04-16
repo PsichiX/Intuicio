@@ -44,7 +44,7 @@ impl Cartridge {
         pot::from_slice(bytes)
     }
 
-    pub fn into_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         pot::to_vec(self)
     }
 }

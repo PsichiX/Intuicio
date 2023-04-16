@@ -3,7 +3,7 @@ use intuicio_core::registry::Registry;
 use intuicio_derive::intuicio_function;
 use toml::Value;
 
-fn into_value(value: &Reference) -> Value {
+fn to_value(value: &Reference) -> Value {
     if let Some(value) = value.read::<Boolean>() {
         Value::Boolean(*value)
     } else if let Some(value) = value.read::<Integer>() {
@@ -13,12 +13,12 @@ fn into_value(value: &Reference) -> Value {
     } else if let Some(value) = value.read::<Text>() {
         Value::String(value.to_owned())
     } else if let Some(value) = value.read::<Array>() {
-        Value::Array(value.iter().map(|value| into_value(value)).collect())
+        Value::Array(value.iter().map(to_value).collect())
     } else if let Some(value) = value.read::<Map>() {
         Value::Table(
             value
                 .iter()
-                .map(|(key, value)| (key.to_owned(), into_value(value)))
+                .map(|(key, value)| (key.to_owned(), to_value(value)))
                 .collect(),
         )
     } else {
@@ -54,15 +54,12 @@ fn from_value(value: Value, registry: &Registry) -> Reference {
 
 #[intuicio_function(module_name = "toml", use_registry)]
 pub fn serialize(registry: &Registry, value: Reference) -> Reference {
-    Reference::new_text(toml::to_string(&into_value(&value)).unwrap(), registry)
+    Reference::new_text(toml::to_string(&to_value(&value)).unwrap(), registry)
 }
 
 #[intuicio_function(module_name = "toml", use_registry)]
 pub fn serialize_pretty(registry: &Registry, value: Reference) -> Reference {
-    Reference::new_text(
-        toml::to_string_pretty(&into_value(&value)).unwrap(),
-        registry,
-    )
+    Reference::new_text(toml::to_string_pretty(&to_value(&value)).unwrap(), registry)
 }
 
 #[intuicio_function(module_name = "toml", use_registry)]

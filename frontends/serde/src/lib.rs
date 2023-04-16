@@ -176,9 +176,7 @@ fn build_script(script: &SerdeScript) -> ScriptHandle<'static, SerdeExpression> 
                     script_failure: operations_failure,
                 } => ScriptOperation::BranchScope {
                     scope_success: build_script(operations_success),
-                    scope_failure: operations_failure
-                        .as_ref()
-                        .map(|script| build_script(script)),
+                    scope_failure: operations_failure.as_ref().map(build_script),
                 },
                 SerdeOperation::LoopScope { script: operations } => ScriptOperation::LoopScope {
                     scope: build_script(operations),
@@ -234,7 +232,7 @@ impl SerdeFunction {
         ScriptFunction {
             signature: ScriptFunctionSignature {
                 name: self.name.to_owned(),
-                module_name: Some(module_name.to_owned().into()),
+                module_name: Some(module_name.to_owned()),
                 struct_query: self.struct_name.as_ref().map(|struct_name| StructQuery {
                     name: Some(struct_name.to_owned().into()),
                     ..Default::default()

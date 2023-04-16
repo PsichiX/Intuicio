@@ -21,7 +21,7 @@ pub fn parse(content: &str) -> Result<AsmFile, String> {
                 rule => unreachable!("{:?}", rule),
             }
         }
-        Err(error) => return Err(format!("{}", error)),
+        Err(error) => Err(format!("{}", error)),
     }
 }
 
@@ -80,9 +80,7 @@ fn parse_structure(pair: Pair<Rule>) -> AsmStruct {
 }
 
 fn parse_struct_fields(pair: Pair<Rule>) -> Vec<AsmStructField> {
-    pair.into_inner()
-        .map(|pair| parse_struct_field(pair))
-        .collect()
+    pair.into_inner().map(parse_struct_field).collect()
 }
 
 fn parse_struct_field(pair: Pair<Rule>) -> AsmStructField {
@@ -144,9 +142,7 @@ fn parse_function(pair: Pair<Rule>) -> AsmFunction {
 }
 
 fn parse_scope(pair: Pair<Rule>) -> Vec<AsmOperation> {
-    pair.into_inner()
-        .map(|pair| parse_operation(pair))
-        .collect()
+    pair.into_inner().map(parse_operation).collect()
 }
 
 fn parse_operation(pair: Pair<Rule>) -> AsmOperation {
@@ -176,7 +172,7 @@ fn parse_branch_scope(pair: Pair<Rule>) -> AsmOperation {
     let mut pairs = pair.into_inner();
     AsmOperation::BranchScope {
         script_success: parse_scope(pairs.next().unwrap()),
-        script_failure: pairs.next().map(|pair| parse_scope(pair)),
+        script_failure: pairs.next().map(parse_scope),
     }
 }
 
@@ -330,9 +326,7 @@ fn parse_push_literal(pair: Pair<Rule>) -> AsmOperation {
 }
 
 fn parse_function_parameters(pair: Pair<Rule>) -> Vec<AsmFunctionParameter> {
-    pair.into_inner()
-        .map(|pair| parse_function_parameter(pair))
-        .collect()
+    pair.into_inner().map(parse_function_parameter).collect()
 }
 
 fn parse_function_parameter(pair: Pair<Rule>) -> AsmFunctionParameter {

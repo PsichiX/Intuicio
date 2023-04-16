@@ -20,8 +20,7 @@ pub fn character(registry: &Registry, text: Reference, index: Reference) -> Refe
     text.read::<Text>()
         .unwrap()
         .chars()
-        .skip(index)
-        .next()
+        .nth(index)
         .map(|character| Reference::new_text(Text::from(character), registry))
         .unwrap_or_default()
 }

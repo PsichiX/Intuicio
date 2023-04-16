@@ -16,6 +16,7 @@ pub struct Server {
 
 #[intuicio_methods(module_name = "net_server")]
 impl Server {
+    #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_registry)]
     pub fn new(registry: &Registry, address: Reference) -> Reference {
         let address = address.read::<Text>().unwrap();

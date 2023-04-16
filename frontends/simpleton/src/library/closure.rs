@@ -13,6 +13,7 @@ pub struct Closure {
 
 #[intuicio_methods(module_name = "closure")]
 impl Closure {
+    #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_registry)]
     pub fn new(registry: &Registry, function: Reference, captured: Reference) -> Reference {
         Reference::new(

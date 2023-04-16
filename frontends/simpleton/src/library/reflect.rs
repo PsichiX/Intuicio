@@ -205,7 +205,7 @@ pub fn does_share_reference(registry: &Registry, a: Reference, b: Reference) -> 
     Reference::new_boolean(a.does_share_reference(&b, false), registry)
 }
 
-pub fn are_same_impl(registry: &Registry, a: &Reference, b: &Reference) -> bool {
+pub fn are_same_impl(a: &Reference, b: &Reference) -> bool {
     if a.is_null() && b.is_null() {
         true
     } else if let (Some(a), Some(b)) = (a.read::<Boolean>(), b.read::<Boolean>()) {
@@ -217,15 +217,11 @@ pub fn are_same_impl(registry: &Registry, a: &Reference, b: &Reference) -> bool 
     } else if let (Some(a), Some(b)) = (a.read::<Text>(), b.read::<Text>()) {
         *a == *b
     } else if let (Some(a), Some(b)) = (a.read::<Array>(), b.read::<Array>()) {
-        a.len() == b.len()
-            && a.iter()
-                .zip(b.iter())
-                .all(|(a, b)| are_same_impl(registry, a, b))
+        a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| are_same_impl(a, b))
     } else if let (Some(a), Some(b)) = (a.read::<Map>(), b.read::<Map>()) {
         a.len() == b.len()
             && a.keys().collect::<HashSet<_>>() == b.keys().collect::<HashSet<_>>()
-            && a.iter()
-                .all(|(k, v)| are_same_impl(registry, v, b.get(k).unwrap()))
+            && a.iter().all(|(k, v)| are_same_impl(v, b.get(k).unwrap()))
     } else if let (Some(a), Some(b)) = (a.read::<Type>(), b.read::<Type>()) {
         a.is_same_as(&b)
     } else if let (Some(a), Some(b)) = (a.read::<Function>(), b.read::<Function>()) {
@@ -250,16 +246,14 @@ pub fn are_same_impl(registry: &Registry, a: &Reference, b: &Reference) -> bool 
                         b.read_field::<Reference>(key),
                     )
                 })
-                .all(|(a, b)| {
-                    a.is_some() && b.is_some() && are_same_impl(registry, a.unwrap(), b.unwrap())
-                })
+                .all(|(a, b)| a.is_some() && b.is_some() && are_same_impl(a.unwrap(), b.unwrap()))
         }
     }
 }
 
 #[intuicio_function(module_name = "reflect", use_registry)]
 pub fn are_same(registry: &Registry, a: Reference, b: Reference) -> Reference {
-    Reference::new_boolean(are_same_impl(registry, &a, &b), registry)
+    Reference::new_boolean(are_same_impl(&a, &b), registry)
 }
 
 #[intuicio_function(module_name = "reflect", use_registry)]
@@ -347,7 +341,7 @@ pub fn to_text(registry: &Registry, value: Reference) -> Reference {
             }
             result.push_str(value.read::<Text>().unwrap().as_str());
         }
-        result.push_str("]");
+        result.push(']');
         return Reference::new_text(result, registry);
     }
     if let Some(value) = value.read::<Map>() {
@@ -360,7 +354,7 @@ pub fn to_text(registry: &Registry, value: Reference) -> Reference {
             result.push_str(": ");
             result.push_str(value.read::<Text>().unwrap().as_str());
         }
-        result.push_str("}");
+        result.push('}');
         return Reference::new_text(result, registry);
     }
     if let Some(value) = value.read::<Type>() {
@@ -378,7 +372,7 @@ pub fn to_text(registry: &Registry, value: Reference) -> Reference {
             }
             result.push_str(&field.name);
         }
-        result.push_str("}");
+        result.push('}');
         return Reference::new_text(result, registry);
     }
     if let Some(value) = value.read::<Function>() {
@@ -396,7 +390,7 @@ pub fn to_text(registry: &Registry, value: Reference) -> Reference {
             }
             result.push_str(&argument.name);
         }
-        result.push_str("}");
+        result.push('}');
         return Reference::new_text(result, registry);
     }
     Reference::null()

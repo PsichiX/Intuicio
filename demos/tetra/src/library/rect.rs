@@ -25,7 +25,7 @@ impl Rect {
         }
     }
 
-    pub fn into_tetra(&self) -> TetraRect {
+    pub fn to_tetra(&self) -> TetraRect {
         TetraRect {
             x: *self.x.read::<Real>().unwrap() as f32,
             y: *self.y.read::<Real>().unwrap() as f32,
@@ -70,8 +70,8 @@ impl Rect {
         value: Reference,
         point: Reference,
     ) -> Reference {
-        let value = value.read::<Rect>().unwrap().into_tetra();
-        let point = point.read::<Vec2>().unwrap().into_tetra();
+        let value = value.read::<Rect>().unwrap().to_tetra();
+        let point = point.read::<Vec2>().unwrap().to_tetra();
         Reference::new_boolean(value.contains_point(point), registry)
     }
 }

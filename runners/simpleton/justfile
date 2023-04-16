@@ -1,0 +1,6 @@
+list:
+  just --list
+
+run:
+  cargo run --release -- --plugins ../../target/debug/ ./resources/examples/
+  cargo run --release -- ./resources/automation/

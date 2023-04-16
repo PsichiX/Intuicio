@@ -43,6 +43,7 @@ impl Bytes {
         self.buffer.get_mut().as_mut_slice()
     }
 
+    #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_registry)]
     pub fn new(registry: &Registry) -> Reference {
         Reference::new(Bytes::default(), registry)
@@ -363,7 +364,7 @@ impl Bytes {
     #[intuicio_method(use_registry)]
     pub fn write_i64(registry: &Registry, mut bytes: Reference, value: Reference) -> Reference {
         let mut bytes = bytes.write::<Bytes>().unwrap();
-        let value = *value.read::<Integer>().unwrap() as i64;
+        let value = *value.read::<Integer>().unwrap();
         Reference::new_boolean(
             bytes.buffer.write_i64::<NetworkEndian>(value).is_ok(),
             registry,
@@ -383,7 +384,7 @@ impl Bytes {
     #[intuicio_method(use_registry)]
     pub fn write_f64(registry: &Registry, mut bytes: Reference, value: Reference) -> Reference {
         let mut bytes = bytes.write::<Bytes>().unwrap();
-        let value = *value.read::<Real>().unwrap() as f64;
+        let value = *value.read::<Real>().unwrap();
         Reference::new_boolean(
             bytes.buffer.write_f64::<NetworkEndian>(value).is_ok(),
             registry,

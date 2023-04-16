@@ -33,8 +33,8 @@ impl Event {
         Reference::null()
     }
 
-    #[intuicio_method(use_registry)]
-    pub fn unbind(registry: &Registry, mut event: Reference, target: Reference) -> Reference {
+    #[intuicio_method()]
+    pub fn unbind(mut event: Reference, target: Reference) -> Reference {
         let mut event = event.write::<Event>().unwrap();
         if target.is_null() {
             event.persistent.clear();
@@ -43,14 +43,14 @@ impl Event {
             while let Some(index) = event
                 .persistent
                 .iter()
-                .position(|item| crate::library::reflect::are_same_impl(registry, item, &target))
+                .position(|item| crate::library::reflect::are_same_impl(item, &target))
             {
                 event.persistent.swap_remove(index);
             }
             while let Some(index) = event
                 .oneshot
                 .iter()
-                .position(|item| crate::library::reflect::are_same_impl(registry, item, &target))
+                .position(|item| crate::library::reflect::are_same_impl(item, &target))
             {
                 event.oneshot.swap_remove(index);
             }
@@ -65,11 +65,11 @@ impl Event {
         arguments: Reference,
     ) {
         if target.read::<Function>().is_some() {
-            crate::library::reflect::call(context, registry, target.clone(), arguments);
+            crate::library::reflect::call(context, registry, target, arguments);
         } else if target.read::<Closure>().is_some() {
-            Closure::call(context, registry, target.clone(), arguments);
+            Closure::call(context, registry, target, arguments);
         } else if target.read::<Promise>().is_some() {
-            Promise::resolve(context, registry, target.clone(), arguments);
+            Promise::resolve(context, registry, target, arguments);
         }
     }
 

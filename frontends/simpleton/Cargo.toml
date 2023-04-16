@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-simpleton"
-version = "0.8.1"
+version = "0.9.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Simpleton frontend module for Intuicio scripting platform"
@@ -20,13 +20,14 @@ jobs = []
 plugins = []
 
 [dependencies]
-intuicio-data = { version = "0.8", path = "../../platform/data" }
-intuicio-core = { version = "0.8", path = "../../platform/core" }
-intuicio-plugins = { version = "0.8", path = "../../platform/plugins" }
-intuicio-derive = { version = "0.8", path = "../../platform/derive" }
+intuicio-data = { version = "0.9", path = "../../platform/data" }
+intuicio-core = { version = "0.9", path = "../../platform/core" }
+intuicio-plugins = { version = "0.9", path = "../../platform/plugins" }
+intuicio-derive = { version = "0.9", path = "../../platform/derive" }
 pest = "2.5"
 pest_derive = "2.5"
 regex = "1"
+serde = "1"
 serde_json = "1"
 toml = "0.7"
 byteorder = "1.4"
@@ -35,4 +36,4 @@ rand = "0.8"
 typid = "1"
 
 [dev-dependencies]
-intuicio-backend-vm = { version = "0.8", path = "../../backends/vm" }
+intuicio-backend-vm = { version = "0.9", path = "../../backends/vm" }

@@ -182,7 +182,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
             }
             let field_name = match field.ident.as_ref() {
                 Some(ident) => ident,
-                None => panic!("Struct: {} has field without a name!", ident.to_string()),
+                None => panic!("Struct: {} has field without a name!", ident),
             };
             let name = if let Some(name) = name {
                 quote! { stringify!(#name) }

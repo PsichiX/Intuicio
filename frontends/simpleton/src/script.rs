@@ -12,11 +12,12 @@ use intuicio_core::{
     struct_type::StructQuery,
     Visibility,
 };
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error};
 
 const CLOSURES: &str = "_closures";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SimpletonScriptLiteral {
     Null,
     Boolean(Boolean),
@@ -98,7 +99,7 @@ impl SimpletonScriptLiteral {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SimpletonScriptExpression {
     FindStruct { name: String, module_name: String },
     FindFunction { name: String, module_name: String },
@@ -196,7 +197,7 @@ impl ScriptExpression for SimpletonScriptExpression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SimpletonLiteral {
     Null,
     Boolean(Boolean),
@@ -274,7 +275,7 @@ impl SimpletonLiteral {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SimpletonExpressionStart {
     FindStruct {
         name: String,
@@ -570,7 +571,7 @@ impl SimpletonExpressionStart {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SimpletonExpressionNext {
     GetField {
         name: String,
@@ -724,7 +725,7 @@ impl SimpletonExpressionNext {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SimpletonStatement {
     CreateVariable {
         name: String,
@@ -986,7 +987,7 @@ impl SimpletonStatement {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimpletonFunction {
     pub name: String,
     pub arguments: Vec<String>,
@@ -1044,7 +1045,7 @@ impl SimpletonFunction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimpletonStruct {
     pub name: String,
     pub fields: Vec<String>,
@@ -1069,7 +1070,7 @@ impl SimpletonStruct {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimpletonModule {
     pub name: String,
     pub dependencies: Vec<String>,
@@ -1103,7 +1104,7 @@ impl SimpletonModule {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct SimpletonPackage {
     pub modules: HashMap<String, SimpletonModule>,
 }

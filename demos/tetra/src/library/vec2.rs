@@ -20,7 +20,7 @@ impl Vec2 {
         }
     }
 
-    pub fn into_tetra(&self) -> TetraVec2 {
+    pub fn to_tetra(&self) -> TetraVec2 {
         TetraVec2 {
             x: *self.x.read::<Real>().unwrap() as f32,
             y: *self.y.read::<Real>().unwrap() as f32,
@@ -39,36 +39,36 @@ impl Vec2 {
 
     #[intuicio_method(use_registry)]
     pub fn add(registry: &Registry, a: Reference, b: Reference) -> Reference {
-        let a = a.read::<Vec2>().unwrap().into_tetra();
-        let b = b.read::<Vec2>().unwrap().into_tetra();
+        let a = a.read::<Vec2>().unwrap().to_tetra();
+        let b = b.read::<Vec2>().unwrap().to_tetra();
         Reference::new(Vec2::from_tetra(a + b, registry), registry)
     }
 
     #[intuicio_method(use_registry)]
     pub fn sub(registry: &Registry, a: Reference, b: Reference) -> Reference {
-        let a = a.read::<Vec2>().unwrap().into_tetra();
-        let b = b.read::<Vec2>().unwrap().into_tetra();
+        let a = a.read::<Vec2>().unwrap().to_tetra();
+        let b = b.read::<Vec2>().unwrap().to_tetra();
         Reference::new(Vec2::from_tetra(a - b, registry), registry)
     }
 
     #[intuicio_method(use_registry)]
     pub fn mul(registry: &Registry, a: Reference, b: Reference) -> Reference {
-        let a = a.read::<Vec2>().unwrap().into_tetra();
-        let b = b.read::<Vec2>().unwrap().into_tetra();
+        let a = a.read::<Vec2>().unwrap().to_tetra();
+        let b = b.read::<Vec2>().unwrap().to_tetra();
         Reference::new(Vec2::from_tetra(a * b, registry), registry)
     }
 
     #[intuicio_method(use_registry)]
     pub fn div(registry: &Registry, a: Reference, b: Reference) -> Reference {
-        let a = a.read::<Vec2>().unwrap().into_tetra();
-        let b = b.read::<Vec2>().unwrap().into_tetra();
+        let a = a.read::<Vec2>().unwrap().to_tetra();
+        let b = b.read::<Vec2>().unwrap().to_tetra();
         Reference::new(Vec2::from_tetra(a / b, registry), registry)
     }
 
     #[intuicio_method(use_registry)]
     pub fn dot(registry: &Registry, a: Reference, b: Reference) -> Reference {
-        let a = a.read::<Vec2>().unwrap().into_tetra();
-        let b = b.read::<Vec2>().unwrap().into_tetra();
+        let a = a.read::<Vec2>().unwrap().to_tetra();
+        let b = b.read::<Vec2>().unwrap().to_tetra();
         Reference::new(a.dot(b) as Real, registry)
     }
 }
