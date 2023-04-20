@@ -28,6 +28,7 @@ demo:
 
 clean:
   find . -name target -type d -exec rm -r {} +
+  just remove-lockfiles
 
 remove-lockfiles:
   find . -name Cargo.lock -type f -exec rm {} +

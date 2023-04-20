@@ -1,6 +1,6 @@
 [package]
 name = "tetra-integration"
-version = "0.10.0"
+version = "0.10.1"
 edition = "2021"
 publish = false
 
@@ -10,6 +10,6 @@ intuicio-core = { version = "0.10", path = "../../platform/core" }
 intuicio-derive = { version = "0.10", path = "../../platform/derive" }
 intuicio-backend-vm = { version = "0.10", path = "../../backends/vm" }
 intuicio-frontend-simpleton = { version = "0.10", path = "../../frontends/simpleton" }
-tetra = { version = "0.7", features = ["sdl2_bundled"] }
+tetra = { version = "0.8", features = ["sdl2_bundled"] }
 toml = "0.7"
 serde = "1"

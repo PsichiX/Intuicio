@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-plugins"
-version = "0.10.0"
+version = "0.10.1"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Plugins module for Intuicio scripting platform"
@@ -12,4 +12,4 @@ readme = "../../README.md"
 
 [dependencies]
 intuicio-core = { version = "0.10", path = "../core" }
-libloading = "0.7"
+libloading = "0.8"
