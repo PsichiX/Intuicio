@@ -381,6 +381,7 @@ pub struct VaultFunctionParameter {
 impl VaultFunctionParameter {
     pub fn build(&self) -> ScriptFunctionParameter<'static> {
         ScriptFunctionParameter {
+            meta: None,
             name: self.name.to_owned(),
             struct_query: StructQuery {
                 name: Some(self.arg_type.as_str().to_owned().into()),
@@ -407,12 +408,14 @@ impl VaultFunction {
         struct_query: Option<StructQuery<'static>>,
     ) -> ScriptFunction<'static, VaultScriptExpression> {
         let signature = ScriptFunctionSignature {
+            meta: None,
             name: self.name.to_owned(),
             module_name: module_name.to_owned().into(),
             struct_query,
             visibility: Visibility::Public,
             inputs: self.arguments.iter().map(|input| input.build()).collect(),
             outputs: vec![ScriptFunctionParameter {
+                meta: None,
                 name: "result".to_owned(),
                 struct_query: if let Some(return_type) = &self.return_type {
                     StructQuery {
@@ -464,6 +467,7 @@ pub struct VaultStructField {
 impl VaultStructField {
     pub fn build(&self) -> ScriptStructField<'static> {
         ScriptStructField {
+            meta: None,
             name: self.name.to_owned(),
             visibility: Visibility::Public,
             struct_query: StructQuery {
@@ -486,6 +490,7 @@ pub struct VaultStruct {
 impl VaultStruct {
     pub fn compile_struct(&self, module_name: &str) -> ScriptStruct<'static> {
         ScriptStruct {
+            meta: None,
             name: self.name.to_owned(),
             module_name: Some(module_name.to_owned()),
             visibility: Visibility::Public,

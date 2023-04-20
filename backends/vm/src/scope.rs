@@ -279,12 +279,14 @@ mod tests {
             VmScope::<()>::generate_function(
                 &ScriptFunction {
                     signature: ScriptFunctionSignature {
+                        meta: None,
                         name: "add_script".to_owned(),
                         module_name: None,
                         struct_query: None,
                         visibility: Visibility::Public,
                         inputs: vec![
                             ScriptFunctionParameter {
+                                meta: None,
                                 name: "a".to_owned(),
                                 struct_query: StructQuery {
                                     type_hash: Some(TypeHash::of::<i32>()),
@@ -292,6 +294,7 @@ mod tests {
                                 },
                             },
                             ScriptFunctionParameter {
+                                meta: None,
                                 name: "b".to_owned(),
                                 struct_query: StructQuery {
                                     type_hash: Some(TypeHash::of::<i32>()),
@@ -300,6 +303,7 @@ mod tests {
                             },
                         ],
                         outputs: vec![ScriptFunctionParameter {
+                            meta: None,
                             name: "result".to_owned(),
                             struct_query: StructQuery {
                                 type_hash: Some(TypeHash::of::<i32>()),

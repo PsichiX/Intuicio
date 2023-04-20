@@ -1,6 +1,7 @@
 use crate::{
     context::Context,
     function::{Function, FunctionBody, FunctionParameter, FunctionQuery, FunctionSignature},
+    meta::Meta,
     registry::Registry,
     struct_type::{RuntimeStructBuilder, StructField, StructHandle, StructQuery},
     Visibility,
@@ -192,6 +193,7 @@ impl<'a, SE: ScriptExpression> ScriptBuilder<'a, SE> {
 
 #[derive(Debug)]
 pub struct ScriptFunctionParameter<'a> {
+    pub meta: Option<Meta>,
     pub name: String,
     pub struct_query: StructQuery<'a>,
 }
@@ -199,6 +201,7 @@ pub struct ScriptFunctionParameter<'a> {
 impl<'a> ScriptFunctionParameter<'a> {
     pub fn build(&self, registry: &Registry) -> FunctionParameter {
         FunctionParameter {
+            meta: self.meta.to_owned(),
             name: self.name.to_owned(),
             struct_handle: registry
                 .structs()
@@ -211,6 +214,7 @@ impl<'a> ScriptFunctionParameter<'a> {
 
 #[derive(Debug)]
 pub struct ScriptFunctionSignature<'a> {
+    pub meta: Option<Meta>,
     pub name: String,
     pub module_name: Option<String>,
     pub struct_query: Option<StructQuery<'a>>,
@@ -222,6 +226,7 @@ pub struct ScriptFunctionSignature<'a> {
 impl<'a> ScriptFunctionSignature<'a> {
     pub fn build(&self, registry: &Registry) -> FunctionSignature {
         FunctionSignature {
+            meta: self.meta.to_owned(),
             name: self.name.to_owned(),
             module_name: self.module_name.to_owned(),
             struct_handle: self.struct_query.as_ref().map(|struct_query| {
@@ -288,6 +293,7 @@ pub trait ScriptFunctionGenerator<SE: ScriptExpression> {
 
 #[derive(Debug)]
 pub struct ScriptStructField<'a> {
+    pub meta: Option<Meta>,
     pub name: String,
     pub visibility: Visibility,
     pub struct_query: StructQuery<'a>,
@@ -295,7 +301,7 @@ pub struct ScriptStructField<'a> {
 
 impl<'a> ScriptStructField<'a> {
     pub fn build(&self, registry: &Registry) -> StructField {
-        StructField::new(
+        let mut result = StructField::new(
             &self.name,
             registry
                 .structs()
@@ -303,12 +309,15 @@ impl<'a> ScriptStructField<'a> {
                 .unwrap()
                 .clone(),
         )
-        .with_visibility(self.visibility)
+        .with_visibility(self.visibility);
+        result.meta = self.meta.to_owned();
+        result
     }
 }
 
 #[derive(Debug)]
 pub struct ScriptStruct<'a> {
+    pub meta: Option<Meta>,
     pub name: String,
     pub module_name: Option<String>,
     pub visibility: Visibility,
@@ -321,6 +330,9 @@ impl<'a> ScriptStruct<'a> {
         builder = builder.visibility(self.visibility);
         if let Some(module_name) = self.module_name.as_ref() {
             builder = builder.module_name(module_name);
+        }
+        if let Some(meta) = self.meta.as_ref() {
+            builder = builder.meta(meta.to_owned());
         }
         registry.add_struct(builder.build());
     }

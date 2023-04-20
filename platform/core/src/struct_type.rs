@@ -1,10 +1,11 @@
-use crate::{is_send, is_sync, prelude::RuntimeObject, Visibility};
+use crate::{is_send, is_sync, meta::Meta, prelude::RuntimeObject, Visibility};
 use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
 use std::{alloc::Layout, borrow::Cow, sync::Arc};
 
 pub type StructHandle = Arc<Struct>;
 
 pub struct RuntimeStructBuilder {
+    meta: Option<Meta>,
     name: String,
     module_name: Option<String>,
     visibility: Visibility,
@@ -19,6 +20,7 @@ pub struct RuntimeStructBuilder {
 impl RuntimeStructBuilder {
     pub fn new(name: impl ToString) -> Self {
         Self {
+            meta: None,
             name: name.to_string(),
             module_name: None,
             visibility: Visibility::default(),
@@ -29,6 +31,11 @@ impl RuntimeStructBuilder {
             initializer: RuntimeObject::initialize_raw,
             finalizer: RuntimeObject::finalize_raw,
         }
+    }
+
+    pub fn meta(mut self, meta: Meta) -> Self {
+        self.meta = Some(meta);
+        self
     }
 
     pub fn module_name(mut self, module_name: impl ToString) -> Self {
@@ -54,6 +61,7 @@ impl RuntimeStructBuilder {
         let is_send = self.fields.iter().all(|field| field.struct_handle.is_send);
         let is_sync = self.fields.iter().all(|field| field.struct_handle.is_sync);
         Struct {
+            meta: self.meta,
             name: self.name,
             module_name: self.module_name,
             visibility: self.visibility,
@@ -76,6 +84,7 @@ impl RuntimeStructBuilder {
 impl From<Struct> for RuntimeStructBuilder {
     fn from(value: Struct) -> Self {
         Self {
+            meta: value.meta,
             name: value.name,
             module_name: value.module_name,
             visibility: value.visibility,
@@ -90,6 +99,7 @@ impl From<Struct> for RuntimeStructBuilder {
 }
 
 pub struct NativeStructBuilder {
+    meta: Option<Meta>,
     name: String,
     module_name: Option<String>,
     visibility: Visibility,
@@ -106,6 +116,7 @@ pub struct NativeStructBuilder {
 impl NativeStructBuilder {
     pub fn new<T: Initialize + Finalize + 'static>() -> Self {
         Self {
+            meta: None,
             name: std::any::type_name::<T>().to_owned(),
             module_name: None,
             visibility: Visibility::default(),
@@ -122,6 +133,7 @@ impl NativeStructBuilder {
 
     pub fn new_named<T: Initialize + Finalize + 'static>(name: impl ToString) -> Self {
         Self {
+            meta: None,
             name: name.to_string(),
             module_name: None,
             visibility: Visibility::default(),
@@ -134,6 +146,11 @@ impl NativeStructBuilder {
             is_send: is_send::<T>(),
             is_sync: is_sync::<T>(),
         }
+    }
+
+    pub fn meta(mut self, meta: Meta) -> Self {
+        self.meta = Some(meta);
+        self
     }
 
     pub fn module_name(mut self, module_name: impl ToString) -> Self {
@@ -169,6 +186,7 @@ impl NativeStructBuilder {
     pub fn build(mut self) -> Struct {
         self.fields.sort_by(|a, b| a.offset.cmp(&b.offset));
         Struct {
+            meta: self.meta,
             name: self.name,
             module_name: self.module_name,
             visibility: self.visibility,
@@ -191,6 +209,7 @@ impl NativeStructBuilder {
 impl From<Struct> for NativeStructBuilder {
     fn from(value: Struct) -> Self {
         Self {
+            meta: value.meta,
             name: value.name,
             module_name: value.module_name,
             visibility: value.visibility,
@@ -207,6 +226,7 @@ impl From<Struct> for NativeStructBuilder {
 }
 
 pub struct StructField {
+    pub meta: Option<Meta>,
     pub name: String,
     pub visibility: Visibility,
     offset: usize,
@@ -216,6 +236,7 @@ pub struct StructField {
 impl std::fmt::Debug for StructField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StructField")
+            .field("meta", &self.meta)
             .field("name", &self.name)
             .field("visibility", &self.visibility)
             .field("offset", &self.offset)
@@ -227,11 +248,17 @@ impl std::fmt::Debug for StructField {
 impl StructField {
     pub fn new(name: impl ToString, struct_handle: StructHandle) -> Self {
         Self {
+            meta: None,
             name: name.to_string(),
             visibility: Visibility::default(),
             offset: 0,
             struct_handle,
         }
+    }
+
+    pub fn with_meta(mut self, meta: Meta) -> Self {
+        self.meta = Some(meta);
+        self
     }
 
     pub fn with_visibility(mut self, visibility: Visibility) -> Self {
@@ -258,6 +285,7 @@ impl PartialEq for StructField {
 
 #[derive(Debug)]
 pub struct Struct {
+    pub meta: Option<Meta>,
     pub name: String,
     pub module_name: Option<String>,
     pub visibility: Visibility,

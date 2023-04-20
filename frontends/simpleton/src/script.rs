@@ -1002,6 +1002,7 @@ impl SimpletonFunction {
         closures_index: &mut usize,
     ) -> ScriptFunction<'static, SimpletonScriptExpression> {
         let signature = ScriptFunctionSignature {
+            meta: None,
             name: self.name.to_owned(),
             module_name: Some(module_name.to_owned()),
             struct_query: None,
@@ -1010,11 +1011,13 @@ impl SimpletonFunction {
                 .arguments
                 .iter()
                 .map(|name| ScriptFunctionParameter {
+                    meta: None,
                     name: name.to_owned(),
                     struct_query: StructQuery::of::<Reference>(),
                 })
                 .collect(),
             outputs: vec![ScriptFunctionParameter {
+                meta: None,
                 name: "result".to_owned(),
                 struct_query: StructQuery::of::<Reference>(),
             }],
@@ -1054,6 +1057,7 @@ pub struct SimpletonStruct {
 impl SimpletonStruct {
     pub fn compile(&self, module_name: &str) -> ScriptStruct<'static> {
         ScriptStruct {
+            meta: None,
             name: self.name.to_owned(),
             module_name: Some(module_name.to_owned()),
             visibility: Visibility::Public,
@@ -1061,6 +1065,7 @@ impl SimpletonStruct {
                 .fields
                 .iter()
                 .map(|name| ScriptStructField {
+                    meta: None,
                     name: name.to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery::of::<Reference>(),

@@ -867,11 +867,13 @@ mod tests {
         let mut registry = Registry::default().with_basic_types();
 
         let struct_type = ScriptStruct {
+            meta: None,
             name: "Foo".to_owned(),
             module_name: Some("test".to_owned()),
             visibility: Visibility::Public,
             fields: vec![
                 ScriptStructField {
+                    meta: None,
                     name: "a".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
@@ -880,6 +882,7 @@ mod tests {
                     },
                 },
                 ScriptStructField {
+                    meta: None,
                     name: "b".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
@@ -888,6 +891,7 @@ mod tests {
                     },
                 },
                 ScriptStructField {
+                    meta: None,
                     name: "c".to_owned(),
                     visibility: Visibility::Public,
                     struct_query: StructQuery {
@@ -906,12 +910,14 @@ mod tests {
 
         let function = ScriptFunction::<()> {
             signature: ScriptFunctionSignature {
+                meta: None,
                 name: "foo".to_owned(),
                 module_name: Some("test".to_owned()),
                 struct_query: None,
                 visibility: Visibility::Public,
                 inputs: vec![
                     ScriptFunctionParameter {
+                        meta: None,
                         name: "a".to_owned(),
                         struct_query: StructQuery {
                             type_hash: Some(TypeHash::of::<bool>()),
@@ -919,6 +925,7 @@ mod tests {
                         },
                     },
                     ScriptFunctionParameter {
+                        meta: None,
                         name: "b".to_owned(),
                         struct_query: StructQuery {
                             type_hash: Some(TypeHash::of::<usize>()),
@@ -927,6 +934,7 @@ mod tests {
                     },
                 ],
                 outputs: vec![ScriptFunctionParameter {
+                    meta: None,
                     name: "c".to_owned(),
                     struct_query: StructQuery {
                         type_hash: Some(TypeHash::of::<f32>()),

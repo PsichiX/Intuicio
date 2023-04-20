@@ -1,5 +1,6 @@
 use crate::{
     context::Context,
+    meta::Meta,
     registry::Registry,
     struct_type::{StructHandle, StructQuery},
     Visibility,
@@ -46,6 +47,7 @@ impl std::fmt::Debug for FunctionBody {
 
 #[derive(Clone, PartialEq)]
 pub struct FunctionParameter {
+    pub meta: Option<Meta>,
     pub name: String,
     pub struct_handle: StructHandle,
 }
@@ -53,6 +55,7 @@ pub struct FunctionParameter {
 impl FunctionParameter {
     pub fn new(name: impl ToString, struct_handle: StructHandle) -> Self {
         Self {
+            meta: None,
             name: name.to_string(),
             struct_handle,
         }
@@ -62,6 +65,7 @@ impl FunctionParameter {
 impl std::fmt::Debug for FunctionParameter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FunctionParameter")
+            .field("meta", &self.meta)
             .field("name", &self.name)
             .field("struct_handle", &self.struct_handle.name)
             .finish()
@@ -70,6 +74,7 @@ impl std::fmt::Debug for FunctionParameter {
 
 #[derive(Clone, PartialEq)]
 pub struct FunctionSignature {
+    pub meta: Option<Meta>,
     pub name: String,
     pub module_name: Option<String>,
     pub struct_handle: Option<StructHandle>,
@@ -81,6 +86,7 @@ pub struct FunctionSignature {
 impl FunctionSignature {
     pub fn new(name: impl ToString) -> Self {
         Self {
+            meta: None,
             name: name.to_string(),
             module_name: None,
             struct_handle: None,
@@ -88,6 +94,11 @@ impl FunctionSignature {
             inputs: vec![],
             outputs: vec![],
         }
+    }
+
+    pub fn with_meta(mut self, meta: Meta) -> Self {
+        self.meta = Some(meta);
+        self
     }
 
     pub fn with_module_name(mut self, name: impl ToString) -> Self {
@@ -119,6 +130,7 @@ impl FunctionSignature {
 impl std::fmt::Debug for FunctionSignature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FunctionSignature")
+            .field("meta", &self.meta)
             .field("name", &self.name)
             .field("module_name", &self.module_name)
             .field(
@@ -137,6 +149,9 @@ impl std::fmt::Debug for FunctionSignature {
 
 impl std::fmt::Display for FunctionSignature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(meta) = self.meta.as_ref() {
+            write!(f, "#{} ", meta)?;
+        }
         if let Some(module_name) = self.module_name.as_ref() {
             write!(f, "mod {} ", module_name)?;
         }

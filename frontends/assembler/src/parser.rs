@@ -86,6 +86,7 @@ fn parse_struct_fields(pair: Pair<Rule>) -> Vec<AsmStructField> {
 fn parse_struct_field(pair: Pair<Rule>) -> AsmStructField {
     let pairs = pair.into_inner();
     let mut result = AsmStructField {
+        meta: None,
         name: Default::default(),
         visibility: Visibility::Public,
         module_name: None,
@@ -114,6 +115,7 @@ fn parse_struct_field(pair: Pair<Rule>) -> AsmStructField {
 fn parse_struct_header(pair: Pair<Rule>) -> AsmStruct {
     let pairs = pair.into_inner();
     let mut result = AsmStruct {
+        meta: None,
         name: Default::default(),
         visibility: Visibility::Public,
         fields: vec![],
@@ -332,6 +334,7 @@ fn parse_function_parameters(pair: Pair<Rule>) -> Vec<AsmFunctionParameter> {
 fn parse_function_parameter(pair: Pair<Rule>) -> AsmFunctionParameter {
     let mut pairs = pair.into_inner();
     let mut result = AsmFunctionParameter {
+        meta: None,
         name: parse_identifier(pairs.next().unwrap()),
         module_name: None,
         struct_name: Default::default(),
@@ -353,6 +356,7 @@ fn parse_function_parameter(pair: Pair<Rule>) -> AsmFunctionParameter {
 fn parse_function_header(pair: Pair<Rule>) -> AsmFunction {
     let pairs = pair.into_inner();
     let mut result = AsmFunction {
+        meta: None,
         name: Default::default(),
         struct_name: None,
         visibility: Visibility::Public,

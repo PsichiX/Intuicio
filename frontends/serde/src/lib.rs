@@ -2,6 +2,7 @@ use intuicio_core::{
     context::Context,
     crate_version,
     function::FunctionQuery,
+    meta::Meta,
     registry::Registry,
     script::{
         ScriptContentProvider, ScriptExpression, ScriptFunction, ScriptFunctionParameter,
@@ -192,6 +193,7 @@ fn build_script(script: &SerdeScript) -> ScriptHandle<'static, SerdeExpression> 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeFunctionParameter {
+    pub meta: Option<Meta>,
     pub name: String,
     pub module_name: Option<String>,
     pub struct_name: String,
@@ -200,6 +202,7 @@ pub struct SerdeFunctionParameter {
 impl SerdeFunctionParameter {
     pub fn compile(&self) -> ScriptFunctionParameter<'static> {
         ScriptFunctionParameter {
+            meta: self.meta.to_owned(),
             name: self.name.to_owned(),
             struct_query: StructQuery {
                 name: Some(self.struct_name.to_owned().into()),
@@ -215,6 +218,8 @@ impl SerdeFunctionParameter {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeFunction {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Meta>,
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub struct_name: Option<String>,
@@ -231,6 +236,7 @@ impl SerdeFunction {
     pub fn compile(&self, module_name: &str) -> ScriptFunction<'static, SerdeExpression> {
         ScriptFunction {
             signature: ScriptFunctionSignature {
+                meta: self.meta.to_owned(),
                 name: self.name.to_owned(),
                 module_name: Some(module_name.to_owned()),
                 struct_query: self.struct_name.as_ref().map(|struct_name| StructQuery {
@@ -256,6 +262,8 @@ impl SerdeFunction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeStructField {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Meta>,
     pub name: String,
     #[serde(default, skip_serializing_if = "Visibility::is_public")]
     pub visibility: Visibility,
@@ -266,6 +274,7 @@ pub struct SerdeStructField {
 impl SerdeStructField {
     pub fn compile(&self) -> ScriptStructField<'static> {
         ScriptStructField {
+            meta: self.meta.to_owned(),
             name: self.name.to_owned(),
             visibility: self.visibility,
             struct_query: StructQuery {
@@ -282,6 +291,8 @@ impl SerdeStructField {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeStruct {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Meta>,
     pub name: String,
     #[serde(default, skip_serializing_if = "Visibility::is_public")]
     pub visibility: Visibility,
@@ -292,6 +303,7 @@ pub struct SerdeStruct {
 impl SerdeStruct {
     pub fn compile(&self, module_name: &str) -> ScriptStruct<'static> {
         ScriptStruct {
+            meta: self.meta.to_owned(),
             name: self.name.to_owned(),
             module_name: Some(module_name.to_owned()),
             visibility: self.visibility,

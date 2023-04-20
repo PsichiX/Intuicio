@@ -1,6 +1,7 @@
 pub mod context;
 pub mod function;
 pub mod host;
+pub mod meta;
 pub mod nativizer;
 pub mod object;
 pub mod registry;
