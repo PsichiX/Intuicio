@@ -37,7 +37,25 @@ list-outdated:
   cargo outdated -R -w
 
 update:
-  cargo update --workspace
+  cargo update --manifest-path ./platform/data/Cargo.toml --aggressive
+  cargo update --manifest-path ./platform/core/Cargo.toml --aggressive
+  cargo update --manifest-path ./platform/plugins/Cargo.toml --aggressive
+  cargo update --manifest-path ./platform/derive/Cargo.toml --aggressive
+  cargo update --manifest-path ./backends/vm/Cargo.toml --aggressive
+  cargo update --manifest-path ./backends/rust/Cargo.toml --aggressive
+  cargo update --manifest-path ./frontends/serde/Cargo.toml --aggressive
+  cargo update --manifest-path ./frontends/assembler/Cargo.toml --aggressive
+  cargo update --manifest-path ./frontends/simpleton/Cargo.toml --aggressive
+  cargo update --manifest-path ./frontends/vault/Cargo.toml --aggressive
+  cargo update --manifest-path ./plugins/simpleton-http/Cargo.toml --aggressive
+  cargo update --manifest-path ./runners/simpleton/Cargo.toml --aggressive
+  cargo update --manifest-path ./runners/alchemyst/Cargo.toml --aggressive
+  cargo update --manifest-path ./essentials/Cargo.toml --aggressive
+  cargo update --manifest-path ./demos/tetra/Cargo.toml --aggressive
+  cargo update --manifest-path ./demos/plugin/Cargo.toml --aggressive
+  cargo update --manifest-path ./demos/emu/Cargo.toml --aggressive
+  cargo update --manifest-path ./demos/custom/Cargo.toml --aggressive
+  cargo update --manifest-path ./tests/Cargo.toml --aggressive
 
 install:
   cargo install --path ./runners/simpleton
