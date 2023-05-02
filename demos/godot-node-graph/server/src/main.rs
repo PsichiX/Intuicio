@@ -119,6 +119,11 @@ pub enum Request {
         x: i64,
         y: i64,
     },
+    Validate {
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        payload: String,
+        graph: NodeGraphId<AsmNodes>,
+    },
     RegistryAdd {
         #[serde(default, skip_serializing_if = "String::is_empty")]
         payload: String,
@@ -130,6 +135,10 @@ pub enum Request {
         payload: String,
         structs: Vec<RequestStructQuery>,
         functions: Vec<RequestFunctionQuery>,
+    },
+    RegistryClear {
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        payload: String,
     },
 }
 
@@ -205,11 +214,20 @@ pub enum Response {
         y: i64,
         content: Vec<ResponseSuggestionNode<AsmNodes>>,
     },
+    Validate {
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        payload: String,
+        graph: NodeGraphId<AsmNodes>,
+    },
     RegistryAdd {
         #[serde(default, skip_serializing_if = "String::is_empty")]
         payload: String,
     },
     RegistryRemove {
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        payload: String,
+    },
+    RegistryClear {
         #[serde(default, skip_serializing_if = "String::is_empty")]
         payload: String,
     },
@@ -479,6 +497,7 @@ fn process_request(
         } => match server.graph_mut(graph) {
             Ok(found) => {
                 *found = serde_json::from_value(content).unwrap();
+                found.refresh_spatial_cache();
                 let message = Response::Deserialize { payload, graph };
                 send_message!(sender, message);
             }
@@ -496,6 +515,16 @@ fn process_request(
             };
             send_message!(sender, message);
         }
+        Request::Validate { payload, graph } => match server.validate(graph, registry) {
+            Ok(_) => {
+                let message = Response::Validate { payload, graph };
+                send_message!(sender, message);
+            }
+            Err(error) => {
+                let message = Response::Error { payload, error };
+                send_message!(sender, message);
+            }
+        },
         Request::RegistryAdd {
             payload,
             structs,
@@ -543,6 +572,11 @@ fn process_request(
                 }
             }
             let message = Response::RegistryAdd { payload };
+            send_message!(sender, message);
+        }
+        Request::RegistryClear { payload } => {
+            *registry = Registry::default();
+            let message = Response::RegistryClear { payload };
             send_message!(sender, message);
         }
     }

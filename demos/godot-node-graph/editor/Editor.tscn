@@ -21,21 +21,28 @@ margin_right = 1024.0
 margin_bottom = 20.0
 
 [node name="New" type="Button" parent="View/Buttons"]
-margin_right = 79.0
+margin_right = 40.0
 margin_bottom = 20.0
-text = "New graph"
+text = "New"
 
 [node name="Save" type="Button" parent="View/Buttons"]
-margin_left = 83.0
-margin_right = 163.0
+margin_left = 44.0
+margin_right = 85.0
 margin_bottom = 20.0
-text = "Save graph"
+text = "Save"
 
 [node name="Load" type="Button" parent="View/Buttons"]
-margin_left = 167.0
-margin_right = 248.0
+margin_left = 89.0
+margin_right = 131.0
 margin_bottom = 20.0
-text = "Load graph"
+text = "Load"
+
+[node name="Validate" type="Button" parent="View/Buttons"]
+margin_left = 135.0
+margin_right = 198.0
+margin_bottom = 20.0
+rect_pivot_offset = Vector2( -400, 71 )
+text = "Validate"
 
 [node name="GraphEdit" type="GraphEdit" parent="View"]
 margin_top = 24.0
@@ -48,9 +55,19 @@ snap_distance = 16
 show_zoom_label = true
 
 [node name="Popups" type="Control" parent="."]
-margin_top = 600.0
-margin_right = 1024.0
-margin_bottom = 600.0
+anchor_right = 1.0
+anchor_bottom = 1.0
 mouse_filter = 2
 
 [node name="SuggestionsPopup" parent="Popups" instance=ExtResource( 3 )]
+
+[node name="ValidationPopup" type="AcceptDialog" parent="Popups"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -41.5
+margin_top = -29.0
+margin_right = 41.5
+margin_bottom = 29.0
+popup_exclusive = true

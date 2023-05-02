@@ -45,6 +45,7 @@ pub struct ResponseQuery<T: NodeDefinition> {
 pub enum NodeGraphServerError {
     NodeGraphDoesNotExists(String),
     NodeNotFound { graph: String, node: String },
+    ValidationErrors { graph: String, errors: Vec<String> },
 }
 
 impl std::fmt::Display for NodeGraphServerError {
@@ -55,6 +56,13 @@ impl std::fmt::Display for NodeGraphServerError {
             }
             NodeGraphServerError::NodeNotFound { graph, node } => {
                 write!(f, "Node graph: {} does not have node: {}", graph, node)
+            }
+            NodeGraphServerError::ValidationErrors { graph, errors } => {
+                write!(f, "Node graph: {} validation errors:", graph)?;
+                for error in errors {
+                    write!(f, "{}", error)?;
+                }
+                Ok(())
             }
         }
     }
@@ -241,6 +249,26 @@ impl<T: NodeDefinition + Clone> NodeGraphServer<T> {
         registry: &Registry,
     ) -> Vec<ResponseSuggestionNode<T>> {
         NodeGraph::suggest_all_nodes(x, y, registry)
+    }
+
+    pub fn validate(
+        &self,
+        graph: NodeGraphId<T>,
+        registry: &Registry,
+    ) -> Result<(), NodeGraphServerError> {
+        if let Some(item) = self.graphs.get(&graph) {
+            match item.validate(registry) {
+                Ok(_) => Ok(()),
+                Err(errors) => Err(NodeGraphServerError::ValidationErrors {
+                    graph: graph.to_string(),
+                    errors: errors.into_iter().map(|error| error.to_string()).collect(),
+                }),
+            }
+        } else {
+            Err(NodeGraphServerError::NodeGraphDoesNotExists(
+                graph.to_string(),
+            ))
+        }
     }
 }
 

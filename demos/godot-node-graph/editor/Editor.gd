@@ -3,9 +3,11 @@ extends Control
 onready var _client = $Client
 onready var _editor = $View/GraphEdit
 onready var _suggestions = $Popups/SuggestionsPopup
+onready var _validation = $Popups/ValidationPopup
 onready var _new_button = $View/Buttons/New
 onready var _save_button = $View/Buttons/Save
 onready var _load_button = $View/Buttons/Load
+onready var _validate_button = $View/Buttons/Validate
 
 var _graph = null
 var _pending_connection = null
@@ -27,7 +29,9 @@ func _init():
 
 func _ready():
 	_editor.scroll_offset = _editor.rect_size * -0.4
+	_validation.window_title = "Validation errors!"
 	_client.connect("change", self, "_client_change")
+	_client.connect("response_error", self, "_client_response_error")
 	_client.connect("response_create", self, "_client_response_create")
 	_client.connect("response_suggest_all_nodes", self, "_client_response_suggest_all_nodes")
 	_client.connect("response_query_all", self, "_client_response_query_all")
@@ -42,6 +46,7 @@ func _ready():
 	_new_button.connect("pressed", self, "_new")
 	_save_button.connect("pressed", self, "_save")
 	_load_button.connect("pressed", self, "_load")
+	_validate_button.connect("pressed", self, "_validate")
 
 func editor_node(name):
 	for child in _editor.get_children():
@@ -60,6 +65,14 @@ func _client_change(alive):
 		_client.request_create()
 	else:
 		_graph = null
+
+func _client_response_error(data):
+	if "ValidationErrors" in data.error:
+		var message = ""
+		for error in data.error.ValidationErrors.errors:
+			message += error + "\n"
+		_validation.dialog_text = message
+		_validation.popup_centered()
 
 func _client_response_create(data):
 	_graph = data.graph
@@ -235,3 +248,6 @@ func _load():
 	var data = parse_json(save_game.get_line())
 	save_game.close()
 	_client.request_deserialize(_graph, data)
+
+func _validate():
+	_client.request_validate(_graph)

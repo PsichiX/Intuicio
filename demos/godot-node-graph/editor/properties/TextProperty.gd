@@ -62,12 +62,13 @@ func _ready():
 	_text_node.max_length = 1 if single else 0
 	_text_node.caret_blink = true
 	_text_node.connect("text_entered", self, "_changed")
-	_text_node.connect("focus_exited", self, "_canceled")
+	_text_node.connect("focus_exited", self, "_defocused")
 	add_child(_text_node)
 
 func _changed(v):
 	set_value(v)
 	emit_signal("changed", value)
 
-func _canceled():
+func _defocused():
+	set_value(_text_node.text)
 	emit_signal("changed", value)

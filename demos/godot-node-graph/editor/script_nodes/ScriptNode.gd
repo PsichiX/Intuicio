@@ -9,13 +9,12 @@ var _input_ports = []
 var _output_ports = []
 
 const SLOT_EXECUTE = 0
-const SLOT_PROPERTY = 1
 const COLOR_EXECUTE = Color.white
-const COLOR_PROPERTY = Color.limegreen
 
 func setup(data):
 	_data = data
 	name = data.id
+	hint_tooltip = data.id
 	broadcast_change()
 
 func data():
@@ -71,8 +70,6 @@ func add_property(label, node_class):
 	var slot = get_child_count()
 	var node = node_class.new()
 	add_child(node)
-	set_slot_type_left(slot, SLOT_PROPERTY)
-	set_slot_color_left(slot, COLOR_PROPERTY)
 	return node
 
 func add_property_bool(label, value = false):

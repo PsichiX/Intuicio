@@ -4,6 +4,7 @@ extends Node
 export var port = 8001
 
 signal response
+signal response_error
 signal response_create
 signal response_destroy
 signal response_list
@@ -73,6 +74,9 @@ func request_serialize(graph):
 func request_deserialize(graph, content):
 	request({"Deserialize": {"graph": graph, "content": content}})
 
+func request_validate(graph):
+	request({"Validate": {"graph": graph}})
+
 func is_alive():
 	return _state == 2
 
@@ -131,7 +135,9 @@ func _on_data():
 	var result = JSON.parse(content)
 	if result.error == OK:
 		emit_signal("response", result.result)
-		if "Create" in result.result:
+		if "Error" in result.result:
+			emit_signal("response_error", result.result.Error)
+		elif "Create" in result.result:
 			emit_signal("response_create", result.result.Create)
 		elif "Destroy" in result.result:
 			emit_signal("response_destroy", result.result.Destroy)
