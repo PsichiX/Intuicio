@@ -1,0 +1,253 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=4
+
+_global_script_classes=[ {
+"base": "HBoxContainer",
+"class": "FloatProperty",
+"language": "GDScript",
+"path": "res://properties/FloatProperty.gd"
+}, {
+"base": "HBoxContainer",
+"class": "IntegerProperty",
+"language": "GDScript",
+"path": "res://properties/IntegerProperty.gd"
+}, {
+"base": "Node",
+"class": "NodeGraphClient",
+"language": "GDScript",
+"path": "res://NodeGraphClient.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptBranchScopeNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptBranchScopeNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptCallFunctionNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptCallFunctionNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptDropRegisterNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptDropRegisterNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptLiteralBoolNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralBoolNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptLiteralCharNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralCharNode.gd"
+}, {
+"base": "ScriptLiteralFloatNode",
+"class": "ScriptLiteralF32Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralF32Node.gd"
+}, {
+"base": "ScriptLiteralFloatNode",
+"class": "ScriptLiteralF64Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralF64Node.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptLiteralFloatNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralFloatNode.gd"
+}, {
+"base": "ScriptLiteralSignedNode",
+"class": "ScriptLiteralI128Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralI128Node.gd"
+}, {
+"base": "ScriptLiteralSignedNode",
+"class": "ScriptLiteralI16Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralI16Node.gd"
+}, {
+"base": "ScriptLiteralSignedNode",
+"class": "ScriptLiteralI32Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralI32Node.gd"
+}, {
+"base": "ScriptLiteralSignedNode",
+"class": "ScriptLiteralI64Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralI64Node.gd"
+}, {
+"base": "ScriptLiteralSignedNode",
+"class": "ScriptLiteralI8Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralI8Node.gd"
+}, {
+"base": "ScriptLiteralSignedNode",
+"class": "ScriptLiteralIsizeNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralIsizeNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptLiteralSignedNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralSignedNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptLiteralStringNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralStringNode.gd"
+}, {
+"base": "ScriptLiteralUnsignedNode",
+"class": "ScriptLiteralU128Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralU128Node.gd"
+}, {
+"base": "ScriptLiteralUnsignedNode",
+"class": "ScriptLiteralU16Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralU16Node.gd"
+}, {
+"base": "ScriptLiteralUnsignedNode",
+"class": "ScriptLiteralU32Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralU32Node.gd"
+}, {
+"base": "ScriptLiteralUnsignedNode",
+"class": "ScriptLiteralU64Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralU64Node.gd"
+}, {
+"base": "ScriptLiteralUnsignedNode",
+"class": "ScriptLiteralU8Node",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralU8Node.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptLiteralUnitNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralUnitNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptLiteralUnsignedNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralUnsignedNode.gd"
+}, {
+"base": "ScriptLiteralUnsignedNode",
+"class": "ScriptLiteralUsizeNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/literal/ScriptLiteralUsizeNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptLoopScopeNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptLoopScopeNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptMakeRegisterNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptMakeRegisterNode.gd"
+}, {
+"base": "GraphNode",
+"class": "ScriptNode",
+"language": "GDScript",
+"path": "res://script_nodes/ScriptNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptPopScopeNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptPopScopeNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptPopToRegisterNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptPopToRegisterNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptPushFromRegisterNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptPushFromRegisterNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptPushScopeNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/ScriptPushScopeNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptStackDropNode",
+"language": "GDScript",
+"path": "res://script_nodes/operation/expression/ScriptStackDropNode.gd"
+}, {
+"base": "ScriptNode",
+"class": "ScriptStartNode",
+"language": "GDScript",
+"path": "res://script_nodes/ScriptStartNodeNode.gd"
+}, {
+"base": "HBoxContainer",
+"class": "TextProperty",
+"language": "GDScript",
+"path": "res://properties/TextProperty.gd"
+} ]
+_global_script_class_icons={
+"FloatProperty": "",
+"IntegerProperty": "",
+"NodeGraphClient": "",
+"ScriptBranchScopeNode": "",
+"ScriptCallFunctionNode": "",
+"ScriptDropRegisterNode": "",
+"ScriptLiteralBoolNode": "",
+"ScriptLiteralCharNode": "",
+"ScriptLiteralF32Node": "",
+"ScriptLiteralF64Node": "",
+"ScriptLiteralFloatNode": "",
+"ScriptLiteralI128Node": "",
+"ScriptLiteralI16Node": "",
+"ScriptLiteralI32Node": "",
+"ScriptLiteralI64Node": "",
+"ScriptLiteralI8Node": "",
+"ScriptLiteralIsizeNode": "",
+"ScriptLiteralSignedNode": "",
+"ScriptLiteralStringNode": "",
+"ScriptLiteralU128Node": "",
+"ScriptLiteralU16Node": "",
+"ScriptLiteralU32Node": "",
+"ScriptLiteralU64Node": "",
+"ScriptLiteralU8Node": "",
+"ScriptLiteralUnitNode": "",
+"ScriptLiteralUnsignedNode": "",
+"ScriptLiteralUsizeNode": "",
+"ScriptLoopScopeNode": "",
+"ScriptMakeRegisterNode": "",
+"ScriptNode": "",
+"ScriptPopScopeNode": "",
+"ScriptPopToRegisterNode": "",
+"ScriptPushFromRegisterNode": "",
+"ScriptPushScopeNode": "",
+"ScriptStackDropNode": "",
+"ScriptStartNode": "",
+"TextProperty": ""
+}
+
+[application]
+
+config/name="Editor"
+run/main_scene="res://Editor.tscn"
+config/icon="res://icon.png"
+
+[gui]
+
+common/drop_mouse_on_gui_input_disabled=true
+
+[physics]
+
+common/enable_pause_aware_picking=true
+
+[rendering]
+
+environment/default_environment="res://default_env.tres"

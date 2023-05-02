@@ -1,0 +1,56 @@
+[gd_scene load_steps=4 format=2]
+
+[ext_resource path="res://Editor.gd" type="Script" id=2]
+[ext_resource path="res://SuggestionsPopup.tscn" type="PackedScene" id=3]
+[ext_resource path="res://NodeGraphClient.gd" type="Script" id=4]
+
+[node name="Editor" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 2 )
+
+[node name="Client" type="Node" parent="."]
+script = ExtResource( 4 )
+
+[node name="View" type="VBoxContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Buttons" type="HBoxContainer" parent="View"]
+margin_right = 1024.0
+margin_bottom = 20.0
+
+[node name="New" type="Button" parent="View/Buttons"]
+margin_right = 79.0
+margin_bottom = 20.0
+text = "New graph"
+
+[node name="Save" type="Button" parent="View/Buttons"]
+margin_left = 83.0
+margin_right = 163.0
+margin_bottom = 20.0
+text = "Save graph"
+
+[node name="Load" type="Button" parent="View/Buttons"]
+margin_left = 167.0
+margin_right = 248.0
+margin_bottom = 20.0
+text = "Load graph"
+
+[node name="GraphEdit" type="GraphEdit" parent="View"]
+margin_top = 24.0
+margin_right = 1024.0
+margin_bottom = 600.0
+size_flags_vertical = 3
+right_disconnects = true
+scroll_offset = Vector2( 0, -20 )
+snap_distance = 16
+show_zoom_label = true
+
+[node name="Popups" type="Control" parent="."]
+margin_top = 600.0
+margin_right = 1024.0
+margin_bottom = 600.0
+mouse_filter = 2
+
+[node name="SuggestionsPopup" parent="Popups" instance=ExtResource( 3 )]

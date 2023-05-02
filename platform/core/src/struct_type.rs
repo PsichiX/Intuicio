@@ -374,7 +374,7 @@ impl PartialEq for Struct {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct StructFieldQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub struct_query: Option<StructQuery<'a>>,
@@ -399,7 +399,7 @@ impl<'a> StructFieldQuery<'a> {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct StructQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub module_name: Option<Cow<'a, str>>,

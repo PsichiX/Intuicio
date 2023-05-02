@@ -12,6 +12,10 @@ use intuicio_core::{
     struct_type::StructQuery,
     IntuicioVersion, Visibility,
 };
+use intuicio_nodes::nodes::{
+    Node, NodeDefinition, NodeGraphVisitor, NodePin, NodeSuggestion, NodeTypeInfo, PropertyValue,
+    ResponseSuggestionNode,
+};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error};
 
@@ -21,7 +25,7 @@ pub fn frontend_serde_version() -> IntuicioVersion {
     crate_version!()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SerdeLiteral {
     Unit,
     Bool(bool),
@@ -68,7 +72,7 @@ impl SerdeLiteral {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SerdeExpression {
     Literal(SerdeLiteral),
     StackDrop,
@@ -87,7 +91,7 @@ impl ScriptExpression for SerdeExpression {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SerdeOperation {
     Expression(SerdeExpression),
     MakeRegister {
@@ -158,7 +162,6 @@ fn build_script(script: &SerdeScript) -> ScriptHandle<'static, SerdeExpression> 
                     module_name,
                     struct_name,
                     visibility,
-                    ..
                 } => ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some(name.to_owned().into()),
@@ -393,11 +396,755 @@ impl SerdePackage {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SerdeNodeTypeInfo {
+    pub name: String,
+    pub module_name: Option<String>,
+}
+
+impl SerdeNodeTypeInfo {
+    pub fn new(name: impl ToString, module_name: Option<impl ToString>) -> Self {
+        Self {
+            name: name.to_string(),
+            module_name: module_name.map(|name| name.to_string()),
+        }
+    }
+}
+
+impl NodeTypeInfo for SerdeNodeTypeInfo {
+    fn struct_query(&self) -> StructQuery {
+        StructQuery {
+            name: Some(self.name.as_str().into()),
+            module_name: self.module_name.as_ref().map(|name| name.into()),
+            ..Default::default()
+        }
+    }
+}
+
+impl std::fmt::Display for SerdeNodeTypeInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}::{}",
+            self.name,
+            self.module_name.as_deref().unwrap_or("")
+        )
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SerdeNodes {
+    #[default]
+    Start,
+    Operation(SerdeOperation),
+}
+
+impl NodeDefinition for SerdeNodes {
+    type TypeInfo = SerdeNodeTypeInfo;
+
+    fn node_label(&self, _: &Registry) -> String {
+        match self {
+            Self::Start => "Start".to_owned(),
+            Self::Operation(operation) => match operation {
+                SerdeOperation::Expression(expression) => match expression {
+                    SerdeExpression::Literal(literal) => match literal {
+                        SerdeLiteral::Unit => "Unit literal".to_owned(),
+                        SerdeLiteral::Bool(_) => "Boolean literal".to_owned(),
+                        SerdeLiteral::I8(_) => "Signed 8-bit literal".to_owned(),
+                        SerdeLiteral::I16(_) => "Signed 16-bit literal".to_owned(),
+                        SerdeLiteral::I32(_) => "Signed 32-bit literal".to_owned(),
+                        SerdeLiteral::I64(_) => "Signed 64-bit literal".to_owned(),
+                        SerdeLiteral::I128(_) => "Signed 128-bit literal".to_owned(),
+                        SerdeLiteral::Isize(_) => "Signed size literal".to_owned(),
+                        SerdeLiteral::U8(_) => "Unsigned 8-bit literal".to_owned(),
+                        SerdeLiteral::U16(_) => "Unsigned 16-bit literal".to_owned(),
+                        SerdeLiteral::U32(_) => "Unsigned 32-bit literal".to_owned(),
+                        SerdeLiteral::U64(_) => "Unsigned 64-bit literal".to_owned(),
+                        SerdeLiteral::U128(_) => "Unsigned 128-bit literal".to_owned(),
+                        SerdeLiteral::Usize(_) => "Unsigned size literal".to_owned(),
+                        SerdeLiteral::F32(_) => "32-bit float literal".to_owned(),
+                        SerdeLiteral::F64(_) => "64-bit float literal".to_owned(),
+                        SerdeLiteral::Char(_) => "Character literal".to_owned(),
+                        SerdeLiteral::String(_) => "String literal".to_owned(),
+                    },
+                    SerdeExpression::StackDrop => "Stack drop".to_owned(),
+                },
+                SerdeOperation::MakeRegister { .. } => "Make register".to_owned(),
+                SerdeOperation::DropRegister { .. } => "Drop register".to_owned(),
+                SerdeOperation::PushFromRegister { .. } => {
+                    "Push data from register to stack".to_owned()
+                }
+                SerdeOperation::PopToRegister { .. } => {
+                    "Pop data from stack to register".to_owned()
+                }
+                SerdeOperation::CallFunction {
+                    name, module_name, ..
+                } => format!(
+                    "Call function: `{}::{}`",
+                    module_name.as_deref().unwrap_or(""),
+                    name
+                ),
+                SerdeOperation::BranchScope { .. } => "Branch scope".to_owned(),
+                SerdeOperation::LoopScope { .. } => "Loop scope".to_owned(),
+                SerdeOperation::PushScope { .. } => "Push scope".to_owned(),
+                SerdeOperation::PopScope => "Pop scope".to_owned(),
+            },
+        }
+    }
+
+    fn node_pins_in(&self, _: &Registry) -> Vec<NodePin<Self::TypeInfo>> {
+        match self {
+            Self::Start => vec![],
+            Self::Operation(operation) => match operation {
+                SerdeOperation::Expression(expression) => match expression {
+                    SerdeExpression::Literal(literal) => match literal {
+                        SerdeLiteral::Unit => vec![NodePin::execute("In", false)],
+                        _ => vec![NodePin::execute("In", false), NodePin::property("Value")],
+                    },
+                    SerdeExpression::StackDrop => vec![NodePin::execute("In", false)],
+                },
+                SerdeOperation::MakeRegister { .. } => vec![
+                    NodePin::execute("In", false),
+                    NodePin::property("Struct name"),
+                    NodePin::property("Struct module name"),
+                ],
+                SerdeOperation::DropRegister { .. }
+                | SerdeOperation::PushFromRegister { .. }
+                | SerdeOperation::PopToRegister { .. } => {
+                    vec![NodePin::execute("In", false), NodePin::property("Index")]
+                }
+                SerdeOperation::CallFunction { .. } => vec![
+                    NodePin::execute("In", false),
+                    NodePin::property("Name"),
+                    NodePin::property("Module name"),
+                    NodePin::property("Struct name"),
+                    NodePin::property("Visibility"),
+                ],
+                _ => vec![NodePin::execute("In", false)],
+            },
+        }
+    }
+
+    fn node_pins_out(&self, _: &Registry) -> Vec<NodePin<Self::TypeInfo>> {
+        match self {
+            Self::Start => vec![NodePin::execute("Out", false)],
+            Self::Operation(operation) => match operation {
+                SerdeOperation::BranchScope { .. } => vec![
+                    NodePin::execute("Out", false),
+                    NodePin::execute("Success body", true),
+                    NodePin::execute("Failure body", true),
+                ],
+                SerdeOperation::LoopScope { .. } | SerdeOperation::PushScope { .. } => vec![
+                    NodePin::execute("Out", false),
+                    NodePin::execute("Body", true),
+                ],
+                SerdeOperation::PopScope => vec![],
+                _ => vec![NodePin::execute("Out", false)],
+            },
+        }
+    }
+
+    fn node_is_expression(&self, _: &Registry) -> bool {
+        false
+    }
+
+    fn node_is_start(&self, _: &Registry) -> bool {
+        matches!(self, SerdeNodes::Start)
+    }
+
+    fn node_suggestions(
+        x: i64,
+        y: i64,
+        _: NodeSuggestion<Self>,
+        registry: &Registry,
+    ) -> Vec<ResponseSuggestionNode<Self>> {
+        vec![
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::Unit,
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::Bool(true),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::I8(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::I16(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::I32(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::I64(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::I128(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::Isize(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::U8(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::U16(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::U32(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::U64(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::U128(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::Usize(0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::F32(0.0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::F64(0.0),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::Char('@'),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Literal",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::String("text".to_owned()),
+                    ))),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Expression",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::StackDrop)),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Register",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::MakeRegister {
+                        name: "Type".to_owned(),
+                        module_name: None,
+                    }),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Register",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::DropRegister { index: 0 }),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Register",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::PushFromRegister { index: 0 }),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Register",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::PopToRegister { index: 0 }),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Call",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::CallFunction {
+                        name: "Function".to_owned(),
+                        module_name: None,
+                        struct_name: None,
+                        visibility: None,
+                    }),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Scope",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::BranchScope {
+                        script_success: vec![],
+                        script_failure: None,
+                    }),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Scope",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::LoopScope { script: vec![] }),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Scope",
+                Node::new(
+                    x,
+                    y,
+                    SerdeNodes::Operation(SerdeOperation::PushScope { script: vec![] }),
+                ),
+                registry,
+            ),
+            ResponseSuggestionNode::new(
+                "Scope",
+                Node::new(x, y, SerdeNodes::Operation(SerdeOperation::PopScope)),
+                registry,
+            ),
+        ]
+    }
+
+    fn get_property(&self, property_name: &str) -> Option<PropertyValue> {
+        match self {
+            Self::Operation(operation) => match operation {
+                SerdeOperation::Expression(SerdeExpression::Literal(literal)) => {
+                    match property_name {
+                        "Value" => match literal {
+                            SerdeLiteral::Unit => PropertyValue::new(&()).ok(),
+                            SerdeLiteral::Bool(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::I8(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::I16(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::I32(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::I64(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::I128(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::Isize(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::U8(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::U16(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::U32(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::U64(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::U128(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::Usize(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::F32(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::F64(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::Char(value) => PropertyValue::new(value).ok(),
+                            SerdeLiteral::String(value) => PropertyValue::new(value).ok(),
+                        },
+                        _ => None,
+                    }
+                }
+                SerdeOperation::MakeRegister { name, module_name } => match property_name {
+                    "Struct name" => PropertyValue::new(name).ok(),
+                    "Struct module name" => module_name
+                        .as_ref()
+                        .and_then(|name| PropertyValue::new(name).ok()),
+                    _ => None,
+                },
+                SerdeOperation::DropRegister { index } => match property_name {
+                    "Index" => PropertyValue::new(index).ok(),
+                    _ => None,
+                },
+                SerdeOperation::PushFromRegister { index } => match property_name {
+                    "Index" => PropertyValue::new(index).ok(),
+                    _ => None,
+                },
+                SerdeOperation::PopToRegister { index } => match property_name {
+                    "Index" => PropertyValue::new(index).ok(),
+                    _ => None,
+                },
+                SerdeOperation::CallFunction {
+                    name,
+                    module_name,
+                    struct_name,
+                    visibility,
+                } => match property_name {
+                    "Name" => PropertyValue::new(name).ok(),
+                    "Module name" => module_name
+                        .as_ref()
+                        .and_then(|name| PropertyValue::new(name).ok()),
+                    "Struct name" => struct_name
+                        .as_ref()
+                        .and_then(|name| PropertyValue::new(name).ok()),
+                    "Visibility" => visibility
+                        .as_ref()
+                        .and_then(|name| PropertyValue::new(name).ok()),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn set_property(&mut self, property_name: &str, property_value: PropertyValue) {
+        if let Self::Operation(operation) = self {
+            match operation {
+                SerdeOperation::Expression(SerdeExpression::Literal(literal)) => {
+                    if property_name == "Value" {
+                        match literal {
+                            SerdeLiteral::Unit => {}
+                            SerdeLiteral::Bool(value) => {
+                                if let Ok(v) = property_value.get_exact::<bool>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::I8(value) => {
+                                if let Ok(v) = property_value.get_exact::<i8>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::I16(value) => {
+                                if let Ok(v) = property_value.get_exact::<i16>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::I32(value) => {
+                                if let Ok(v) = property_value.get_exact::<i32>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::I64(value) => {
+                                if let Ok(v) = property_value.get_exact::<i64>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::I128(value) => {
+                                if let Ok(v) = property_value.get_exact::<i128>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::Isize(value) => {
+                                if let Ok(v) = property_value.get_exact::<isize>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::U8(value) => {
+                                if let Ok(v) = property_value.get_exact::<u8>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::U16(value) => {
+                                if let Ok(v) = property_value.get_exact::<u16>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::U32(value) => {
+                                if let Ok(v) = property_value.get_exact::<u32>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::U64(value) => {
+                                if let Ok(v) = property_value.get_exact::<u64>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::U128(value) => {
+                                if let Ok(v) = property_value.get_exact::<u128>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::Usize(value) => {
+                                if let Ok(v) = property_value.get_exact::<usize>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::F32(value) => {
+                                if let Ok(v) = property_value.get_exact::<f32>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::F64(value) => {
+                                if let Ok(v) = property_value.get_exact::<f64>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::Char(value) => {
+                                if let Ok(v) = property_value.get_exact::<char>() {
+                                    *value = v;
+                                }
+                            }
+                            SerdeLiteral::String(value) => {
+                                if let Ok(v) = property_value.get_exact::<String>() {
+                                    *value = v;
+                                }
+                            }
+                        }
+                    }
+                }
+                SerdeOperation::MakeRegister { name, module_name } => match property_name {
+                    "Struct name" => {
+                        if let Ok(v) = property_value.get_exact::<String>() {
+                            *name = v;
+                        }
+                    }
+                    "Struct module name" => {
+                        *module_name = if let Ok(v) = property_value.get_exact::<String>() {
+                            Some(v)
+                        } else {
+                            None
+                        };
+                    }
+                    _ => {}
+                },
+                SerdeOperation::DropRegister { index } => {
+                    if property_name == "Index" {
+                        if let Ok(v) = property_value.get_exact::<usize>() {
+                            *index = v;
+                        }
+                    }
+                }
+                SerdeOperation::PushFromRegister { index } => {
+                    if property_name == "Index" {
+                        if let Ok(v) = property_value.get_exact::<usize>() {
+                            *index = v;
+                        }
+                    }
+                }
+                SerdeOperation::PopToRegister { index } => {
+                    if property_name == "Index" {
+                        if let Ok(v) = property_value.get_exact::<usize>() {
+                            *index = v;
+                        }
+                    }
+                }
+                SerdeOperation::CallFunction {
+                    name,
+                    module_name,
+                    struct_name,
+                    visibility,
+                } => match property_name {
+                    "Name" => {
+                        if let Ok(v) = property_value.get_exact::<String>() {
+                            *name = v;
+                        }
+                    }
+                    "Module name" => {
+                        *module_name = if let Ok(v) = property_value.get_exact::<String>() {
+                            Some(v)
+                        } else {
+                            None
+                        };
+                    }
+                    "Struct name" => {
+                        *struct_name = if let Ok(v) = property_value.get_exact::<String>() {
+                            Some(v)
+                        } else {
+                            None
+                        };
+                    }
+                    "Visibility" => {
+                        *visibility = if let Ok(v) = property_value.get_exact::<Visibility>() {
+                            Some(v)
+                        } else {
+                            None
+                        };
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
+    }
+}
+
+pub struct CompileSerdeNodeGraphVisitor;
+
+impl NodeGraphVisitor<SerdeNodes> for CompileSerdeNodeGraphVisitor {
+    type Output = SerdeOperation;
+
+    fn visit_statement(
+        &mut self,
+        node: &Node<SerdeNodes>,
+        mut scopes: HashMap<String, Vec<Self::Output>>,
+        result: &mut Vec<Self::Output>,
+    ) -> bool {
+        if let SerdeNodes::Operation(operation) = &node.data {
+            match operation {
+                SerdeOperation::BranchScope { .. } => {
+                    if let Some(script_success) = scopes.remove("Success body") {
+                        result.push(SerdeOperation::BranchScope {
+                            script_success,
+                            script_failure: scopes.remove("Failure body"),
+                        });
+                    }
+                }
+                SerdeOperation::LoopScope { .. } => {
+                    if let Some(script) = scopes.remove("Body") {
+                        result.push(SerdeOperation::LoopScope { script });
+                    }
+                }
+                SerdeOperation::PushScope { .. } => {
+                    if let Some(script) = scopes.remove("Body") {
+                        result.push(SerdeOperation::PushScope { script });
+                    }
+                }
+                _ => result.push(operation.to_owned()),
+            }
+        }
+        true
+    }
+
+    fn visit_expression(&mut self, _: &Node<SerdeNodes>, _: &mut Vec<Self::Output>) {}
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
     use intuicio_backend_vm::prelude::*;
     use intuicio_core::prelude::*;
+    use intuicio_nodes::nodes::*;
 
     pub struct LexprContentParser;
 
@@ -447,5 +1194,131 @@ mod tests {
             .unwrap()
             .run(());
         assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn test_nodes() {
+        let mut registry = Registry::default().with_basic_types();
+        registry.add_function(define_function! {
+            registry => mod intrinsics fn add(a: usize, b: usize) -> (result: usize) {
+                (a + b,)
+            }
+        });
+        let mut graph = NodeGraph::default();
+        let start = graph
+            .add_node(Node::new(0, 0, SerdeNodes::Start), &registry)
+            .unwrap();
+        let literal_a = graph
+            .add_node(
+                Node::new(
+                    0,
+                    0,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::I32(2),
+                    ))),
+                ),
+                &registry,
+            )
+            .unwrap();
+        let literal_b = graph
+            .add_node(
+                Node::new(
+                    0,
+                    0,
+                    SerdeNodes::Operation(SerdeOperation::Expression(SerdeExpression::Literal(
+                        SerdeLiteral::I32(40),
+                    ))),
+                ),
+                &registry,
+            )
+            .unwrap();
+        let call_add = graph
+            .add_node(
+                Node::new(
+                    0,
+                    0,
+                    SerdeNodes::Operation(SerdeOperation::CallFunction {
+                        name: "add".to_owned(),
+                        module_name: Some("intrinsics".to_owned()),
+                        struct_name: None,
+                        visibility: None,
+                    }),
+                ),
+                &registry,
+            )
+            .unwrap();
+        graph.connect_nodes(NodeConnection::new(start, literal_a, "Out", "In"));
+        graph.connect_nodes(NodeConnection::new(literal_a, literal_b, "Out", "In"));
+        graph.connect_nodes(NodeConnection::new(literal_b, call_add, "Out", "In"));
+        graph.validate(&registry).unwrap();
+        assert_eq!(
+            graph.visit(&mut CompileSerdeNodeGraphVisitor, &registry),
+            vec![
+                SerdeOperation::Expression(SerdeExpression::Literal(SerdeLiteral::I32(2))),
+                SerdeOperation::Expression(SerdeExpression::Literal(SerdeLiteral::I32(40))),
+                SerdeOperation::CallFunction {
+                    name: "add".to_owned(),
+                    module_name: Some("intrinsics".to_owned()),
+                    struct_name: None,
+                    visibility: None,
+                }
+            ]
+        );
+
+        {
+            let mut graph = graph.clone();
+            graph.connect_nodes(NodeConnection {
+                from_node: call_add,
+                to_node: call_add,
+                from_pin: "Out".to_owned(),
+                to_pin: "In".to_owned(),
+            });
+            assert!(matches!(
+                graph.validate(&registry).unwrap_err()[0],
+                NodeGraphError::Connection(ConnectionError::InternalConnection(_))
+            ));
+        }
+
+        {
+            let mut graph = graph.clone();
+            graph.connect_nodes(NodeConnection {
+                from_node: literal_a,
+                to_node: literal_b,
+                from_pin: "Out".to_owned(),
+                to_pin: "Body".to_owned(),
+            });
+            assert!(matches!(
+                graph.validate(&registry).unwrap_err()[0],
+                NodeGraphError::Connection(ConnectionError::TargetPinNotFound { .. })
+            ));
+        }
+
+        {
+            let mut graph = graph.clone();
+            graph.connect_nodes(NodeConnection {
+                from_node: literal_a,
+                to_node: literal_b,
+                from_pin: "Out".to_owned(),
+                to_pin: "Value".to_owned(),
+            });
+            assert!(matches!(
+                graph.validate(&registry).unwrap_err()[0],
+                NodeGraphError::Connection(ConnectionError::MismatchPins { .. })
+            ));
+        }
+
+        {
+            let mut graph = graph.clone();
+            graph.connect_nodes(NodeConnection {
+                from_node: call_add,
+                to_node: literal_a,
+                from_pin: "Out".to_owned(),
+                to_pin: "In".to_owned(),
+            });
+            assert!(matches!(
+                graph.validate(&registry).unwrap_err()[0],
+                NodeGraphError::Connection(ConnectionError::CycleNodeFound { .. })
+            ));
+        }
     }
 }

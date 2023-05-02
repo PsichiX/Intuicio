@@ -249,7 +249,7 @@ impl Function {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct FunctionQueryParameter<'a> {
     pub name: Option<Cow<'a, str>>,
     pub struct_query: Option<StructQuery<'a>>,
@@ -269,7 +269,7 @@ impl<'a> FunctionQueryParameter<'a> {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct FunctionQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub module_name: Option<Cow<'a, str>>,

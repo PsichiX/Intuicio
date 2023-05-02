@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://SuggestionsPopup.gd" type="Script" id=1]
+
+[node name="SuggestionsPopup" type="PopupMenu"]
+margin_right = 200.0
+margin_bottom = 300.0
+allow_search = true
+script = ExtResource( 1 )
+
+[node name="LiteralPopup" type="PopupMenu" parent="."]
+margin_right = 20.0
+margin_bottom = 20.0
+
+[node name="RegisterPopup" type="PopupMenu" parent="."]
+margin_right = 20.0
+margin_bottom = 20.0
+
+[node name="ScopePopup" type="PopupMenu" parent="."]
+margin_right = 20.0
+margin_bottom = 20.0

@@ -15,6 +15,9 @@ pub type AsmStruct = SerdeStruct;
 pub type AsmModule = SerdeModule;
 pub type AsmFile = SerdeFile;
 pub type AsmPackage = SerdePackage;
+pub type AsmNodeTypeInfo = SerdeNodeTypeInfo;
+pub type AsmNodes = SerdeNodes;
+pub type CompileAsmNodeGraphVisitor = CompileSerdeNodeGraphVisitor;
 
 pub fn frontend_assembly_version() -> IntuicioVersion {
     crate_version!()

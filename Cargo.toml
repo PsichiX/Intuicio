@@ -4,6 +4,7 @@ members = [
     "platform/core",
     "platform/plugins",
     "platform/derive",
+    "platform/nodes",
     "backends/vm",
     "backends/rust",
     "frontends/serde",
@@ -18,5 +19,6 @@ members = [
     "demos/plugin",
     "demos/emu",
     "demos/custom",
+    "demos/godot-node-graph/server",
     "tests",
 ]

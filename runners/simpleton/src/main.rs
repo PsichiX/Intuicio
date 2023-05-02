@@ -36,7 +36,7 @@ struct Cli {
     heap_page_capacity: Option<usize>,
 
     /// Prints CLI parameters.
-    #[arg(short, long, value_name = "BYTES")]
+    #[arg(short, long)]
     show_cli: bool,
 
     /// Writes generated simpleton code into specified file.
