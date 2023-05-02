@@ -32,7 +32,6 @@ func _ready():
 	_client.connect("response_suggest_all_nodes", self, "_client_response_suggest_all_nodes")
 	_client.connect("response_query_all", self, "_client_response_query_all")
 	_client.connect("response_serialize", self, "_client_response_serialize")
-	_client.connect("response_deserialize", self, "_client_response_deserialize")
 	_editor.connect("popup_request", self, "_editor_suggestions")
 	_editor.connect("connection_request", self, "_editor_bind_nodes")
 	_editor.connect("disconnection_request", self, "_editor_unbind_nodes")
@@ -155,7 +154,6 @@ func _client_response_query_all(data):
 			node.connect("changed", self, "_editor_update_node")
 			_editor.add_child(node)
 	for connection in data.content.connections:
-		print_debug(connection)
 		var from_node = editor_node_named(connection.from_node)
 		var to_node = editor_node_named(connection.to_node)
 		var from_port = from_node.output_port(connection.from_pin)
@@ -167,9 +165,6 @@ func _client_response_serialize(data):
 	save_game.open("user://graph.json", File.WRITE)
 	save_game.store_line(to_json(data.content))
 	save_game.close()
-
-func _client_response_deserialize(data):
-	print_debug(data)
 
 func _editor_suggestions(position):
 	position = position + _editor.scroll_offset
