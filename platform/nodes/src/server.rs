@@ -291,6 +291,10 @@ mod tests {
         fn struct_query(&self) -> StructQuery {
             Default::default()
         }
+
+        fn are_compatible(&self, _: &Self) -> bool {
+            true
+        }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -334,10 +338,6 @@ mod tests {
                     NodePin::parameter("Data out", TypeInfo),
                 ],
             }
-        }
-
-        fn node_is_expression(&self, _: &Registry) -> bool {
-            matches!(self, Self::Expression(_))
         }
 
         fn node_is_start(&self, _: &Registry) -> bool {

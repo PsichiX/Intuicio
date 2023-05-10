@@ -419,6 +419,10 @@ impl NodeTypeInfo for SerdeNodeTypeInfo {
             ..Default::default()
         }
     }
+
+    fn are_compatible(&self, other: &Self) -> bool {
+        self == other
+    }
 }
 
 impl std::fmt::Display for SerdeNodeTypeInfo {
@@ -542,10 +546,6 @@ impl NodeDefinition for SerdeNodes {
                 _ => vec![NodePin::execute("Out", false)],
             },
         }
-    }
-
-    fn node_is_expression(&self, _: &Registry) -> bool {
-        false
     }
 
     fn node_is_start(&self, _: &Registry) -> bool {
@@ -1102,11 +1102,13 @@ impl NodeDefinition for SerdeNodes {
 pub struct CompileSerdeNodeGraphVisitor;
 
 impl NodeGraphVisitor<SerdeNodes> for CompileSerdeNodeGraphVisitor {
+    type Input = ();
     type Output = SerdeOperation;
 
     fn visit_statement(
         &mut self,
         node: &Node<SerdeNodes>,
+        _: HashMap<String, Self::Input>,
         mut scopes: HashMap<String, Vec<Self::Output>>,
         result: &mut Vec<Self::Output>,
     ) -> bool {
@@ -1136,7 +1138,13 @@ impl NodeGraphVisitor<SerdeNodes> for CompileSerdeNodeGraphVisitor {
         true
     }
 
-    fn visit_expression(&mut self, _: &Node<SerdeNodes>, _: &mut Vec<Self::Output>) {}
+    fn visit_expression(
+        &mut self,
+        _: &Node<SerdeNodes>,
+        _: HashMap<String, Self::Input>,
+    ) -> Option<Self::Input> {
+        None
+    }
 }
 
 #[cfg(test)]

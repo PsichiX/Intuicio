@@ -45,9 +45,10 @@ impl PropertyValue {
 }
 
 pub trait NodeTypeInfo:
-    Clone + std::fmt::Debug + Display + PartialEq + Serialize + for<'d> Deserialize<'d>
+    Clone + std::fmt::Debug + Display + PartialEq + Serialize + for<'de> Deserialize<'de>
 {
     fn struct_query(&self) -> StructQuery;
+    fn are_compatible(&self, other: &Self) -> bool;
 }
 
 pub trait NodeDefinition: Sized {
@@ -56,7 +57,6 @@ pub trait NodeDefinition: Sized {
     fn node_label(&self, registry: &Registry) -> String;
     fn node_pins_in(&self, registry: &Registry) -> Vec<NodePin<Self::TypeInfo>>;
     fn node_pins_out(&self, registry: &Registry) -> Vec<NodePin<Self::TypeInfo>>;
-    fn node_is_expression(&self, registry: &Registry) -> bool;
     fn node_is_start(&self, registry: &Registry) -> bool;
     fn node_suggestions(
         x: i64,
@@ -84,13 +84,14 @@ pub trait NodeDefinition: Sized {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum NodePin<TI> {
+#[serde(bound = "TI: NodeTypeInfo")]
+pub enum NodePin<TI: NodeTypeInfo> {
     Execute { name: String, subscope: bool },
     Parameter { name: String, type_info: TI },
     Property { name: String },
 }
 
-impl<TI> NodePin<TI> {
+impl<TI: NodeTypeInfo> NodePin<TI> {
     pub fn execute(name: impl ToString, subscope: bool) -> Self {
         Self::Execute {
             name: name.to_string(),
@@ -721,7 +722,18 @@ impl<T: NodeDefinition> NodeGraph<T> {
         };
         match (from_pin, to_pin) {
             (NodePin::Execute { .. }, NodePin::Execute { .. }) => {}
-            (NodePin::Parameter { .. }, NodePin::Parameter { .. }) => {}
+            (NodePin::Parameter { type_info: a, .. }, NodePin::Parameter { type_info: b, .. }) => {
+                if !a.are_compatible(b) {
+                    return Some(ConnectionError::MismatchTypes {
+                        from_node: connection.from_node.to_string(),
+                        from_pin: connection.from_pin.to_owned(),
+                        to_node: connection.to_node.to_string(),
+                        to_pin: connection.to_pin.to_owned(),
+                        from_type_info: a.to_string(),
+                        to_type_info: b.to_string(),
+                    });
+                }
+            }
             (NodePin::Property { .. }, NodePin::Property { .. }) => {}
             _ => {
                 return Some(ConnectionError::MismatchPins {
@@ -797,13 +809,21 @@ impl<T: NodeDefinition> NodeGraph<T> {
         registry: &Registry,
     ) {
         if let Some(node) = self.node(id) {
-            for pin in node.data.node_pins_in(registry) {
-                if pin.is_parameter() {
-                    for id in self.node_neighbors_in(id, Some(pin.name())) {
-                        self.visit_expression(id, result, visitor, registry);
-                    }
-                }
-            }
+            let inputs = node
+                .data
+                .node_pins_in(registry)
+                .into_iter()
+                .filter(|pin| pin.is_parameter())
+                .filter_map(|pin| {
+                    self.node_neighbors_in(id, Some(pin.name()))
+                        .next()
+                        .map(|id| (pin.name().to_owned(), id))
+                })
+                .filter_map(|(name, id)| {
+                    self.visit_expression(id, visitor, registry)
+                        .map(|input| (name, input))
+                })
+                .collect();
             let pins_out = node.data.node_pins_out(registry);
             let scopes = pins_out
                 .iter()
@@ -818,7 +838,7 @@ impl<T: NodeDefinition> NodeGraph<T> {
                     (name, result)
                 })
                 .collect();
-            if visitor.visit_statement(node, scopes, result) {
+            if visitor.visit_statement(node, inputs, scopes, result) {
                 for pin in pins_out {
                     if pin.is_execute() && !pin.has_subscope() {
                         for id in self.node_neighbors_out(id, Some(pin.name())) {
@@ -833,22 +853,28 @@ impl<T: NodeDefinition> NodeGraph<T> {
     fn visit_expression<V: NodeGraphVisitor<T>>(
         &self,
         id: NodeId<T>,
-        result: &mut Vec<V::Output>,
         visitor: &mut V,
         registry: &Registry,
-    ) {
+    ) -> Option<V::Input> {
         if let Some(node) = self.node(id) {
-            if node.data.node_is_expression(registry) {
-                for pin in node.data.node_pins_in(registry).into_iter() {
-                    if pin.is_parameter() {
-                        for id in self.node_neighbors_in(id, Some(pin.name())) {
-                            self.visit_expression(id, result, visitor, registry);
-                        }
-                    }
-                }
-                visitor.visit_expression(node, result);
-            }
+            let inputs = node
+                .data
+                .node_pins_in(registry)
+                .into_iter()
+                .filter(|pin| pin.is_parameter())
+                .filter_map(|pin| {
+                    self.node_neighbors_in(id, Some(pin.name()))
+                        .next()
+                        .map(|id| (pin.name().to_owned(), id))
+                })
+                .filter_map(|(name, id)| {
+                    self.visit_expression(id, visitor, registry)
+                        .map(|input| (name, input))
+                })
+                .collect();
+            return visitor.visit_expression(node, inputs);
         }
+        None
     }
 }
 
@@ -862,16 +888,22 @@ impl<T: NodeDefinition + std::fmt::Debug> std::fmt::Debug for NodeGraph<T> {
 }
 
 pub trait NodeGraphVisitor<T: NodeDefinition> {
+    type Input;
     type Output;
 
     fn visit_statement(
         &mut self,
         node: &Node<T>,
+        inputs: HashMap<String, Self::Input>,
         scopes: HashMap<String, Vec<Self::Output>>,
         result: &mut Vec<Self::Output>,
     ) -> bool;
 
-    fn visit_expression(&mut self, node: &Node<T>, result: &mut Vec<Self::Output>);
+    fn visit_expression(
+        &mut self,
+        node: &Node<T>,
+        inputs: HashMap<String, Self::Input>,
+    ) -> Option<Self::Input>;
 }
 
 #[cfg(test)]
@@ -895,6 +927,10 @@ mod tests {
                 ..Default::default()
             }
         }
+
+        fn are_compatible(&self, other: &Self) -> bool {
+            self == other
+        }
     }
 
     #[derive(Debug, Clone)]
@@ -916,7 +952,9 @@ mod tests {
         fn node_pins_in(&self, _: &Registry) -> Vec<NodePin<Self::TypeInfo>> {
             match self {
                 Nodes::Start => vec![],
-                Nodes::Expression(_) => vec![NodePin::property("Value")],
+                Nodes::Expression(_) => {
+                    vec![NodePin::execute("In", false), NodePin::property("Value")]
+                }
                 Nodes::Result => vec![
                     NodePin::execute("In", false),
                     NodePin::parameter("Data", "i32".to_owned()),
@@ -933,7 +971,10 @@ mod tests {
         fn node_pins_out(&self, _: &Registry) -> Vec<NodePin<Self::TypeInfo>> {
             match self {
                 Nodes::Start => vec![NodePin::execute("Out", false)],
-                Nodes::Expression(_) => vec![NodePin::parameter("Data", "i32".to_owned())],
+                Nodes::Expression(_) => vec![
+                    NodePin::execute("Out", false),
+                    NodePin::parameter("Data", "i32".to_owned()),
+                ],
                 Nodes::Result => vec![],
                 Nodes::Convert(_) => vec![
                     NodePin::execute("Out", false),
@@ -944,10 +985,6 @@ mod tests {
                     NodePin::execute("Body", true),
                 ],
             }
-        }
-
-        fn node_is_expression(&self, _: &Registry) -> bool {
-            matches!(self, Self::Expression(_))
         }
 
         fn node_is_start(&self, _: &Registry) -> bool {
@@ -1000,11 +1037,13 @@ mod tests {
     struct CompileNodesToScript;
 
     impl NodeGraphVisitor<Nodes> for CompileNodesToScript {
+        type Input = ();
         type Output = Script;
 
         fn visit_statement(
             &mut self,
             node: &Node<Nodes>,
+            _: HashMap<String, Self::Input>,
             mut scopes: HashMap<String, Vec<Self::Output>>,
             result: &mut Vec<Self::Output>,
         ) -> bool {
@@ -1016,16 +1055,18 @@ mod tests {
                         result.push(Script::Scope(body));
                     }
                 }
+                Nodes::Expression(value) => result.push(Script::Literal(*value)),
                 _ => {}
             }
             true
         }
 
-        fn visit_expression(&mut self, node: &Node<Nodes>, result: &mut Vec<Self::Output>) {
-            match &node.data {
-                Nodes::Expression(value) => result.push(Script::Literal(*value)),
-                _ => {}
-            }
+        fn visit_expression(
+            &mut self,
+            _: &Node<Nodes>,
+            _: HashMap<String, Self::Input>,
+        ) -> Option<Self::Input> {
+            None
         }
     }
 
@@ -1058,7 +1099,13 @@ mod tests {
             .add_node(Node::new(0, 0, Nodes::Result), &registry)
             .unwrap();
         graph.connect_nodes(NodeConnection::new(start, child, "Out", "In"));
-        graph.connect_nodes(NodeConnection::new(child, convert_child, "Body", "In"));
+        graph.connect_nodes(NodeConnection::new(child, expression_child, "Body", "In"));
+        graph.connect_nodes(NodeConnection::new(
+            expression_child,
+            convert_child,
+            "Out",
+            "In",
+        ));
         graph.connect_nodes(NodeConnection::new(
             expression_child,
             convert_child,
@@ -1077,7 +1124,8 @@ mod tests {
             "Data out",
             "Data",
         ));
-        graph.connect_nodes(NodeConnection::new(child, convert, "Out", "In"));
+        graph.connect_nodes(NodeConnection::new(child, expression, "Out", "In"));
+        graph.connect_nodes(NodeConnection::new(expression, convert, "Out", "In"));
         graph.connect_nodes(NodeConnection::new(expression, convert, "Data", "Data in"));
         graph.connect_nodes(NodeConnection::new(convert, result, "Out", "In"));
         graph.connect_nodes(NodeConnection::new(convert, result, "Data out", "Data"));
