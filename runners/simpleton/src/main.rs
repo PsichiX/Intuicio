@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_frontend_simpleton::prelude::{jobs::Jobs, *};
@@ -39,17 +39,34 @@ struct Cli {
     #[arg(short, long)]
     show_cli: bool,
 
-    /// Writes generated simpleton code into specified file.
-    #[arg(short, long, value_name = "PATH")]
-    into_code: Option<String>,
-
-    /// Writes generated intuicio code into specified file.
-    #[arg(short, long, value_name = "PATH")]
-    into_intuicio: Option<String>,
-
     /// Additional root path to binary plugins.
     #[arg(short, long, value_name = "PATH")]
     plugins: Option<String>,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Writes generated simpleton code into specified file.
+    Code {
+        /// Path to file.
+        #[arg(value_name = "PATH")]
+        path: String,
+    },
+    /// Writes generated intuicio code into specified file.
+    Intuicio {
+        /// Path to file.
+        #[arg(value_name = "PATH")]
+        path: String,
+    },
+    /// Writes generated binary code into specified file.
+    Binary {
+        /// Path to file.
+        #[arg(value_name = "PATH")]
+        path: String,
+    },
 }
 
 fn main() {
@@ -68,17 +85,27 @@ fn main() {
             "simp",
             FileContentProvider::new("simp", SimpletonContentParser),
         )
+        .extension("bimp", SimpletonBinaryFileContentProvider::new("bimp"))
         .extension("plugin", IgnoreContentProvider)
         .default_extension("simp");
     let package = SimpletonPackage::new(&entry, &mut content_provider).unwrap();
-    if let Some(path) = &cli.into_code {
-        std::fs::write(path, format!("{:#?}", package)).unwrap();
-    }
-    if let Some(path) = &cli.into_intuicio {
-        std::fs::write(path, format!("{:#?}", package.compile())).unwrap();
-    }
-    if cli.into_code.is_some() || cli.into_intuicio.is_some() {
-        std::process::exit(0);
+    if let Some(command) = cli.command {
+        match command {
+            Commands::Code { path } => {
+                std::fs::write(path, format!("{:#?}", package)).unwrap();
+            }
+            Commands::Intuicio { path } => {
+                std::fs::write(path, format!("{:#?}", package.compile())).unwrap();
+            }
+            Commands::Binary { path } => {
+                let bytes = SimpletonBinary::archive(package, |path| {
+                    path.ends_with(".plugin") || path.ends_with(".bimp")
+                })
+                .unwrap();
+                std::fs::write(path, bytes).unwrap();
+            }
+        }
+        return;
     }
     let stack_capacity = cli.stack_capacity.unwrap_or(1024);
     let registers_capacity = cli.registers_capacity.unwrap_or(1024);

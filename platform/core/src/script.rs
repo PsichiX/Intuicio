@@ -444,8 +444,22 @@ impl<SE: ScriptExpression> ScriptPackage<'static, SE> {
     }
 }
 
+pub struct ScriptContent<T> {
+    pub path: String,
+    pub name: String,
+    pub data: Result<Option<T>, Box<dyn Error>>,
+}
+
 pub trait ScriptContentProvider<T> {
     fn load(&mut self, path: &str) -> Result<Option<T>, Box<dyn Error>>;
+
+    fn unpack_load(&mut self, path: &str) -> Result<Vec<ScriptContent<T>>, Box<dyn Error>> {
+        Ok(vec![ScriptContent {
+            path: path.to_owned(),
+            name: path.to_owned(),
+            data: self.load(path),
+        }])
+    }
 
     fn sanitize_path(&self, path: &str) -> Result<String, Box<dyn Error>> {
         Ok(path.to_owned())
@@ -486,7 +500,11 @@ impl<S> ExtensionContentProvider<S> {
 }
 
 impl<S> ScriptContentProvider<S> for ExtensionContentProvider<S> {
-    fn load(&mut self, path: &str) -> Result<Option<S>, Box<dyn Error>> {
+    fn load(&mut self, _: &str) -> Result<Option<S>, Box<dyn Error>> {
+        Ok(None)
+    }
+
+    fn unpack_load(&mut self, path: &str) -> Result<Vec<ScriptContent<S>>, Box<dyn Error>> {
         let extension = match Path::new(path).extension() {
             Some(extension) => extension.to_string_lossy().to_string(),
             None => match &self.default_extension {
@@ -495,7 +513,7 @@ impl<S> ScriptContentProvider<S> for ExtensionContentProvider<S> {
             },
         };
         if let Some(content_provider) = self.extension_providers.get_mut(&extension) {
-            content_provider.load(path)
+            content_provider.unpack_load(path)
         } else {
             Err(Box::new(
                 ExtensionContentProviderError::ContentProviderForExtensionNotFound(extension),

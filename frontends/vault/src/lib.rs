@@ -593,12 +593,14 @@ impl VaultPackage {
         if self.modules.contains_key(&path) {
             return Ok(());
         }
-        if let Some(module) = content_provider.load(&path)? {
-            let dependencies = module.dependencies.to_owned();
-            self.modules.insert(path.to_owned(), module);
-            for relative in dependencies {
-                let path = content_provider.join_paths(&path, &relative)?;
-                self.load(&path, content_provider)?;
+        for content in content_provider.unpack_load(&path)? {
+            if let Some(module) = content.data? {
+                let dependencies = module.dependencies.to_owned();
+                self.modules.insert(content.name, module);
+                for relative in dependencies {
+                    let path = content_provider.join_paths(&content.path, &relative)?;
+                    self.load(&path, content_provider)?;
+                }
             }
         }
         Ok(())

@@ -16,9 +16,9 @@
                         "action": {
                             "program": "simpleton",
                             "arguments": [
-                                "--into-code",
-                                "code.log",
-                                "../"
+                                "../",
+                                "code",
+                                "code.log"
                             ]
                         }
                     },
@@ -27,9 +27,9 @@
                         "action": {
                             "program": "simpleton",
                             "arguments": [
-                                "--into-intuicio",
-                                "intuicio.log",
-                                "../"
+                                "../",
+                                "intuicio",
+                                "intuicio.log"
                             ]
                         }
                     }

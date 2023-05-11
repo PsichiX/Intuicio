@@ -28,6 +28,7 @@ fn main() {
             "simp",
             FileContentProvider::new("simp", SimpletonContentParser),
         )
+        .extension("bimp", SimpletonBinaryFileContentProvider::new("bimp"))
         .extension("plugin", IgnoreContentProvider)
         .default_extension("simp");
     let package = SimpletonPackage::new(&cli.entry, &mut content_provider).unwrap();

@@ -1,19 +1,21 @@
 use crate::{parser, Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type};
+use bincode::{DefaultOptions, Options};
 use intuicio_core::{
     context::Context,
+    crate_version,
     function::FunctionQuery,
     object::Object,
     registry::Registry,
     script::{
-        BytesContentParser, ScriptContentProvider, ScriptExpression, ScriptFunction,
+        BytesContentParser, ScriptContent, ScriptContentProvider, ScriptExpression, ScriptFunction,
         ScriptFunctionParameter, ScriptFunctionSignature, ScriptHandle, ScriptModule,
         ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
     struct_type::StructQuery,
-    Visibility,
+    IntuicioVersion, Visibility,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error, path::PathBuf};
 
 const CLOSURES: &str = "_closures";
 
@@ -1132,12 +1134,14 @@ impl SimpletonPackage {
         if self.modules.contains_key(&path) {
             return Ok(());
         }
-        if let Some(module) = content_provider.load(&path)? {
-            let dependencies = module.dependencies.to_owned();
-            self.modules.insert(path.to_owned(), module);
-            for relative in dependencies {
-                let path = content_provider.join_paths(&path, &relative)?;
-                self.load(&path, content_provider)?;
+        for content in content_provider.unpack_load(&path)? {
+            if let Some(module) = content.data? {
+                let dependencies = module.dependencies.to_owned();
+                self.modules.insert(content.name, module);
+                for relative in dependencies {
+                    let path = content_provider.join_paths(&content.path, &relative)?;
+                    self.load(&path, content_provider)?;
+                }
             }
         }
         Ok(())
@@ -1174,7 +1178,7 @@ impl SimpletonPackage {
     pub fn install_plugins(&self, registry: &mut Registry, search_paths: &[&str]) {
         use intuicio_core::core_version;
         use intuicio_plugins::install_plugin;
-        use std::{env::consts::DLL_EXTENSION, path::PathBuf};
+        use std::env::consts::DLL_EXTENSION;
 
         for module in self.modules.values() {
             'plugin: for path in &module.dependencies {
@@ -1210,5 +1214,95 @@ impl BytesContentParser<SimpletonModule> for SimpletonContentParser {
     fn parse(&self, bytes: Vec<u8>) -> Result<SimpletonModule, Box<dyn Error>> {
         let content = String::from_utf8(bytes)?;
         Ok(SimpletonModule::parse(&content)?)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SimpletonBinary {
+    pub version: IntuicioVersion,
+    pub modules: Vec<SimpletonModule>,
+}
+
+impl SimpletonBinary {
+    pub fn archive(
+        package: SimpletonPackage,
+        dependencies_filter: impl Fn(&str) -> bool,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
+        let binary = SimpletonBinary {
+            version: crate_version!(),
+            modules: package
+                .modules
+                .into_values()
+                .map(|mut module| {
+                    module.dependencies.retain(|path| dependencies_filter(path));
+                    module
+                })
+                .collect(),
+        };
+        let options = DefaultOptions::new()
+            .with_fixint_encoding()
+            .allow_trailing_bytes();
+        Ok(options.serialize(&binary)?)
+    }
+}
+
+pub struct SimpletonBinaryFileContentProvider {
+    extension: String,
+}
+
+impl SimpletonBinaryFileContentProvider {
+    pub fn new(extension: impl ToString) -> Self {
+        Self {
+            extension: extension.to_string(),
+        }
+    }
+}
+
+impl ScriptContentProvider<SimpletonModule> for SimpletonBinaryFileContentProvider {
+    fn load(&mut self, _: &str) -> Result<Option<SimpletonModule>, Box<dyn Error>> {
+        Ok(None)
+    }
+
+    fn unpack_load(
+        &mut self,
+        path: &str,
+    ) -> Result<Vec<ScriptContent<SimpletonModule>>, Box<dyn Error>> {
+        let options = DefaultOptions::new()
+            .with_fixint_encoding()
+            .allow_trailing_bytes();
+        let bytes = std::fs::read(path)?;
+        let binary = options.deserialize::<SimpletonBinary>(&bytes)?;
+        let version = crate_version!();
+        if !binary.version.is_compatible(&version) {
+            return Err(format!(
+                "Binary version: {} is not compatible with Simpleton version: {}",
+                binary.version, version
+            )
+            .into());
+        }
+        Ok(binary
+            .modules
+            .into_iter()
+            .enumerate()
+            .map(|(index, module)| ScriptContent {
+                path: path.to_owned(),
+                name: format!("{}#{}", path, index),
+                data: Ok(Some(module)),
+            })
+            .collect())
+    }
+
+    fn sanitize_path(&self, path: &str) -> Result<String, Box<dyn Error>> {
+        let mut result = PathBuf::from(path);
+        if result.extension().is_none() {
+            result.set_extension(&self.extension);
+        }
+        Ok(result.canonicalize()?.to_string_lossy().into_owned())
+    }
+
+    fn join_paths(&self, parent: &str, relative: &str) -> Result<String, Box<dyn Error>> {
+        let mut path = PathBuf::from(parent);
+        path.pop();
+        Ok(path.join(relative).to_string_lossy().into_owned())
     }
 }

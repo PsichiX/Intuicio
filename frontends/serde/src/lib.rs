@@ -373,12 +373,14 @@ impl SerdePackage {
         if self.files.contains_key(&path) {
             return Ok(());
         }
-        if let Some(file) = content_provider.load(&path)? {
-            let dependencies = file.dependencies.to_owned();
-            self.files.insert(path.to_owned(), file);
-            for relative in dependencies {
-                let path = content_provider.join_paths(&path, &relative)?;
-                self.load(&path, content_provider)?;
+        for content in content_provider.unpack_load(&path)? {
+            if let Some(file) = content.data? {
+                let dependencies = file.dependencies.to_owned();
+                self.files.insert(content.name, file);
+                for relative in dependencies {
+                    let path = content_provider.join_paths(&content.path, &relative)?;
+                    self.load(&path, content_provider)?;
+                }
             }
         }
         Ok(())
