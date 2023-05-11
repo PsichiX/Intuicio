@@ -1,7 +1,10 @@
 use crate::{Array, Integer, Map, Reference, Text};
 use intuicio_core::{registry::Registry, IntuicioStruct};
 use intuicio_derive::{intuicio_function, IntuicioStruct};
-use std::process::Command;
+use std::{
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 #[derive(IntuicioStruct, Default)]
 #[intuicio(name = "CommandOutput", module_name = "process", override_send = true)]
@@ -55,8 +58,18 @@ pub fn command(
     Reference::new(output, registry)
 }
 
+#[intuicio_function(module_name = "process", use_registry)]
+pub fn current_time(registry: &Registry) -> Reference {
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_else(|_| panic!("Time went backwards: {:?}", start));
+    Reference::new_real(since_the_epoch.as_secs_f64(), registry)
+}
+
 pub fn install(registry: &mut Registry) {
     registry.add_struct(CommandOutput::define_struct(registry));
     registry.add_function(panic::define_function(registry));
     registry.add_function(command::define_function(registry));
+    registry.add_function(current_time::define_function(registry));
 }

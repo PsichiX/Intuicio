@@ -4,5 +4,11 @@ mod example_process {
         console::log_line(
             debug::debug(result.status, false),
         );
+        var start = process::current_time();
+        var now = start;
+        while math::less_than(math::sub(now, start), 0.5) {
+            now = process::current_time();
+        }
+        console::log_line(debug::debug(math::sub(now, start), false));
     }
 }

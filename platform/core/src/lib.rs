@@ -11,7 +11,7 @@ pub mod struct_type;
 pub mod prelude {
     pub use crate::{
         context::*, function::*, host::*, nativizer::*, object::*, registry::*, script::*,
-        struct_type::*, IntuicioStruct, Visibility,
+        struct_type::*, IntuicioStruct, IntuicioVersion, Visibility,
     };
     pub use crate::{
         define_function, define_native_struct, define_runtime_struct, function_signature,
@@ -58,7 +58,7 @@ pub trait IntuicioStruct {
     fn define_struct(registry: &Registry) -> Struct;
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(C)]
 pub struct IntuicioVersion {
     major: usize,
