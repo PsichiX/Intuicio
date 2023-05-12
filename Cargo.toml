@@ -12,6 +12,7 @@ members = [
     "frontends/simpleton",
     "frontends/vault",
     "plugins/simpleton-http",
+    "plugins/simpleton-ecs",
     "runners/simpleton",
     "runners/alchemyst",
     "essentials",

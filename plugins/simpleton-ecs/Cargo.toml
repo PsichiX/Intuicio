@@ -1,23 +1,15 @@
 [package]
-name = "custom"
+name = "simpleton-ecs"
 version = "0.12.1"
 edition = "2021"
 publish = false
 
-[[bin]]
-name = "custom-frontend"
-path = "src/main_frontend.rs"
-
-[[bin]]
-name = "custom-backend"
-path = "src/main_backend.rs"
-
-[[bin]]
-name = "custom-runner"
-path = "src/main_runner.rs"
+[lib]
+crate-type = ["cdylib"]
 
 [dependencies]
 intuicio-data = { version = "0.12", path = "../../platform/data" }
 intuicio-core = { version = "0.12", path = "../../platform/core" }
 intuicio-derive = { version = "0.12", path = "../../platform/derive" }
-intuicio-backend-vm = { version = "0.12", path = "../../backends/vm" }
+intuicio-frontend-simpleton = { version = "0.12", path = "../../frontends/simpleton" }
+bitvec = "1"

@@ -380,6 +380,18 @@ pub fn all(
 }
 
 #[intuicio_function(module_name = "iter", use_context, use_registry)]
+pub fn count(context: &mut Context, registry: &Registry, iterator: Reference) -> Reference {
+    let mut result = 0;
+    loop {
+        let value = crate::library::iter::next(context, registry, iterator.clone());
+        if value.is_null() {
+            return Reference::new_integer(result, registry);
+        }
+        result += 1;
+    }
+}
+
+#[intuicio_function(module_name = "iter", use_context, use_registry)]
 pub fn compared_by(
     context: &mut Context,
     registry: &Registry,
@@ -686,6 +698,7 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(position::define_function(registry));
     registry.add_function(any::define_function(registry));
     registry.add_function(all::define_function(registry));
+    registry.add_function(count::define_function(registry));
     registry.add_function(compared_by::define_function(registry));
     registry.add_struct(IterWalk::define_struct(registry));
     registry.add_function(IterWalk::next__define_function(registry));

@@ -1,0 +1,56 @@
+mod example_ecs {
+    import "simpleton_ecs.plugin";
+
+    struct Foo {}
+
+    struct Bar {}
+
+    func main(args) {
+        var world = world::new();
+        
+        var entity0 = world::spawn(world);
+        world::add(world, entity0, example_ecs::Foo {});
+        var entity1 = world::spawn(world);
+        world::add(world, entity1, example_ecs::Bar {});
+        var entity2 = world::spawn(world);
+        world::add(world, entity2, example_ecs::Foo {});
+        world::add(world, entity2, example_ecs::Bar {});
+        world::maintain(world);
+        console::log_line(debug::debug(world::entities(world), false));
+        console::log_line(debug::debug(world::snapshot(world), true));
+        example_ecs::test_queries(world);
+
+        world::remove(world, entity1, <struct example_ecs::Bar>);
+        world::remove(world, entity2, <struct example_ecs::Foo>);
+        world::maintain(world);
+        console::log_line(debug::debug(world::entities(world), false));
+        console::log_line(debug::debug(world::snapshot(world), true));
+        example_ecs::test_queries(world);
+
+        world::clear(world);
+        world::maintain(world);
+        console::log_line(debug::debug(world::entities(world), false));
+        console::log_line(debug::debug(world::snapshot(world), true));
+        example_ecs::test_queries(world);
+    }
+
+    func test_queries(world) {
+        console::log_line("* Foo");
+        for query in world::query(world, [<struct example_ecs::Foo>]) {
+            console::log_line(debug::debug(query, false));
+        }
+
+        console::log_line("* Bar");
+        for query in world::query(world, [<struct example_ecs::Bar>]) {
+            console::log_line(debug::debug(query, false));
+        }
+
+        console::log_line("* Foo + Bar");
+        for query in world::query(world, [
+            <struct example_ecs::Foo>,
+            <struct example_ecs::Bar>,
+        ]) {
+            console::log_line(debug::debug(query, false));
+        }
+    }
+}
