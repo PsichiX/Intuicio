@@ -12,4 +12,4 @@ intuicio-data = { version = "0.12", path = "../../platform/data" }
 intuicio-core = { version = "0.12", path = "../../platform/core" }
 intuicio-derive = { version = "0.12", path = "../../platform/derive" }
 intuicio-frontend-simpleton = { version = "0.12", path = "../../frontends/simpleton" }
-reqwest = { version = "0.12", features = ["blocking", "json"] }
+reqwest = { version = "0.11", features = ["blocking", "json"] }
