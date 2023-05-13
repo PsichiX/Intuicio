@@ -8,9 +8,9 @@ build:
   cargo build --all --all-features
 
 test:
-  # cargo test --all --all-features
+  cargo test --all --all-features
   cd ./runners/simpleton && just run
-  # cd ./runners/alchemyst && just run
+  cd ./runners/alchemyst && just run
 
 bench:
   cargo test --manifest-path ./tests/Cargo.toml --features=bench --release -- --nocapture

@@ -20,26 +20,28 @@ mod main {
     import "jobs";
     import "ecs";
     import "http";
+    import "window";
 
     func main(args) {
-        //example_hello::main(args);
-        //example_math::main(args);
-        //example_text::main(args);
-        //example_array::main(args);
-        //example_map::main(args);
+        example_hello::main(args);
+        example_math::main(args);
+        example_text::main(args);
+        example_array::main(args);
+        example_map::main(args);
         example_reflect::main(args);
-        //example_json::main(args);
-        //example_toml::main(args);
-        //example_fs::main(args);
-        //example_bytes::main(args);
-        //example_process::main(args);
-        //example_net::main(args);
-        //example_closure::main(args);
-        //example_iter::main(args);
-        //example_promise::main(args);
-        //example_event::main(args);
-        //example_jobs::main(args);
-        //example_ecs::main(args);
-        //example_http::main(args);
+        example_json::main(args);
+        example_toml::main(args);
+        example_fs::main(args);
+        example_bytes::main(args);
+        example_process::main(args);
+        example_net::main(args);
+        example_closure::main(args);
+        example_iter::main(args);
+        example_promise::main(args);
+        example_event::main(args);
+        example_jobs::main(args);
+        example_ecs::main(args);
+        example_http::main(args);
+        example_window::main(args);
     }
 }
