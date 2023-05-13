@@ -32,6 +32,19 @@ mod example_ecs {
         console::log_line(debug::debug(world::entities(world), false));
         console::log_line(debug::debug(world::snapshot(world), true));
         example_ecs::test_queries(world);
+
+        console::log_line("* Resources");
+        world::add_resource(world, example_ecs::Foo {});
+        world::add_resource(world, example_ecs::Bar {});
+        console::log_line(
+            debug::debug(
+                world::resources(world, [
+                    <struct example_ecs::Foo>,
+                    <struct example_ecs::Bar>,
+                ]),
+                false,
+            )
+        );
     }
 
     func test_queries(world) {

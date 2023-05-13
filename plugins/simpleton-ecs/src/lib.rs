@@ -21,6 +21,8 @@ pub struct World {
     #[intuicio(ignore)]
     entity_generator: Integer,
     #[intuicio(ignore)]
+    resources: Vec<Reference>,
+    #[intuicio(ignore)]
     to_despawn: HashSet<Integer>,
     #[intuicio(ignore)]
     to_add: HashMap<Integer, Vec<Reference>>,
@@ -91,6 +93,7 @@ impl World {
     pub fn clear(mut world: Reference) -> Reference {
         let mut world = world.write::<World>().expect("`world` is not a World!");
         world.to_clear = true;
+        world.resources.clear();
         Reference::null()
     }
 
@@ -278,6 +281,83 @@ impl World {
         Reference::null()
     }
 
+    #[intuicio_method()]
+    pub fn add_resource(mut world: Reference, resource: Reference) -> Reference {
+        let mut world = world.write::<World>().expect("`world` is not a World!");
+        let resource_type = resource.type_of().unwrap();
+        if let Some(res) = world
+            .resources
+            .iter_mut()
+            .find(|res| res.type_of().unwrap().is_same_as(&resource_type))
+        {
+            *res = resource.clone();
+        } else {
+            world.resources.push(resource.clone());
+        }
+        resource
+    }
+
+    #[intuicio_method()]
+    pub fn remove_resource(mut world: Reference, resource_type: Reference) -> Reference {
+        let mut world = world.write::<World>().expect("`world` is not a World!");
+        let resource_type = resource_type
+            .read::<Type>()
+            .expect("`resource_type` is not a Type!");
+        if let Some(index) = world
+            .resources
+            .iter()
+            .position(|res| res.type_of().unwrap().is_same_as(&resource_type))
+        {
+            return world.resources.swap_remove(index);
+        }
+        Reference::null()
+    }
+
+    #[intuicio_method()]
+    pub fn resource(world: Reference, resource_type: Reference) -> Reference {
+        let world = world.read::<World>().expect("`world` is not a World!");
+        let resource_type = resource_type
+            .read::<Type>()
+            .expect("`resource_type` is not a Type!");
+        if let Some(resource) = world
+            .resources
+            .iter()
+            .find(|res| res.type_of().unwrap().is_same_as(&resource_type))
+        {
+            return resource.clone();
+        }
+        Reference::null()
+    }
+
+    #[intuicio_method(use_registry)]
+    pub fn resources(
+        registry: &Registry,
+        world: Reference,
+        resource_types: Reference,
+    ) -> Reference {
+        let world = world.read::<World>().expect("`world` is not a World!");
+        let resource_types = resource_types
+            .read::<Array>()
+            .expect("`resource_types` is not an Array!");
+        Reference::new_array(
+            resource_types
+                .iter()
+                .map(|resource_type| {
+                    let resource_type = resource_type
+                        .read::<Type>()
+                        .expect("`resource_types` item is not a Type!");
+                    world
+                        .resources
+                        .iter()
+                        .find(|resource| resource.type_of().unwrap().is_same_as(&resource_type))
+                        .cloned()
+                        .unwrap_or_default()
+                })
+                .collect(),
+            registry,
+        )
+    }
+
     #[intuicio_method(use_registry)]
     pub fn snapshot(registry: &Registry, world: Reference) -> Reference {
         let world = world.read::<World>().expect("`world` is not a World!");
@@ -432,6 +512,10 @@ pub extern "C" fn install(registry: &mut Registry) {
     registry.add_function(World::get__define_function(registry));
     registry.add_function(World::query__define_function(registry));
     registry.add_function(World::maintain__define_function(registry));
+    registry.add_function(World::add_resource__define_function(registry));
+    registry.add_function(World::remove_resource__define_function(registry));
+    registry.add_function(World::resource__define_function(registry));
+    registry.add_function(World::resources__define_function(registry));
     registry.add_function(World::snapshot__define_function(registry));
     registry.add_function(IterQuery::next__define_function(registry));
 }

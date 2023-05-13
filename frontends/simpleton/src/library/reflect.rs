@@ -180,6 +180,38 @@ pub fn function_arguments(registry: &Registry, value: Reference) -> Reference {
     )
 }
 
+#[intuicio_function(module_name = "reflect")]
+pub fn select(mut value: Reference, path: Reference) -> Reference {
+    let path = path.read::<Text>().unwrap();
+    if path.is_empty() {
+        return value;
+    }
+    for part in path.split('/') {
+        if value.is_null() {
+            return value;
+        }
+        let found = if let Some(array) = value.read::<Array>() {
+            if let Ok(index) = part.parse::<usize>() {
+                array[index].clone()
+            } else {
+                return Reference::null();
+            }
+        } else if let Some(map) = value.read::<Map>() {
+            if let Some(item) = map.get(part) {
+                item.clone()
+            } else {
+                return Reference::null();
+            }
+        } else if let Some(item) = value.read_object().unwrap().read_field::<Reference>(part) {
+            item.clone()
+        } else {
+            return Reference::null();
+        };
+        value = found;
+    }
+    value
+}
+
 #[intuicio_function(module_name = "reflect", use_registry)]
 pub fn is_null(registry: &Registry, value: Reference) -> Reference {
     Reference::new_boolean(value.is_null(), registry)
@@ -436,6 +468,7 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(call::define_function(registry));
     registry.add_function(function_name::define_function(registry));
     registry.add_function(function_arguments::define_function(registry));
+    registry.add_function(select::define_function(registry));
     registry.add_function(is_null::define_function(registry));
     registry.add_function(is_valid::define_function(registry));
     registry.add_function(is_being_written::define_function(registry));

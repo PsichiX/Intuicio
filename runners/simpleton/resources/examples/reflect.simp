@@ -132,5 +132,19 @@ mod example_reflect {
         console::log_line(
             debug::debug(reflect::to_text(true), false),
         );
+
+        var temp = {
+            array: [
+                example_reflect::Foo {
+                    a: 42,
+                },
+            ],
+        };
+        console::log_line(
+            debug::debug(
+                reflect::select(temp, "array/0/a"),
+                false,
+            ),
+        );
     }
 }
