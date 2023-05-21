@@ -1,0 +1,192 @@
+#!simpleton
+
+mod main {
+    import "simpleton_window.plugin";
+    import "simpleton_renderer.plugin";
+
+    struct Image { width, height, texture }
+
+    struct State {
+        renderer,
+        buffer,
+        shader,
+        mesh,
+        image,
+        transform,
+        controls,
+    }
+
+    func main(args) {
+        fs::set_current_dir(simpleton::get_entry_dir());
+
+        var window = window::new(window::WindowConfig {
+            title: "Simpleton renderer example",
+            vsync: true,
+            fps: 30,
+        });
+
+        var layout = ["position", 2, "uv", 2];
+        var renderer = renderer::new(window::gl(window), null);
+        var buffer = render_buffer::RenderBuffer {};
+        var image = main::create_image(renderer, "./ferris.png");
+        var mesh = main::create_quad_mesh(
+            renderer,
+            layout,
+            reflect::to_real(image.width),
+            reflect::to_real(image.height),
+        );
+        var shader = main::create_shader(renderer, layout);
+        var state = main::State {
+            renderer,
+            buffer,
+            shader,
+            mesh,
+            image,
+            transform: transform::Transform {
+                px: 0.0,
+                py: 0.0,
+            },
+            controls: {
+                W: false,
+                S: false,
+                A: false,
+                D: false,
+            },
+        };
+        
+        event::bind(window::redraw_event(window), @[state](interface, delta_time) {
+            main::on_redraw(interface, delta_time, state);
+        });
+        event::bind(window::input_event(window), @[state](interface, input) {
+            main::on_input(interface, input, state);
+        });
+        window::run(window);
+    }
+
+    func on_redraw(interface, delta_time, state) {
+        render_buffer::clear(state.buffer);
+
+        if state.controls{"W"} {
+            state.transform.py = math::sub(state.transform.py, 10.0);
+        }
+        if state.controls{"S"} {
+            state.transform.py = math::add(state.transform.py, 10.0);
+        }
+        if state.controls{"A"} {
+            state.transform.px = math::sub(state.transform.px, 10.0);
+            state.transform.sx = 1.0;
+        }
+        if state.controls{"D"} {
+            state.transform.px = math::add(state.transform.px, 10.0);
+            state.transform.sx = -1.0;
+        }
+
+        render_buffer::enqueue(
+            state.buffer,
+            state.shader,
+            state.mesh,
+            state.transform,
+            0,
+            2,
+            { image: state.image.texture },
+        );
+
+        renderer::render(
+            state.renderer,
+            state.buffer,
+            window_interface::width(interface),
+            window_interface::height(interface),
+            null,
+            transform::Transform {},
+        );
+    }
+
+    func on_input(interface, input, state) {
+        if reflect::are_same(reflect::type_of(input), <struct window::KeyboardInput>) {
+            if text::equals(input.keycode, "Escape") {
+                window_interface::exit(interface);
+            }
+            state.controls{input.keycode} = input.state;
+        }
+    }
+
+    func create_quad_mesh(renderer, layout, width, height) {
+        width = math::mul(width, 0.5);
+        height = math::mul(height, 0.5);
+        var vertex_bytes = bytes::new();
+        bytes::set_native_endian(vertex_bytes, true);
+        bytes::write_f32(vertex_bytes, math::negate(width));
+        bytes::write_f32(vertex_bytes, math::negate(height));
+        bytes::write_f32(vertex_bytes, 0.0);
+        bytes::write_f32(vertex_bytes, 0.0);
+        bytes::write_f32(vertex_bytes, width);
+        bytes::write_f32(vertex_bytes, math::negate(height));
+        bytes::write_f32(vertex_bytes, 1.0);
+        bytes::write_f32(vertex_bytes, 0.0);
+        bytes::write_f32(vertex_bytes, width);
+        bytes::write_f32(vertex_bytes, height);
+        bytes::write_f32(vertex_bytes, 1.0);
+        bytes::write_f32(vertex_bytes, 1.0);
+        bytes::write_f32(vertex_bytes, math::negate(width));
+        bytes::write_f32(vertex_bytes, height);
+        bytes::write_f32(vertex_bytes, 0.0);
+        bytes::write_f32(vertex_bytes, 1.0);
+        var index_bytes = bytes::new();
+        bytes::set_native_endian(index_bytes, true);
+        bytes::write_u32(index_bytes, 0);
+        bytes::write_u32(index_bytes, 1);
+        bytes::write_u32(index_bytes, 2);
+        bytes::write_u32(index_bytes, 2);
+        bytes::write_u32(index_bytes, 3);
+        bytes::write_u32(index_bytes, 0);
+        return renderer::create_mesh(renderer, vertex_bytes, index_bytes, layout);
+    }
+
+    func create_image(renderer, path) {
+        var image = image::decode(fs::read_file(path));
+        var texture = renderer::create_texture(
+            renderer,
+            image.bytes,
+            image.width,
+            image.height,
+            true,
+        );
+        return main::Image {
+            width: image.width,
+            height: image.height,
+            texture,
+        };
+    }
+
+    func create_shader(renderer, layout) {
+        var vertex_content = "
+            in vec2 position;
+            in vec2 uv;
+            out vec2 _uv;
+            uniform mat4 projection;
+            uniform mat4 view;
+            uniform mat4 model;
+            void main() {
+                _uv = uv;
+                mat4 matrix = projection * view * model;
+                gl_Position = matrix * vec4(position, 0.0, 1.0);
+            }
+        ";
+        var fragment_content = "
+            precision mediump float;
+            in vec2 _uv;
+            out vec4 color;
+            uniform sampler2D image;
+            void main() {
+                color = texture(image, _uv);
+            }
+        ";
+        return renderer::create_shader(
+            renderer,
+            vertex_content,
+            fragment_content,
+            ["projection", "view", "model", "image"],
+            layout,
+        );
+    }
+}

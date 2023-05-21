@@ -33,7 +33,7 @@ where
 pub trait Finalize: Sized {
     /// # Safety
     unsafe fn finalize_raw(data: *mut ()) {
-        drop(unsafe { data.cast::<Self>().read() });
+        std::ptr::drop_in_place(data.cast::<Self>());
     }
 }
 

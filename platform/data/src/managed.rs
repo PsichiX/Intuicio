@@ -50,6 +50,16 @@ impl<T> Managed<T> {
             self.lifetime.borrow_mut()?,
         ))
     }
+
+    /// # Safety
+    pub unsafe fn as_ptr(&self) -> *const T {
+        &self.data as _
+    }
+
+    /// # Safety
+    pub unsafe fn as_mut_ptr(&mut self) -> *mut T {
+        &mut self.data as _
+    }
 }
 
 pub struct ManagedRef<T> {
@@ -193,7 +203,12 @@ mod tests {
         *value.borrow_mut().unwrap().write().unwrap() = 2;
         assert_eq!(*value.read().unwrap(), 2);
         let value_ref = value.borrow().unwrap();
+        let value_ref2 = value_ref.borrow().unwrap();
+        drop(value_ref);
+        assert!(value_ref2.read().is_some());
+        let value_ref = value.borrow().unwrap();
         drop(value);
         assert!(value_ref.read().is_none());
+        assert!(value_ref2.read().is_none());
     }
 }

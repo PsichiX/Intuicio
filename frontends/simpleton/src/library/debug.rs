@@ -1,4 +1,6 @@
-use crate::{Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type};
+use crate::{
+    library::bytes::Bytes, Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type,
+};
 use intuicio_core::registry::Registry;
 use intuicio_derive::intuicio_function;
 use std::fmt::Write;
@@ -28,6 +30,8 @@ fn debug_impl(value: &Reference, result: &mut dyn Write, indent: &mut Option<usi
         write!(result, "{}", *value).unwrap();
     } else if let Some(value) = value.read::<Text>() {
         write!(result, r#""{}""#, value.as_str()).unwrap();
+    } else if let Some(value) = value.read::<Bytes>() {
+        write!(result, "#{:?}", value.get_ref()).unwrap();
     } else if let Some(value) = value.read::<Array>() {
         write!(result, "[").unwrap();
         if !value.is_empty() {

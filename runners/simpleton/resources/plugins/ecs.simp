@@ -1,4 +1,6 @@
-mod example_ecs {
+#!simpleton
+
+mod main {
     import "simpleton_ecs.plugin";
 
     struct Foo {}
@@ -9,38 +11,38 @@ mod example_ecs {
         var world = world::new();
         
         var entity0 = world::spawn(world);
-        world::add(world, entity0, example_ecs::Foo {});
+        world::add(world, entity0, main::Foo {});
         var entity1 = world::spawn(world);
-        world::add(world, entity1, example_ecs::Bar {});
+        world::add(world, entity1, main::Bar {});
         var entity2 = world::spawn(world);
-        world::add(world, entity2, example_ecs::Foo {});
-        world::add(world, entity2, example_ecs::Bar {});
+        world::add(world, entity2, main::Foo {});
+        world::add(world, entity2, main::Bar {});
         world::maintain(world);
         console::log_line(debug::debug(world::entities(world), false));
         console::log_line(debug::debug(world::snapshot(world), true));
-        example_ecs::test_queries(world);
+        main::test_queries(world);
 
-        world::remove(world, entity1, <struct example_ecs::Bar>);
-        world::remove(world, entity2, <struct example_ecs::Foo>);
+        world::remove(world, entity1, <struct main::Bar>);
+        world::remove(world, entity2, <struct main::Foo>);
         world::maintain(world);
         console::log_line(debug::debug(world::entities(world), false));
         console::log_line(debug::debug(world::snapshot(world), true));
-        example_ecs::test_queries(world);
+        main::test_queries(world);
 
         world::clear(world);
         world::maintain(world);
         console::log_line(debug::debug(world::entities(world), false));
         console::log_line(debug::debug(world::snapshot(world), true));
-        example_ecs::test_queries(world);
+        main::test_queries(world);
 
         console::log_line("* Resources");
-        world::add_resource(world, example_ecs::Foo {});
-        world::add_resource(world, example_ecs::Bar {});
+        world::add_resource(world, main::Foo {});
+        world::add_resource(world, main::Bar {});
         console::log_line(
             debug::debug(
                 world::resources(world, [
-                    <struct example_ecs::Foo>,
-                    <struct example_ecs::Bar>,
+                    <struct main::Foo>,
+                    <struct main::Bar>,
                 ]),
                 false,
             )
@@ -49,19 +51,19 @@ mod example_ecs {
 
     func test_queries(world) {
         console::log_line("* Foo");
-        for query in world::query(world, [<struct example_ecs::Foo>]) {
+        for query in world::query(world, [<struct main::Foo>]) {
             console::log_line(debug::debug(query, false));
         }
 
         console::log_line("* Bar");
-        for query in world::query(world, [<struct example_ecs::Bar>]) {
+        for query in world::query(world, [<struct main::Bar>]) {
             console::log_line(debug::debug(query, false));
         }
 
         console::log_line("* Foo + Bar");
         for query in world::query(world, [
-            <struct example_ecs::Foo>,
-            <struct example_ecs::Bar>,
+            <struct main::Foo>,
+            <struct main::Bar>,
         ]) {
             console::log_line(debug::debug(query, false));
         }

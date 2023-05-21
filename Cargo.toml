@@ -14,6 +14,7 @@ members = [
     "plugins/simpleton-http",
     "plugins/simpleton-ecs",
     "plugins/simpleton-window",
+    "plugins/simpleton-renderer",
     "runners/simpleton",
     "runners/alchemyst",
     "essentials",

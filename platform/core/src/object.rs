@@ -18,13 +18,17 @@ impl Drop for Object {
     fn drop(&mut self) {
         if self.drop {
             unsafe {
-                for field in self.handle.fields() {
-                    field.struct_handle().finalize(
-                        self.memory
-                            .as_mut_ptr()
-                            .add(field.address_offset())
-                            .cast::<()>(),
-                    );
+                if self.handle.is_native() {
+                    self.handle.finalize(self.memory.as_mut_ptr().cast::<()>());
+                } else {
+                    for field in self.handle.fields() {
+                        field.struct_handle().finalize(
+                            self.memory
+                                .as_mut_ptr()
+                                .add(field.address_offset())
+                                .cast::<()>(),
+                        );
+                    }
                 }
             }
         }
@@ -83,8 +87,9 @@ impl Object {
     /// # Safety
     pub unsafe fn field_memory<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&[u8]> {
         self.handle.find_field(query).map(|field| {
-            &self.memory[field.address_offset()
-                ..(field.address_offset() + field.struct_handle().layout().size())]
+            let from = field.address_offset();
+            let to = from + field.struct_handle().layout().size();
+            &self.memory[from..to]
         })
     }
 
@@ -94,8 +99,9 @@ impl Object {
         query: StructFieldQuery<'a>,
     ) -> Option<&mut [u8]> {
         self.handle.find_field(query).map(|field| {
-            &mut self.memory[field.address_offset()
-                ..(field.address_offset() + field.struct_handle().layout().size())]
+            let from = field.address_offset();
+            let to = from + field.struct_handle().layout().size();
+            &mut self.memory[from..to]
         })
     }
 
@@ -209,6 +215,7 @@ impl DynamicObject {
 #[cfg(test)]
 mod tests {
     use crate::{object::*, struct_type::*};
+    use intuicio_data::prelude::*;
     use std::rc::{Rc, Weak};
 
     #[test]
@@ -270,5 +277,24 @@ mod tests {
         assert!(object.read_field::<()>("d").is_none());
         drop(object);
         assert_eq!(Rc::weak_count(&dropped), 0);
+    }
+
+    #[test]
+    fn test_drop() {
+        type Wrapper = Option<LifetimeRefMut>;
+
+        let lifetime = Lifetime::default();
+        let handle = NativeStructBuilder::new::<Wrapper>().build_handle();
+        let mut object = unsafe { Object::new_uninitialized(handle) };
+        assert!(lifetime.state().can_write());
+        unsafe {
+            object
+                .as_mut_ptr()
+                .cast::<Wrapper>()
+                .write(Some(lifetime.borrow_mut().unwrap()))
+        };
+        assert_eq!(lifetime.state().can_write(), false);
+        drop(object);
+        assert!(lifetime.state().can_write());
     }
 }

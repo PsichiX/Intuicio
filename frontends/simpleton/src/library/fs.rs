@@ -1,4 +1,4 @@
-use crate::{Array, Reference, Text};
+use crate::{library::bytes::Bytes, Array, Reference, Text};
 use intuicio_core::registry::Registry;
 use intuicio_derive::intuicio_function;
 use std::path::{Path, PathBuf};
@@ -51,18 +51,18 @@ pub fn scan_dir(registry: &Registry, path: Reference) -> Reference {
 
 #[intuicio_function(module_name = "fs", use_registry)]
 pub fn read_file(registry: &Registry, path: Reference) -> Reference {
-    Reference::new_text(
-        std::fs::read_to_string(path.read::<Text>().unwrap().as_str()).unwrap(),
+    Reference::new(
+        Bytes::new_raw(std::fs::read(path.read::<Text>().unwrap().as_str()).unwrap()),
         registry,
     )
 }
 
 #[intuicio_function(module_name = "fs", use_registry)]
-pub fn write_file(registry: &Registry, path: Reference, contents: Reference) -> Reference {
+pub fn write_file(registry: &Registry, path: Reference, bytes: Reference) -> Reference {
     Reference::new_boolean(
         std::fs::write(
             path.read::<Text>().unwrap().as_str(),
-            contents.read::<Text>().unwrap().as_str(),
+            bytes.read::<Bytes>().unwrap().get_ref(),
         )
         .is_ok(),
         registry,

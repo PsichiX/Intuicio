@@ -6,10 +6,9 @@ mod main {
     import "run";
 
     func main(args) {
-        fs::set_current_dir("./resources/automation/");
-        var content = fs::read_file("./pipeline.json");
-        var pipeline = json::deserialize(content);
-        pipeline = build::pipeline(pipeline);
+        fs::set_current_dir(simpleton::get_entry_dir());
+        var content = text::from_bytes(fs::read_file("./pipeline.json"));
+        var pipeline = build::pipeline(json::deserialize(content));
         run::pipeline("./", pipeline);
     }
 }

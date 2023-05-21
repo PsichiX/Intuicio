@@ -180,9 +180,11 @@ impl ScriptExpression for SimpletonScriptExpression {
                 let object = context.stack().pop::<Reference>().unwrap();
                 let value = object
                     .read_object()
-                    .unwrap()
+                    .expect("Could not read object got from stack!")
                     .read_field::<Reference>(name)
-                    .unwrap()
+                    .unwrap_or_else(|| {
+                        panic!("Could not read `{}` field of object got from stack!", name)
+                    })
                     .clone();
                 context.stack().push(value);
             }
@@ -191,9 +193,11 @@ impl ScriptExpression for SimpletonScriptExpression {
                 let value = context.stack().pop::<Reference>().unwrap();
                 *object
                     .write_object()
-                    .unwrap()
+                    .expect("Could not write object got from stack!")
                     .write_field::<Reference>(name)
-                    .unwrap() = value;
+                    .unwrap_or_else(|| {
+                        panic!("Could not write `{}` field of object got from stack!", name)
+                    }) = value;
             }
         }
     }
@@ -403,7 +407,10 @@ impl SimpletonExpressionStart {
                 }
             }
             Self::GetVariable { name, next } => {
-                let index = registers.iter().position(|n| n == name.as_str()).unwrap();
+                let index = registers
+                    .iter()
+                    .position(|n| n == name.as_str())
+                    .unwrap_or_else(|| panic!("Variable `{}` not found!", name));
                 result.push(ScriptOperation::PushFromRegister { index });
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackDuplicate,
@@ -693,6 +700,9 @@ impl SimpletonExpressionNext {
                             ..Default::default()
                         },
                     });
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::StackDrop,
+                    });
                 }
             }
             Self::GetMapItem { index, next } => {
@@ -720,6 +730,9 @@ impl SimpletonExpressionNext {
                             module_name: Some("map".into()),
                             ..Default::default()
                         },
+                    });
+                    result.push(ScriptOperation::Expression {
+                        expression: SimpletonScriptExpression::StackDrop,
                     });
                 }
             }

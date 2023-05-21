@@ -1,8 +1,12 @@
+mod library;
+
 use clap::{Parser, Subcommand};
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_frontend_simpleton::prelude::{jobs::Jobs, *};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+const ENTRY_DIR: &str = "entry-dir";
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -123,6 +127,7 @@ fn main() {
         }
         let mut registry = Registry::default();
         intuicio_frontend_simpleton::library::install(&mut registry);
+        crate::library::install(&mut registry);
         package.install_plugins(&mut registry, &plugin_search_paths);
         package
             .compile()
@@ -133,6 +138,11 @@ fn main() {
     let mut host = host_producer.produce();
     host.context()
         .set_custom(Jobs::HOST_PRODUCER_CUSTOM, host_producer);
+    host.context().set_custom(ENTRY_DIR, {
+        let mut result = PathBuf::from(entry);
+        result.pop();
+        result.to_string_lossy().to_string()
+    });
     let args = Reference::new_array(
         cli.args
             .into_iter()

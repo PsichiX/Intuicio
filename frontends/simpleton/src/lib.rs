@@ -178,7 +178,14 @@ impl Reference {
     }
 
     pub fn new<T: 'static>(data: T, registry: &Registry) -> Self {
-        let struct_type = registry.find_struct(StructQuery::of::<T>()).unwrap();
+        let struct_type = registry
+            .find_struct(StructQuery::of::<T>())
+            .unwrap_or_else(|| {
+                panic!(
+                    "Could not make a reference of type: {}",
+                    std::any::type_name::<T>()
+                )
+            });
         let mut value = unsafe { Object::new_uninitialized(struct_type) };
         unsafe { value.as_mut_ptr().cast::<T>().write(data) };
         Self::new_raw(value)
@@ -194,6 +201,10 @@ impl Reference {
         Self {
             data: Some(Shared::new(data)),
         }
+    }
+
+    pub fn new_shared(data: Shared<Object>) -> Self {
+        Self { data: Some(data) }
     }
 
     pub fn initialized(ty: &Type) -> Self {

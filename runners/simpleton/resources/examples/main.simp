@@ -18,9 +18,6 @@ mod main {
     import "promise";
     import "event";
     import "jobs";
-    import "ecs";
-    import "http";
-    import "window";
 
     func main(args) {
         example_hello::main(args);
@@ -40,8 +37,5 @@ mod main {
         example_promise::main(args);
         example_event::main(args);
         example_jobs::main(args);
-        example_ecs::main(args);
-        example_http::main(args);
-        example_window::main(args);
     }
 }

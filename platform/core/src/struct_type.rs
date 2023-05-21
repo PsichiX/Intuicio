@@ -141,8 +141,8 @@ impl NativeStructBuilder {
             type_name: std::any::type_name::<T>().to_owned(),
             fields: vec![],
             layout: Layout::new::<T>(),
-            initializer: RuntimeObject::initialize_raw,
-            finalizer: RuntimeObject::finalize_raw,
+            initializer: T::initialize_raw,
+            finalizer: T::finalize_raw,
             is_send: is_send::<T>(),
             is_sync: is_sync::<T>(),
         }

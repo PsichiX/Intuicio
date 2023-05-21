@@ -1,0 +1,28 @@
+#!simpleton
+
+mod main {
+    import "simpleton_window.plugin";
+
+    func main(args) {
+        var window = window::new(window::WindowConfig {
+            title: "Simpleton window example",
+            vsync: true,
+            fps: 30,
+        });
+        event::bind(window::redraw_event(window), <func main::on_redraw>);
+        event::bind(window::input_event(window), <func main::on_input>);
+        window::run(window);
+    }
+
+    func on_redraw(interface, delta_time) {}
+
+    func on_input(interface, input) {
+        console::log_line(debug::debug(input, false));
+        
+        if reflect::are_same(reflect::type_of(input), <struct window::KeyboardInput>) {
+            if text::equals(input.keycode, "Escape") {
+                window_interface::exit(interface);
+            }
+        }
+    }
+}

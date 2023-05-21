@@ -1,12 +1,14 @@
-mod example_http {
+#!simpleton
+
+mod main {
     import "simpleton_http.plugin";
 
     func main(args) {
         var jobs = jobs::new(null);
 
-        var job_json = example_http::async_get_text(jobs, "https://httpbin.org/json");
-        var job_png = example_http::async_get_bytes(jobs, "https://httpbin.org/image/png");
-        var job_jpeg = example_http::async_get_bytes(jobs, "https://httpbin.org/image/jpeg");
+        var job_json = main::async_get_text(jobs, "https://httpbin.org/json");
+        var job_png = main::async_get_bytes(jobs, "https://httpbin.org/image/png");
+        var job_jpeg = main::async_get_bytes(jobs, "https://httpbin.org/image/jpeg");
         
         var json = job::wait_then_consume(job_json);
         var png = job::wait_then_consume(job_png);
