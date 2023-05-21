@@ -54,6 +54,9 @@ update:
   cargo update --manifest-path ./frontends/simpleton/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/vault/Cargo.toml --aggressive
   cargo update --manifest-path ./plugins/simpleton-http/Cargo.toml --aggressive
+  cargo update --manifest-path ./plugins/simpleton-ecs/Cargo.toml --aggressive
+  cargo update --manifest-path ./plugins/simpleton-window/Cargo.toml --aggressive
+  cargo update --manifest-path ./plugins/simpleton-renderer/Cargo.toml --aggressive
   cargo update --manifest-path ./runners/simpleton/Cargo.toml --aggressive
   cargo update --manifest-path ./runners/alchemyst/Cargo.toml --aggressive
   cargo update --manifest-path ./essentials/Cargo.toml --aggressive
