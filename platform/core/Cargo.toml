@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-core"
-version = "0.12.3"
+version = "0.13.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Core module for Intuicio scripting platform"
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/intuicio-core"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-data = { version = "0.12", path = "../data" }
+intuicio-data = { version = "0.13", path = "../data" }
 serde = { version = "1", features = ["derive", "rc"] }
 memoffset = "0.8"
 typid = "1"
