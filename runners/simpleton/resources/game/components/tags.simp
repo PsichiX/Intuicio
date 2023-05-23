@@ -1,0 +1,7 @@
+mod tags {
+    struct Player {}
+    
+    struct Bullet {}
+
+    struct Asteroid {}
+}

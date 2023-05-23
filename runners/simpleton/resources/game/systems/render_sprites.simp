@@ -1,0 +1,36 @@
+mod render_sprites {
+    func system(world) {
+        var buffer = world::resource(world, <struct render_buffer::RenderBuffer>);
+        var renderer = world::resource(world, <struct renderer::Renderer>);
+        var drawing = world::resource(world, <struct drawing::Drawing>);
+
+        for query in world::query(world, [
+            <struct sprite::Sprite>,
+            <struct position::Position>,
+            <struct rotation::Rotation>,
+            <struct scale::Scale>,
+        ]) {
+            var sprite = query[1];
+            var position = query[2];
+            var rotation = query[3];
+            var scale = query[4];
+
+            var image = drawing::get_image(drawing, renderer, sprite.path);
+            render_buffer::enqueue(
+                buffer,
+                drawing.shader,
+                drawing.mesh,
+                transform::Transform {
+                    px: position.x,
+                    py: position.y,
+                    yaw: rotation.angle,
+                    sx: math::mul(scale.x, reflect::to_real(image.width)),
+                    sy: math::mul(scale.y, reflect::to_real(image.height)),
+                },
+                0,
+                2,
+                { image: image.texture },
+            );
+        }
+    }
+}

@@ -1,0 +1,10 @@
+mod scale {
+    struct Scale { x, y }
+
+    func new(x, y) {
+        return scale::Scale {
+            x: reflect::pass_or(x, 1.0),
+            y: reflect::pass_or(y, 1.0),
+        };
+    }
+}

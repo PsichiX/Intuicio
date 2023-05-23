@@ -1,0 +1,13 @@
+mod spawner {
+    struct Spawner {
+        asteroids_interval,
+        asteroids_timer,
+    }
+
+    func new(asteroids_interval) {
+        return spawner::Spawner {
+            asteroids_interval,
+            asteroids_timer: 0.0,
+        };
+    }
+}

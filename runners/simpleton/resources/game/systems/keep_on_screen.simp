@@ -1,0 +1,24 @@
+mod keep_on_screen {
+    func system(world) {
+        var drawing = world::resource(world, <struct drawing::Drawing>);
+        var half_width = math::mul(reflect::to_real(drawing.screen_width), 0.5);
+        var half_height = math::mul(reflect::to_real(drawing.screen_height), 0.5);
+
+        for query in world::query(world, [<struct position::Position>]) {
+            var position = query[1];
+
+            if math::less_than(position.x, math::negate(half_width)) {
+                position.x = half_width;
+            }
+            if math::greater_than(position.x, half_width) {
+                position.x = math::negate(half_width);
+            }
+            if math::less_than(position.y, math::negate(half_height)) {
+                position.y = half_height;
+            }
+            if math::greater_than(position.y, half_height) {
+                position.y = math::negate(half_height);
+            }
+        }
+    }
+}

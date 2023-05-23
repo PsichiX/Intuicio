@@ -1,0 +1,9 @@
+mod lifetime {
+    struct Lifetime { time }
+
+    func new(time) {
+        return lifetime::Lifetime {
+            time: reflect::pass_or(time, 0.0),
+        };
+    }
+}

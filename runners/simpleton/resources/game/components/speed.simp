@@ -1,0 +1,10 @@
+mod speed {
+    struct Speed { linear, angular }
+
+    func new(linear, angular) {
+        return speed::Speed {
+            linear: reflect::pass_or(linear, 0.0),
+            angular: reflect::pass_or(angular, 0.0),
+        };
+    }
+}

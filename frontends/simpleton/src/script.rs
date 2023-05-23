@@ -127,7 +127,9 @@ impl ScriptExpression for SimpletonScriptExpression {
                                 module_name: Some(module_name.into()),
                                 ..Default::default()
                             })
-                            .unwrap(),
+                            .unwrap_or_else(|| {
+                                panic!("Could not find struct: {}::{}", module_name, name)
+                            }),
                     ),
                     registry,
                 ));
@@ -141,7 +143,9 @@ impl ScriptExpression for SimpletonScriptExpression {
                                 module_name: Some(module_name.into()),
                                 ..Default::default()
                             })
-                            .unwrap(),
+                            .unwrap_or_else(|| {
+                                panic!("Could not find function: {}::{}", module_name, name)
+                            }),
                     ),
                     registry,
                 ));
@@ -153,22 +157,40 @@ impl ScriptExpression for SimpletonScriptExpression {
                 context.stack().drop();
             }
             Self::StackDuplicate => {
-                let object = context.stack().pop::<Reference>().unwrap();
+                let object = context
+                    .stack()
+                    .pop::<Reference>()
+                    .expect("Could not pop object from stack to duplicate!");
                 context.stack().push(object.clone());
                 context.stack().push(object);
             }
             Self::StackSwap => {
-                let a = context.stack().pop::<Reference>().unwrap();
-                let b = context.stack().pop::<Reference>().unwrap();
+                let a = context
+                    .stack()
+                    .pop::<Reference>()
+                    .expect("Could not pop first object from stack to swap!");
+                let b = context
+                    .stack()
+                    .pop::<Reference>()
+                    .expect("Could not pop second object from stack to swap!");
                 context.stack().push(a);
                 context.stack().push(b);
             }
             Self::StackUnwrapBoolean => {
-                let value = context.stack().pop::<Reference>().unwrap();
-                context.stack().push(*value.read::<Boolean>().unwrap());
+                let value = context
+                    .stack()
+                    .pop::<Reference>()
+                    .expect("Could not pop value from stack to unwrap as boolean!");
+                context.stack().push(
+                    *value
+                        .read::<Boolean>()
+                        .expect("Value got from stack is not a boleean!"),
+                );
             }
             Self::StackValueOr(value) => {
-                let object = context.stack().pop::<Reference>().unwrap();
+                let object = context.stack().pop::<Reference>().unwrap_or_else(|| {
+                    panic!("Could not pop object from stack to tell if scope should continue!")
+                });
                 if object.is_null() {
                     context.stack().push(*value);
                 } else {
@@ -177,10 +199,20 @@ impl ScriptExpression for SimpletonScriptExpression {
                 }
             }
             Self::GetField { name } => {
-                let object = context.stack().pop::<Reference>().unwrap();
+                let object = context.stack().pop::<Reference>().unwrap_or_else(|| {
+                    panic!(
+                        "Could not pop parent object of `{}` field from stack!",
+                        name
+                    )
+                });
+                if object.is_null() {
+                    panic!("Trying to read `{}` field of null reference!", name);
+                }
                 let value = object
                     .read_object()
-                    .expect("Could not read object got from stack!")
+                    .unwrap_or_else(|| {
+                        panic!("Could not read object of `{}` field got from stack!", name)
+                    })
                     .read_field::<Reference>(name)
                     .unwrap_or_else(|| {
                         panic!("Could not read `{}` field of object got from stack!", name)
@@ -189,11 +221,21 @@ impl ScriptExpression for SimpletonScriptExpression {
                 context.stack().push(value);
             }
             Self::SetField { name } => {
-                let mut object = context.stack().pop::<Reference>().unwrap();
+                let mut object = context.stack().pop::<Reference>().unwrap_or_else(|| {
+                    panic!(
+                        "Could not pop parent object of `{}` field from stack!",
+                        name
+                    )
+                });
+                if object.is_null() {
+                    panic!("Trying to write `{}` field of null reference!", name);
+                }
                 let value = context.stack().pop::<Reference>().unwrap();
                 *object
                     .write_object()
-                    .expect("Could not write object got from stack!")
+                    .unwrap_or_else(|| {
+                        panic!("Could not write object of `{}` field got from stack!", name)
+                    })
                     .write_field::<Reference>(name)
                     .unwrap_or_else(|| {
                         panic!("Could not write `{}` field of object got from stack!", name)

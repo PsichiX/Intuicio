@@ -1,0 +1,139 @@
+mod drawing {
+    struct Drawing {
+        screen_width,
+        screen_height,
+        layout,
+        shader,
+        mesh,
+        images,
+    }
+
+    struct Image {
+        width,
+        height,
+        texture,
+    }
+
+    func new(renderer) {
+        var layout = ["position", 2, "uv", 2];
+        var shader = drawing::_create_shader(renderer, layout);
+        var mesh = drawing::_create_quad_mesh(renderer, layout);
+        return drawing::Drawing {
+            layout,
+            shader,
+            mesh,
+            images: {
+                INVALID: drawing::_create_pixel_image(renderer, 255, 0, 255, 255),
+                WHITE: drawing::_create_pixel_image(renderer, 255, 255, 255, 255),
+                BLACK: drawing::_create_pixel_image(renderer, 0, 0, 0, 255),
+                TRANSPARENT: drawing::_create_pixel_image(renderer, 0, 0, 0, 0),
+            },
+        };
+    }
+
+    func get_image(drawing, renderer, path) {
+        if math::negate(map::contains_key(drawing.images, path)) {
+            drawing.images{path} = drawing::_create_image(renderer, path);
+        }
+        return drawing.images{path};
+    }
+
+    func _create_shader(renderer, layout) {
+        var vertex_content = "
+            in vec2 position;
+            in vec2 uv;
+            out vec2 _uv;
+            uniform mat4 projection;
+            uniform mat4 view;
+            uniform mat4 model;
+            void main() {
+                _uv = uv;
+                mat4 matrix = projection * view * model;
+                gl_Position = matrix * vec4(position, 0.0, 1.0);
+            }
+        ";
+        var fragment_content = "
+            precision mediump float;
+            in vec2 _uv;
+            out vec4 color;
+            uniform sampler2D image;
+            void main() {
+                color = texture(image, _uv);
+            }
+        ";
+        return renderer::create_shader(
+            renderer,
+            vertex_content,
+            fragment_content,
+            ["projection", "view", "model", "image"],
+            layout,
+        );
+    }
+
+    func _create_quad_mesh(renderer, layout) {
+        var vertex_bytes = bytes::new();
+        bytes::set_native_endian(vertex_bytes, true);
+        bytes::write_f32(vertex_bytes, -0.5);
+        bytes::write_f32(vertex_bytes, -0.5);
+        bytes::write_f32(vertex_bytes, 0.0);
+        bytes::write_f32(vertex_bytes, 0.0);
+        bytes::write_f32(vertex_bytes, 0.5);
+        bytes::write_f32(vertex_bytes, -0.5);
+        bytes::write_f32(vertex_bytes, 1.0);
+        bytes::write_f32(vertex_bytes, 0.0);
+        bytes::write_f32(vertex_bytes, 0.5);
+        bytes::write_f32(vertex_bytes, 0.5);
+        bytes::write_f32(vertex_bytes, 1.0);
+        bytes::write_f32(vertex_bytes, 1.0);
+        bytes::write_f32(vertex_bytes, -0.5);
+        bytes::write_f32(vertex_bytes, 0.5);
+        bytes::write_f32(vertex_bytes, 0.0);
+        bytes::write_f32(vertex_bytes, 1.0);
+        var index_bytes = bytes::new();
+        bytes::set_native_endian(index_bytes, true);
+        bytes::write_u32(index_bytes, 0);
+        bytes::write_u32(index_bytes, 1);
+        bytes::write_u32(index_bytes, 2);
+        bytes::write_u32(index_bytes, 2);
+        bytes::write_u32(index_bytes, 3);
+        bytes::write_u32(index_bytes, 0);
+        return renderer::create_mesh(renderer, vertex_bytes, index_bytes, layout);
+    }
+
+    func _create_pixel_image(renderer, r, g, b, a) {
+        var bytes = bytes::new();
+        bytes::set_native_endian(bytes, true);
+        bytes::write_u8(bytes, r);
+        bytes::write_u8(bytes, g);
+        bytes::write_u8(bytes, b);
+        bytes::write_u8(bytes, a);
+        var texture = renderer::create_texture(
+            renderer,
+            bytes,
+            1,
+            1,
+            true,
+        );
+        return drawing::Image {
+            width: 1,
+            height: 1,
+            texture,
+        };
+    }
+
+    func _create_image(renderer, path) {
+        var image = image::decode(fs::read_file(path));
+        var texture = renderer::create_texture(
+            renderer,
+            image.bytes,
+            image.width,
+            image.height,
+            true,
+        );
+        return drawing::Image {
+            width: image.width,
+            height: image.height,
+            texture,
+        };
+    }
+}

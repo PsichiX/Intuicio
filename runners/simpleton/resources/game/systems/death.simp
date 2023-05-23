@@ -1,0 +1,15 @@
+mod death {
+    func system(world) {
+        var time = world::resource(world, <struct time::Time>);
+
+        for query in world::query(world, [<struct lifetime::Lifetime>]) {
+            var entity = query[0];
+            var lifetime = query[1];
+
+            lifetime.time = math::sub(lifetime.time, time.delta_time);
+            if math::less_than(lifetime.time, 0.0) {
+                world::despawn(world, entity);
+            }
+        }
+    }
+}

@@ -1,0 +1,9 @@
+mod sprite {
+    struct Sprite { path }
+
+    func new(path) {
+        return sprite::Sprite {
+            path: reflect::pass_or(path, "INVALID"),
+        };
+    }
+}

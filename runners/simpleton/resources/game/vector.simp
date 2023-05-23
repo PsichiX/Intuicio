@@ -1,0 +1,104 @@
+mod vector {
+    struct Vector { x, y }
+
+    func new(x, y) {
+        return vector::Vector {
+            x: reflect::pass_or(x, 0.0),
+            y: reflect::pass_or(y, 0.0),
+        };
+    }
+
+    func add(a, b) {
+        return vector::Vector {
+            x: math::add(a.x, b.x),
+            y: math::add(a.y, b.y),
+        };
+    }
+
+    func add_scalar(v, s) {
+        return vector::Vector {
+            x: math::add(v.x, s),
+            y: math::add(v.y, s),
+        };
+    }
+
+    func sub(a, b) {
+        return vector::Vector {
+            x: math::sub(a.x, b.x),
+            y: math::sub(a.y, b.y),
+        };
+    }
+
+    func sub_scalar(v, s) {
+        return vector::Vector {
+            x: math::sub(v.x, s),
+            y: math::sub(v.y, s),
+        };
+    }
+
+    func mul(a, b) {
+        return vector::Vector {
+            x: math::mul(a.x, b.x),
+            y: math::mul(a.y, b.y),
+        };
+    }
+
+    func mul_scalar(v, s) {
+        return vector::Vector {
+            x: math::mul(v.x, s),
+            y: math::mul(v.y, s),
+        };
+    }
+
+    func div(a, b) {
+        return vector::Vector {
+            x: math::div(a.x, b.x),
+            y: math::div(a.y, b.y),
+        };
+    }
+
+    func div_scalar(v, s) {
+        return vector::Vector {
+            x: math::div(v.x, s),
+            y: math::div(v.y, s),
+        };
+    }
+
+    func length_squared(v) {
+        return math::add(
+            math::mul(v.x, v.x),
+            math::mul(v.y, v.y),
+        );
+    }
+
+    func length(v) {
+        return math::sqrt(vector::length_squared(v));
+    }
+
+    func normalize(v) {
+        var length = vector::length(v);
+        return vector::Vector {
+            x: math::div(v.x, length),
+            y: math::div(v.y, length),
+        };
+    }
+
+    func dot(a, b) {
+        return math::add(
+            math::mul(a.x, b.x),
+            math::mul(a.y, b.y),
+        );
+    }
+
+    func from_angle(angle) {
+        angle = math::radians(angle);
+        return vector::Vector {
+            x: math::cos(angle),
+            y: math::sin(angle),
+        };
+    }
+
+    func to_angle(v) {
+        return math::degrees(math::atan2(v.y, v.x));
+    }
+}

@@ -212,6 +212,15 @@ pub fn select(mut value: Reference, path: Reference) -> Reference {
     value
 }
 
+#[intuicio_function(module_name = "reflect")]
+pub fn pass_or(value: Reference, default: Reference) -> Reference {
+    if value.is_null() {
+        default
+    } else {
+        value
+    }
+}
+
 #[intuicio_function(module_name = "reflect", use_registry)]
 pub fn is_null(registry: &Registry, value: Reference) -> Reference {
     Reference::new_boolean(value.is_null(), registry)
@@ -469,6 +478,7 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(function_name::define_function(registry));
     registry.add_function(function_arguments::define_function(registry));
     registry.add_function(select::define_function(registry));
+    registry.add_function(pass_or::define_function(registry));
     registry.add_function(is_null::define_function(registry));
     registry.add_function(is_valid::define_function(registry));
     registry.add_function(is_being_written::define_function(registry));

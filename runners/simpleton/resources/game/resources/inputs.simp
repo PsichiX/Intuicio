@@ -1,0 +1,19 @@
+mod inputs {
+    struct Inputs {
+        button,
+        axis,
+    }
+
+    func new() {
+        return inputs::Inputs {
+            button: {
+                W: false,
+                S: false,
+                A: false,
+                D: false,
+                Space: false,
+            },
+            axis: {},
+        };
+    }
+}

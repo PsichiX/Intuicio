@@ -1,0 +1,9 @@
+mod time {
+    struct Time { delta_time }
+
+    func new() {
+        return time::Time {
+            delta_time: 0.0,
+        };
+    }
+}

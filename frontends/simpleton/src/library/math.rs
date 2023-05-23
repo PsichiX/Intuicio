@@ -5,6 +5,28 @@ use rand::Rng;
 use std::ops::Rem;
 
 #[intuicio_function(module_name = "math", use_registry)]
+pub fn min(registry: &Registry, a: Reference, b: Reference) -> Reference {
+    if let (Some(a), Some(b)) = (a.read::<Integer>(), b.read::<Integer>()) {
+        return Reference::new_integer(a.min(*b), registry);
+    }
+    if let (Some(a), Some(b)) = (a.read::<Real>(), b.read::<Real>()) {
+        return Reference::new_real(a.min(*b), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn max(registry: &Registry, a: Reference, b: Reference) -> Reference {
+    if let (Some(a), Some(b)) = (a.read::<Integer>(), b.read::<Integer>()) {
+        return Reference::new_integer(a.max(*b), registry);
+    }
+    if let (Some(a), Some(b)) = (a.read::<Real>(), b.read::<Real>()) {
+        return Reference::new_real(a.max(*b), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
 pub fn add(registry: &Registry, a: Reference, b: Reference) -> Reference {
     if let (Some(a), Some(b)) = (a.read::<Integer>(), b.read::<Integer>()) {
         return Reference::new_integer(*a + *b, registry);
@@ -169,6 +191,22 @@ pub fn atan(registry: &Registry, value: Reference) -> Reference {
 pub fn atan2(registry: &Registry, a: Reference, b: Reference) -> Reference {
     if let (Some(a), Some(b)) = (a.read::<Real>(), b.read::<Real>()) {
         return Reference::new_real(a.atan2(*b), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn degrees(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.to_degrees(), registry);
+    }
+    Reference::null()
+}
+
+#[intuicio_function(module_name = "math", use_registry)]
+pub fn radians(registry: &Registry, value: Reference) -> Reference {
+    if let Some(value) = value.read::<Real>() {
+        return Reference::new_real(value.to_radians(), registry);
     }
     Reference::null()
 }
@@ -385,6 +423,8 @@ pub fn install(registry: &mut Registry) {
     registry.add_struct(define_native_struct! {
         registry => mod math struct Real (Real) {}
     });
+    registry.add_function(min::define_function(registry));
+    registry.add_function(max::define_function(registry));
     registry.add_function(add::define_function(registry));
     registry.add_function(sub::define_function(registry));
     registry.add_function(mul::define_function(registry));
@@ -402,6 +442,8 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(acos::define_function(registry));
     registry.add_function(atan::define_function(registry));
     registry.add_function(atan2::define_function(registry));
+    registry.add_function(degrees::define_function(registry));
+    registry.add_function(radians::define_function(registry));
     registry.add_function(sqrt::define_function(registry));
     registry.add_function(floor::define_function(registry));
     registry.add_function(ceil::define_function(registry));

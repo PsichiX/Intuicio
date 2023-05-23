@@ -1,0 +1,31 @@
+mod spawn_asteroids {
+    func system(world) {
+        var time = world::resource(world, <struct time::Time>);
+        var spawner = world::resource(world, <struct spawner::Spawner>);
+        var drawing = world::resource(world, <struct drawing::Drawing>);
+
+        spawner.asteroids_timer = math::sub(spawner.asteroids_timer, time.delta_time);
+        if math::less_than(spawner.asteroids_timer, 0.0) {
+            spawner.asteroids_timer = spawner.asteroids_interval;
+
+            var distance = math::max(
+                reflect::to_real(drawing.screen_width),
+                reflect::to_real(drawing.screen_height),
+            );
+            var direction = vector::from_angle(math::random_real(0.0, 360.0));
+            var position = vector::mul_scalar(direction, distance);
+            var scale = math::random_real(0.2, 1.0);
+            var speed = math::random_real(50.0, 150.0);
+            var entity = world::spawn(world);
+            world::add_bundle(world, entity, [
+                sprite::new("images/asteroid.png"),
+                position::new(position.x, position.y),
+                rotation::new(math::random_real(0.0, 360.0)),
+                scale::new(scale, scale),
+                speed::new(speed, 0.0),
+                lifetime::new(30.0),
+                tags::Asteroid {},
+            ]);
+        }
+    }
+}

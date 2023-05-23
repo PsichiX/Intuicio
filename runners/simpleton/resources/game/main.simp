@@ -1,0 +1,98 @@
+#!simpleton --stack-capacity 10240 --registers-capacity 10240
+
+mod main {
+    import "simpleton_window.plugin";
+    import "simpleton_renderer.plugin";
+    import "simpleton_ecs.plugin";
+    import "vector";
+    import "resources/main";
+    import "components/main";
+    import "systems/main";
+
+    func main(args) {
+        fs::set_current_dir(simpleton::get_entry_dir());
+
+        var window = window::new(window::WindowConfig {
+            title: "Game",
+            vsync: true,
+            fps: 30,
+        });
+        var renderer = renderer::new(window::gl(window), null);
+        var drawing = drawing::new(renderer);
+
+        var world = world::new();
+        world::add_resource(world, time::new());
+        world::add_resource(world, inputs::new());
+        world::add_resource(world, spawner::new(3.0));
+        world::add_resource(world, renderer);
+        world::add_resource(world, render_buffer::RenderBuffer {});
+        world::add_resource(world, drawing);
+
+        main::start_pipeline(world);
+        world::maintain(world);
+
+        event::bind(window::redraw_event(window), @[world](interface, delta_time) {
+            main::on_redraw(interface, delta_time, world);
+        });
+        event::bind(window::input_event(window), @[world](interface, input) {
+            main::on_input(interface, input, world);
+        });
+        window::run(window);
+    }
+
+    func start_pipeline(world) {
+        var entity = world::spawn(world);
+        world::add_bundle(world, entity, [
+            sprite::new("images/space-ship.png"),
+            position::new(0.0, 0.0),
+            rotation::new(-90.0),
+            scale::new(1.0, 1.0),
+            speed::new(200.0, 90.0),
+            gun::new(0.3),
+            tags::Player {},
+        ]);
+    }
+
+    func run_pipeline(world) {
+        spawn_asteroids::system(world);
+        player_movement::system(world);
+        constant_movement::system(world, <struct tags::Bullet>);
+        constant_movement::system(world, <struct tags::Asteroid>);
+        death::system(world);
+        keep_on_screen::system(world);
+        render_sprites::system(world);
+    }
+
+    func on_redraw(interface, delta_time, world) {
+        var time = world::resource(world, <struct time::Time>);
+        var drawing = world::resource(world, <struct drawing::Drawing>);
+        var renderer = world::resource(world, <struct renderer::Renderer>);
+        var buffer = world::resource(world, <struct render_buffer::RenderBuffer>);
+        
+        time.delta_time = delta_time;
+        drawing.screen_width = window_interface::width(interface);
+        drawing.screen_height = window_interface::height(interface);
+        render_buffer::clear(buffer);
+        main::run_pipeline(world);
+        world::maintain(world);
+        renderer::render(
+            renderer,
+            buffer,
+            drawing.screen_width,
+            drawing.screen_height,
+            null,
+            transform::Transform {},
+        );
+    }
+
+    func on_input(interface, input, world) {
+        var inputs = world::resource(world, <struct inputs::Inputs>);
+
+        if reflect::are_same(reflect::type_of(input), <struct window::KeyboardInput>) {
+            if text::equals(input.keycode, "Escape") {
+                window_interface::exit(interface);
+            }
+            inputs.button{input.keycode} = input.state;
+        }
+    }
+}

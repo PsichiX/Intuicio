@@ -1,0 +1,6 @@
+mod resources {
+    import "drawing";
+    import "inputs";
+    import "time";
+    import "spawner";
+}

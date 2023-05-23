@@ -1,0 +1,10 @@
+mod components {
+    import "sprite";
+    import "position";
+    import "rotation";
+    import "scale";
+    import "speed";
+    import "lifetime";
+    import "gun";
+    import "tags";
+}

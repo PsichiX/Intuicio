@@ -73,6 +73,22 @@ impl World {
     }
 
     #[intuicio_method()]
+    pub fn add_bundle(mut world: Reference, entity: Reference, components: Reference) -> Reference {
+        let mut world = world.write::<World>().expect("`world` is not a World!");
+        let entity = entity
+            .read::<Integer>()
+            .expect("`entity` is not an Integer!");
+        let target = world.to_add.entry(*entity).or_default();
+        target.extend(
+            components
+                .read::<Array>()
+                .expect("`components` is not an Array!")
+                .to_owned(),
+        );
+        components
+    }
+
+    #[intuicio_method()]
     pub fn remove(mut world: Reference, entity: Reference, component_type: Reference) -> Reference {
         let mut world = world.write::<World>().expect("`world` is not a World!");
         let entity = entity
@@ -506,6 +522,7 @@ pub extern "C" fn install(registry: &mut Registry) {
     registry.add_function(World::spawn__define_function(registry));
     registry.add_function(World::despawn__define_function(registry));
     registry.add_function(World::add__define_function(registry));
+    registry.add_function(World::add_bundle__define_function(registry));
     registry.add_function(World::remove__define_function(registry));
     registry.add_function(World::clear__define_function(registry));
     registry.add_function(World::entities__define_function(registry));

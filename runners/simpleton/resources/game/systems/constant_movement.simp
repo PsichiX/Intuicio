@@ -1,0 +1,22 @@
+mod constant_movement {
+    func system(world, tag) {
+        var time = world::resource(world, <struct time::Time>);
+        
+        for query in world::query(world, [
+            <struct position::Position>,
+            <struct rotation::Rotation>,
+            <struct speed::Speed>,
+            tag,
+        ]) {
+            var position = query[1];
+            var rotation = query[2];
+            var speed = query[3];
+
+            var direction = vector::from_angle(rotation.angle);
+            var linear_velocity = math::mul(speed.linear, time.delta_time);
+            var offset = vector::mul_scalar(direction, linear_velocity);
+            position.x = math::add(position.x, offset.x);
+            position.y = math::add(position.y, offset.y);
+        }
+    }
+}

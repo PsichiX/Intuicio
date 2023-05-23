@@ -1,0 +1,10 @@
+mod position {
+    struct Position { x, y }
+
+    func new(x, y) {
+        return position::Position {
+            x: reflect::pass_or(x, 0.0),
+            y: reflect::pass_or(y, 0.0),
+        };
+    }
+}

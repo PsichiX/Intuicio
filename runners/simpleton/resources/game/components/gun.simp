@@ -1,0 +1,22 @@
+mod gun {
+    struct Gun { interval, cooldown }
+
+    func new(interval) {
+        return gun::Gun {
+            interval,
+            cooldown: 0.0,
+        };
+    }
+
+    func process(gun, delta_time) {
+        gun.cooldown = math::sub(gun.cooldown, delta_time);
+    }
+
+    func can_fire(gun) {
+        return math::less_than(gun.cooldown, 0.0);
+    }
+
+    func fire(gun) {
+        gun.cooldown = gun.interval;
+    }
+}

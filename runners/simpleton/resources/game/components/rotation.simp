@@ -1,0 +1,9 @@
+mod rotation {
+    struct Rotation { angle }
+
+    func new(angle) {
+        return rotation::Rotation {
+            angle: reflect::pass_or(angle, 0.0),
+        };
+    }
+}
