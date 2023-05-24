@@ -1,0 +1,13 @@
+mod game_cycle {
+    func system(world) {
+        var game_states = world::resource(world, <struct game_states::GameStates>);
+
+        if reflect::is_null(
+            iter::next(
+                world::query(world, [<struct tags::Player>]),
+            ),
+        ) {
+            game_states::change(game_states, "MainMenu");
+        }
+    }
+}

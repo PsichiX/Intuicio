@@ -59,6 +59,13 @@ impl World {
     }
 
     #[intuicio_method()]
+    pub fn despawn_all(mut world: Reference) -> Reference {
+        let mut world = world.write::<World>().expect("`world` is not a World!");
+        world.to_clear = true;
+        Reference::null()
+    }
+
+    #[intuicio_method()]
     pub fn add(mut world: Reference, entity: Reference, component: Reference) -> Reference {
         let mut world = world.write::<World>().expect("`world` is not a World!");
         let entity = entity
@@ -102,6 +109,30 @@ impl World {
             .entry(*entity)
             .or_default()
             .push(component_type.to_owned());
+        Reference::null()
+    }
+
+    #[intuicio_method()]
+    pub fn remove_bundle(
+        mut world: Reference,
+        entity: Reference,
+        component_types: Reference,
+    ) -> Reference {
+        let mut world = world.write::<World>().expect("`world` is not a World!");
+        let entity = entity
+            .read::<Integer>()
+            .expect("`entity` is not an Integer!");
+        world.to_remove.entry(*entity).or_default().extend(
+            component_types
+                .read::<Array>()
+                .expect("`component_types` is not an Array!")
+                .iter()
+                .map(|item| {
+                    item.read::<Type>()
+                        .expect("`component_types` item is not a Type!")
+                        .to_owned()
+                }),
+        );
         Reference::null()
     }
 
@@ -159,6 +190,33 @@ impl World {
     }
 
     #[intuicio_method(use_registry)]
+    pub fn has(
+        registry: &Registry,
+        world: Reference,
+        entity: Reference,
+        component_type: Reference,
+    ) -> Reference {
+        let world = world.read::<World>().expect("`world` is not a World!");
+        let entity = entity
+            .read::<Integer>()
+            .expect("`entity` is not an Integer!");
+        let component_type = component_type
+            .read::<Type>()
+            .expect("`component_type` is not a Type!");
+        for bucket in world.buckets.values() {
+            if bucket.types.iter().any(|ty| component_type.is_same_as(ty))
+                && bucket
+                    .entitity_components
+                    .iter()
+                    .any(|(e, _)| *entity == *e)
+            {
+                return Reference::new_boolean(true, registry);
+            }
+        }
+        Reference::new_boolean(false, registry)
+    }
+
+    #[intuicio_method(use_registry)]
     pub fn query(registry: &Registry, world: Reference, component_types: Reference) -> Reference {
         let world_ref = world.clone();
         let world = world.read::<World>().expect("`world` is not a World!");
@@ -201,6 +259,7 @@ impl World {
         let mut world = world.write::<World>().expect("`world` is not a World!");
         if world.to_clear {
             world.buckets.clear();
+            world.to_clear = false;
         } else {
             for entity in std::mem::take(&mut world.to_despawn) {
                 world.take(entity);
@@ -521,12 +580,15 @@ pub extern "C" fn install(registry: &mut Registry) {
     registry.add_function(World::new__define_function(registry));
     registry.add_function(World::spawn__define_function(registry));
     registry.add_function(World::despawn__define_function(registry));
+    registry.add_function(World::despawn_all__define_function(registry));
     registry.add_function(World::add__define_function(registry));
     registry.add_function(World::add_bundle__define_function(registry));
     registry.add_function(World::remove__define_function(registry));
+    registry.add_function(World::remove_bundle__define_function(registry));
     registry.add_function(World::clear__define_function(registry));
     registry.add_function(World::entities__define_function(registry));
     registry.add_function(World::get__define_function(registry));
+    registry.add_function(World::has__define_function(registry));
     registry.add_function(World::query__define_function(registry));
     registry.add_function(World::maintain__define_function(registry));
     registry.add_function(World::add_resource__define_function(registry));

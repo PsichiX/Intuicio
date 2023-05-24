@@ -5,6 +5,7 @@ mod components {
     import "scale";
     import "speed";
     import "lifetime";
+    import "spatial";
     import "gun";
     import "tags";
 }

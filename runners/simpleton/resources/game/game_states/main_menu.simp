@@ -1,0 +1,79 @@
+mod main_menu {
+    func on_enter(world, interface) {
+        var entity = world::spawn(world);
+        world::add_bundle(world, entity, [
+            sprite::new("images/space-ship.png"),
+            position::new(0.0, 100.0),
+            rotation::new(-90.0),
+            scale::new(1.0, 1.0),
+            speed::new(200.0, 90.0),
+            spatial::new(50.0),
+            tags::Player {},
+        ]);
+
+        var entity = world::spawn(world);
+        world::add_bundle(world, entity, [
+            sprite::new("images/bullet.png"),
+            position::new(-150.0, -100.0),
+            rotation::new(-90.0),
+            scale::new(1.0, 1.0),
+            spatial::new(20.0),
+            tags::Bullet {},
+        ]);
+
+        var entity = world::spawn(world);
+        world::add_bundle(world, entity, [
+            sprite::new("images/asteroid.png"),
+            position::new(150.0, -100.0),
+            rotation::new(-90.0),
+            scale::new(1.0, 1.0),
+            spatial::new(120.0),
+            tags::Asteroid {},
+        ]);
+    }
+
+    func on_exit(world, interface) {
+        world::despawn_all(world);
+    }
+
+    func on_tick(world, interface) {
+        spatial::system(world);
+        player_movement::system(world);
+        keep_on_screen::system(world);
+        render_sprites::system(world);
+
+        var rtree = world::resource(world, <struct rtree::Rtree>);
+        var game_states = world::resource(world, <struct game_states::GameStates>);
+
+        for query in world::query(world, [
+            <struct position::Position>,
+            <struct spatial::Spatial>,
+            <struct tags::Player>,
+        ]) {
+            var entity = query[0];
+            var position = query[1];
+            var spatial = query[2];
+
+            rtree::visit(
+                rtree,
+                position.x,
+                position.y,
+                0.0,
+                spatial.radius,
+                @[world, interface, game_states, entity, spatial](result) {
+                    if math::negate(math::equals(result.handle, spatial.handle)) {
+                        if world::has(world, result.user, <struct tags::Asteroid>) {
+                            window_interface::exit(interface);
+                            return false;
+                        }
+                        if world::has(world, result.user, <struct tags::Bullet>) {
+                            game_states::change(game_states, "GameSession");
+                            return false;
+                        }
+                    }
+                    return true;
+                },
+            );
+        }
+    }
+}

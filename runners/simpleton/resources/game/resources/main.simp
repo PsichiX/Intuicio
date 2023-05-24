@@ -3,4 +3,5 @@ mod resources {
     import "inputs";
     import "time";
     import "spawner";
+    import "game_states";
 }

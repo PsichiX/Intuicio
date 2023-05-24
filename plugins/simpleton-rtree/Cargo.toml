@@ -1,5 +1,5 @@
 [package]
-name = "plugin"
+name = "simpleton-rtree"
 version = "0.13.1"
 edition = "2021"
 publish = false
@@ -12,3 +12,4 @@ intuicio-data = { version = "0.13", path = "../../platform/data" }
 intuicio-core = { version = "0.13", path = "../../platform/core" }
 intuicio-derive = { version = "0.13", path = "../../platform/derive" }
 intuicio-frontend-simpleton = { version = "0.13", path = "../../frontends/simpleton" }
+rstar = "0.10"

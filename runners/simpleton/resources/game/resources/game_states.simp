@@ -1,0 +1,80 @@
+mod game_states {
+    struct GameState {
+        on_enter,
+        on_exit,
+        on_tick,
+    }
+
+    struct GameStates {
+        active,
+        to_change,
+        states,
+    }
+
+    func new() {
+        return game_states::GameStates {
+            states: {},
+        };
+    }
+
+    func is_done(game_states) {
+        return reflect::is_null(game_states.active);
+    }
+
+    func add(game_states, name, on_enter, on_exit, on_tick) {
+        game_states.states{name} = game_states::GameState {
+            on_enter,
+            on_exit,
+            on_tick,
+        };
+    }
+
+    func remove(game_states, name) {
+        map::remove(game_states.states, name);
+    }
+
+    func change(game_states, name) {
+        game_states.to_change = name;
+    }
+
+    func exit(game_states) {
+        game_states.active = null;
+        game_states.to_change = null;
+    }
+
+    func tick(game_states, world, interface) {
+        if reflect::is_valid(game_states.to_change) {
+            if reflect::is_valid(game_states.active) {
+                var state = map::get(game_states.states, game_states.active);
+                if reflect::is_valid(state) {
+                    if reflect::is_valid(state.on_exit) {
+                        reflect::call(state.on_exit, [world, interface]);
+                        world::maintain(world);
+                    }
+                    game_states.active = null;
+                }
+            }
+            
+            var state = map::get(game_states.states, game_states.to_change);
+            if reflect::is_valid(state) {
+                if reflect::is_valid(state.on_enter) {
+                    reflect::call(state.on_enter, [world, interface]);
+                    world::maintain(world);
+                }
+                game_states.active = game_states.to_change;
+            }
+
+            game_states.to_change = null;
+        }
+
+        if reflect::is_valid(game_states.active) {
+            var state = map::get(game_states.states, game_states.active);
+            if reflect::is_valid(state) {
+                if reflect::is_valid(state.on_tick) {
+                    reflect::call(state.on_tick, [world, interface]);
+                    world::maintain(world);
+                }
+            }
+        }
+    }
+}

@@ -4,7 +4,9 @@ mod main {
     import "simpleton_window.plugin";
     import "simpleton_renderer.plugin";
     import "simpleton_ecs.plugin";
-    import "vector";
+    import "simpleton_rtree.plugin";
+    import "utils/main";
+    import "game_states/main";
     import "resources/main";
     import "components/main";
     import "systems/main";
@@ -18,18 +20,33 @@ mod main {
             fps: 30,
         });
         var renderer = renderer::new(window::gl(window), null);
-        var drawing = drawing::new(renderer);
+        
+        var game_states = game_states::new();
+        game_states::add(
+            game_states,
+            "MainMenu",
+            <func main_menu::on_enter>,
+            <func main_menu::on_exit>,
+            <func main_menu::on_tick>,
+        );
+        game_states::add(
+            game_states,
+            "GameSession",
+            <func game_session::on_enter>,
+            <func game_session::on_exit>,
+            <func game_session::on_tick>,
+        );
+        game_states::change(game_states, "MainMenu");
 
         var world = world::new();
         world::add_resource(world, time::new());
         world::add_resource(world, inputs::new());
-        world::add_resource(world, spawner::new(3.0));
-        world::add_resource(world, renderer);
+        world::add_resource(world, spawner::new(1.0));
+        world::add_resource(world, drawing::new(renderer));
         world::add_resource(world, render_buffer::RenderBuffer {});
-        world::add_resource(world, drawing);
-
-        main::start_pipeline(world);
-        world::maintain(world);
+        world::add_resource(world, rtree::Rtree {});
+        world::add_resource(world, renderer);
+        world::add_resource(world, game_states);
 
         event::bind(window::redraw_event(window), @[world](interface, delta_time) {
             main::on_redraw(interface, delta_time, world);
@@ -40,41 +57,18 @@ mod main {
         window::run(window);
     }
 
-    func start_pipeline(world) {
-        var entity = world::spawn(world);
-        world::add_bundle(world, entity, [
-            sprite::new("images/space-ship.png"),
-            position::new(0.0, 0.0),
-            rotation::new(-90.0),
-            scale::new(1.0, 1.0),
-            speed::new(200.0, 90.0),
-            gun::new(0.3),
-            tags::Player {},
-        ]);
-    }
-
-    func run_pipeline(world) {
-        spawn_asteroids::system(world);
-        player_movement::system(world);
-        constant_movement::system(world, <struct tags::Bullet>);
-        constant_movement::system(world, <struct tags::Asteroid>);
-        death::system(world);
-        keep_on_screen::system(world);
-        render_sprites::system(world);
-    }
-
     func on_redraw(interface, delta_time, world) {
         var time = world::resource(world, <struct time::Time>);
         var drawing = world::resource(world, <struct drawing::Drawing>);
         var renderer = world::resource(world, <struct renderer::Renderer>);
         var buffer = world::resource(world, <struct render_buffer::RenderBuffer>);
+        var game_states = world::resource(world, <struct game_states::GameStates>);
         
         time.delta_time = delta_time;
         drawing.screen_width = window_interface::width(interface);
         drawing.screen_height = window_interface::height(interface);
         render_buffer::clear(buffer);
-        main::run_pipeline(world);
-        world::maintain(world);
+        game_states::tick(game_states, world, interface);
         renderer::render(
             renderer,
             buffer,
@@ -83,6 +77,9 @@ mod main {
             null,
             transform::Transform {},
         );
+        if game_states::is_done(game_states) {
+            window_interface::exit(interface);
+        }
     }
 
     func on_input(interface, input, world) {

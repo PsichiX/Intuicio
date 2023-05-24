@@ -1,0 +1,9 @@
+mod spatial {
+    struct Spatial { handle, radius }
+
+    func new(radius) {
+        return spatial::Spatial {
+            radius: reflect::pass_or(radius, 0.0),
+        };
+    }
+}

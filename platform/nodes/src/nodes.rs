@@ -1,5 +1,5 @@
 use intuicio_core::{registry::Registry, struct_type::StructQuery};
-use rstar::{PointDistance, RTree, RTreeObject, AABB};
+use rstar::{Envelope, Point, PointDistance, RTree, RTreeObject, AABB};
 use serde::{Deserialize, Serialize};
 use serde_intermediate::{
     de::intermediate::DeserializeMode, error::Result as IntermediateResult, Intermediate,
@@ -375,9 +375,11 @@ impl<T: NodeDefinition> RTreeObject for SpatialNode<T> {
 impl<T: NodeDefinition> PointDistance for SpatialNode<T> {
     fn distance_2(
         &self,
-        point: &<Self::Envelope as rstar::Envelope>::Point,
-    ) -> <<Self::Envelope as rstar::Envelope>::Point as rstar::Point>::Scalar {
-        point[0] * point[0] + point[1] * point[1]
+        point: &<Self::Envelope as Envelope>::Point,
+    ) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
+        let dx = self.x - point[0];
+        let dy = self.y - point[1];
+        dx * dx + dy * dy
     }
 }
 

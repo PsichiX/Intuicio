@@ -1,0 +1,24 @@
+mod spatial {
+    func system(world) {
+        var rtree = world::resource(world, <struct rtree::Rtree>);
+        rtree::clear(rtree);
+
+        for query in world::query(world, [
+            <struct spatial::Spatial>,
+            <struct position::Position>,
+        ]) {
+            var entity = query[0];
+            var spatial = query[1];
+            var position = query[2];
+
+            spatial.handle = rtree::add(
+                rtree,
+                position.x,
+                position.y,
+                0.0,
+                spatial.radius,
+                entity,
+            );
+        }
+    }
+}

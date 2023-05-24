@@ -1,0 +1,34 @@
+mod game_session {
+    func on_enter(world, interface) {
+        var entity = world::spawn(world);
+        world::add_bundle(world, entity, [
+            sprite::new("images/space-ship.png"),
+            position::new(0.0, 0.0),
+            rotation::new(-90.0),
+            scale::new(1.0, 1.0),
+            speed::new(200.0, 90.0),
+            gun::new(0.3),
+            spatial::new(50.0),
+            tags::Player {},
+        ]);
+    }
+
+    func on_exit(world, interface) {
+        world::despawn_all(world);
+    }
+
+    func on_tick(world, interface) {
+        spawn_asteroids::system(world);
+        death::system(world);
+        spatial::system(world);
+        collisions::system(world, <struct tags::Bullet>, <struct tags::Asteroid>);
+        collisions::system(world, <struct tags::Asteroid>, <struct tags::Player>);
+        player_movement::system(world);
+        player_fire::system(world);
+        constant_movement::system(world, <struct tags::Bullet>);
+        constant_movement::system(world, <struct tags::Asteroid>);
+        keep_on_screen::system(world);
+        render_sprites::system(world);
+        game_cycle::system(world);
+    }
+}

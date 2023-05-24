@@ -15,6 +15,7 @@ mod spawn_asteroids {
             var direction = vector::from_angle(math::random_real(0.0, 360.0));
             var position = vector::mul_scalar(direction, distance);
             var scale = math::random_real(0.2, 1.0);
+            var radius = math::mul(scale, 120.0);
             var speed = math::random_real(50.0, 150.0);
             var entity = world::spawn(world);
             world::add_bundle(world, entity, [
@@ -24,6 +25,7 @@ mod spawn_asteroids {
                 scale::new(scale, scale),
                 speed::new(speed, 0.0),
                 lifetime::new(30.0),
+                spatial::new(radius),
                 tags::Asteroid {},
             ]);
         }

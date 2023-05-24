@@ -1,0 +1,41 @@
+mod player_fire {
+    func system(world) {
+        var time = world::resource(world, <struct time::Time>);
+        var inputs = world::resource(world, <struct inputs::Inputs>);
+
+        for query in world::query(world, [
+            <struct position::Position>,
+            <struct rotation::Rotation>,
+            <struct gun::Gun>,
+            <struct tags::Player>,
+        ]) {
+            var position = query[1];
+            var rotation = query[2];
+            var gun = query[3];
+
+            if gun::can_fire(gun) {
+                if inputs.button{"Space"} {
+                    gun::fire(gun);
+                    var direction = vector::from_angle(rotation.angle);
+                    var offset = vector::mul_scalar(direction, 50.0);
+                    var entity = world::spawn(world);
+                    world::add_bundle(world, entity, [
+                        sprite::new("images/bullet.png"),
+                        position::Position {
+                            x: math::add(position.x, offset.x),
+                            y: math::add(position.y, offset.y),
+                        },
+                        rotation::new(rotation.angle),
+                        scale::new(1.0, 1.0),
+                        speed::new(400.0, 0.0),
+                        lifetime::new(1.5),
+                        spatial::new(20.0),
+                        tags::Bullet {},
+                    ]);
+                }
+            } else {
+                gun::process(gun, time.delta_time);
+            }
+        }
+    }
+}
