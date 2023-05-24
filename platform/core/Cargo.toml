@@ -13,5 +13,5 @@ readme = "../../README.md"
 [dependencies]
 intuicio-data = { version = "0.13", path = "../data" }
 serde = { version = "1", features = ["derive", "rc"] }
-memoffset = "0.8"
+memoffset = "0.9"
 typid = "1"
