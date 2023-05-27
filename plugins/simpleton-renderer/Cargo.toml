@@ -15,3 +15,5 @@ intuicio-frontend-simpleton = { version = "0.13", path = "../../frontends/simple
 glow = { version = "0.12", features = ["debug_automatic_glGetError"] }
 vek = "0.15"
 image = "0.24"
+etagere = "0.2"
+fontsdf = "0.5"

@@ -1,3 +1,4 @@
+use fontsdf::{Font, Metrics};
 use glow::{
     Buffer, Context as GlowContext, HasContext, Program, Texture, UniformLocation, VertexArray,
     ARRAY_BUFFER, BLEND, CLAMP_TO_EDGE, COLOR_BUFFER_BIT, ELEMENT_ARRAY_BUFFER, FLOAT,
@@ -5,12 +6,15 @@ use glow::{
     TEXTURE_2D, TEXTURE_MAG_FILTER, TEXTURE_MIN_FILTER, TEXTURE_WRAP_S, TEXTURE_WRAP_T, TRIANGLES,
     UNSIGNED_BYTE, UNSIGNED_INT, VERTEX_SHADER,
 };
-use image::io::Reader;
+use image::{io::Reader, GrayImage};
 use intuicio_core::{core_version, prelude::*};
 use intuicio_data::prelude::*;
 use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
 use intuicio_frontend_simpleton::prelude::{bytes::Bytes, *};
-use std::{collections::HashMap, io::Cursor};
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::Cursor,
+};
 use vek::{FrustumPlanes, Mat4, Quaternion, Transform as VekTransform, Vec3};
 
 pub type Gl = Option<ManagedRef<GlowContext>>;
@@ -27,6 +31,8 @@ pub struct Renderer {
     /// {handle: (vertex array, vertex buffer, index buffer)}
     #[intuicio(ignore)]
     meshes: HashMap<Integer, (VertexArray, Buffer, Buffer)>,
+    #[intuicio(ignore)]
+    fonts: HashMap<Integer, SpriteFont>,
     #[intuicio(ignore)]
     handle_generator: Integer,
     #[intuicio(ignore)]
@@ -645,6 +651,18 @@ impl Image {
             registry,
         )
     }
+}
+
+struct SpriteFont {
+    font: Font,
+    /// {character: page index}
+    glyphs: BTreeMap<char, usize>,
+    pages: Vec<SpriteFontPage>,
+}
+
+struct SpriteFontPage {
+    characters: BTreeMap<char, (Metrics, GrayImage)>,
+    texture: Texture,
 }
 
 struct Renderable {
