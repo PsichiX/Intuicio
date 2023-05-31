@@ -1,6 +1,6 @@
 [package]
 name = "plugin"
-version = "0.13.1"
+version = "0.14.0"
 edition = "2021"
 publish = false
 
@@ -8,7 +8,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-intuicio-data = { version = "0.13", path = "../../platform/data" }
-intuicio-core = { version = "0.13", path = "../../platform/core" }
-intuicio-derive = { version = "0.13", path = "../../platform/derive" }
-intuicio-frontend-simpleton = { version = "0.13", path = "../../frontends/simpleton" }
+intuicio-data = { version = "0.14", path = "../../platform/data" }
+intuicio-core = { version = "0.14", path = "../../platform/core" }
+intuicio-derive = { version = "0.14", path = "../../platform/derive" }
+intuicio-frontend-simpleton = { version = "0.14", path = "../../frontends/simpleton" }
