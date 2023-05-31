@@ -468,7 +468,7 @@ impl LifetimeRefMut {
     }
 }
 
-pub struct ValueReadAccess<'a, T> {
+pub struct ValueReadAccess<'a, T: 'a> {
     lifetime: LifetimeState,
     data: &'a T,
 }
@@ -494,7 +494,7 @@ impl<'a, T> Deref for ValueReadAccess<'a, T> {
     }
 }
 
-pub struct ValueWriteAccess<'a, T> {
+pub struct ValueWriteAccess<'a, T: 'a> {
     lifetime: LifetimeState,
     data: &'a mut T,
 }

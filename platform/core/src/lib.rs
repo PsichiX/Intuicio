@@ -7,11 +7,12 @@ pub mod object;
 pub mod registry;
 pub mod script;
 pub mod struct_type;
+pub mod transformer;
 
 pub mod prelude {
     pub use crate::{
         context::*, function::*, host::*, nativizer::*, object::*, registry::*, script::*,
-        struct_type::*, IntuicioStruct, IntuicioVersion, Visibility,
+        struct_type::*, transformer::*, IntuicioStruct, IntuicioVersion, Visibility,
     };
     pub use crate::{
         define_function, define_native_struct, define_runtime_struct, function_signature,

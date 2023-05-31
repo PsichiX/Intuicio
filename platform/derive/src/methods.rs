@@ -2,7 +2,7 @@ use proc_macro::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
     parse_macro_input, AttributeArgs, FnArg, Ident, ImplItem, ItemImpl, Lit, Meta, NestedMeta, Pat,
-    ReturnType, Visibility,
+    ReturnType, Type, Visibility,
 };
 
 #[derive(Default)]
@@ -16,6 +16,8 @@ struct MethodAttributes {
     pub use_registry: bool,
     pub use_context: bool,
     pub debug: bool,
+    pub transformer: Option<Ident>,
+    pub dependency: Option<Ident>,
 }
 
 macro_rules! parse_impl_attributes {
@@ -78,6 +80,26 @@ macro_rules! parse_method_attributes {
                                                 }
                                                 _ => {}
                                             }
+                                        } else if name_value.path.is_ident("transformer") {
+                                            match &name_value.lit {
+                                                Lit::Str(content) => {
+                                                    result.transformer = Some(Ident::new(
+                                                        &content.value(),
+                                                        Span::call_site().into(),
+                                                    ))
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if name_value.path.is_ident("dependency") {
+                                            match &name_value.lit {
+                                                Lit::Str(content) => {
+                                                    result.dependency = Some(Ident::new(
+                                                        &content.value(),
+                                                        Span::call_site().into(),
+                                                    ))
+                                                }
+                                                _ => {}
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -106,7 +128,13 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         quote! {}
     };
     let struct_type = &item.self_ty;
-    let struct_handle = quote! {result.struct_handle = Some(registry.find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#struct_type>()).unwrap()); };
+    let struct_handle = quote! {
+        result.struct_handle = Some(
+            registry
+                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#struct_type>())
+                .unwrap_or_else(|| panic!("Could not find struct: `{}`", std::any::type_name::<#struct_type>()))
+        );
+    };
     let items = item
         .items
         .iter()
@@ -123,6 +151,8 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 use_registry,
                 use_context,
                 debug,
+                transformer,
+                dependency,
             },
             found,
         ) = parse_method_attributes!(&item.attrs);
@@ -189,12 +219,12 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 },
             })
             .collect::<Vec<_>>();
-        let arg_types = item
+        let (arg_types, arg_structs): (Vec<_>, Vec<_>) = item
             .sig
             .inputs
             .iter()
             .filter_map(|arg| match arg {
-                FnArg::Receiver(_) => Some(struct_type),
+                FnArg::Receiver(_) => Some((*struct_type.clone(), *struct_type.clone())),
                 FnArg::Typed(meta) => {
                     let ident = match &*meta.pat {
                         Pat::Ident(ident) => &ident.ident,
@@ -204,18 +234,143 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                     {
                         None
                     } else {
-                        Some(&meta.ty)
+                        Some(transformer
+                            .as_ref()
+                            .map(|transformer| match unpack_type(&meta.ty) {
+                                UnpackedType::Owned(ty) => {
+                                    (syn::parse2::<Type>(quote!{
+                                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Owned
+                                    }).unwrap(), ty)
+                                }
+                                UnpackedType::Ref(ty) => {
+                                    (syn::parse2::<Type>(quote!{
+                                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Ref
+                                    }).unwrap(), ty)
+                                }
+                                UnpackedType::RefMut(ty) => {
+                                    (syn::parse2::<Type>(quote!{
+                                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::RefMut
+                                    }).unwrap(), ty)
+                                }
+                            })
+                            .unwrap_or_else(|| (*meta.ty.clone(), *meta.ty.clone())))
                     }
                 }
             })
-            .collect::<Vec<_>>();
+            .unzip();
+        let (transform_arg_idents, arg_transforms): (Vec<_>, Vec<_>) =
+            if let Some(transformer) = transformer.as_ref() {
+                item.sig
+                    .inputs
+                    .iter()
+                    .filter_map(|arg| match arg {
+                        FnArg::Receiver(_) => panic!("`self` arguments are not accepted!"),
+                        FnArg::Typed(meta) => {
+                            let ident = match &*meta.pat {
+                                Pat::Ident(ident) => &ident.ident,
+                                _ => panic!("Only identifiers are accepted as argument names!"),
+                            };
+                            if (use_registry && ident == "registry")
+                                || (use_context && ident == "context")
+                            {
+                                None
+                            } else {
+                                Some((
+                                    ident,
+                                    match unpack_type(&meta.ty) {
+                                        UnpackedType::Owned(_) => {
+                                            quote! {#transformer::into_owned(#ident)}
+                                        }
+                                        UnpackedType::Ref(_) => {
+                                            quote! {#transformer::into_ref(&#ident)}
+                                        }
+                                        UnpackedType::RefMut(_) => {
+                                            quote! {#transformer::into_ref_mut(&mut #ident)}
+                                        }
+                                    },
+                                ))
+                            }
+                        }
+                    })
+                    .unzip()
+            } else {
+                (vec![], vec![])
+            };
+        let transform_arg_deref = if transformer.is_some() {
+            item.sig
+                .inputs
+                .iter()
+                .filter_map(|arg| match arg {
+                    FnArg::Receiver(_) => panic!("`self` arguments are not accepted!"),
+                    FnArg::Typed(meta) => {
+                        let ident = match &*meta.pat {
+                            Pat::Ident(ident) => &ident.ident,
+                            _ => panic!("Only identifiers are accepted as argument names!"),
+                        };
+                        if (use_registry && ident == "registry")
+                            || (use_context && ident == "context")
+                        {
+                            None
+                        } else {
+                            match unpack_type(&meta.ty) {
+                                UnpackedType::Owned(_) => None,
+                                UnpackedType::Ref(_) => Some(quote! {let #ident = &#ident;}),
+                                UnpackedType::RefMut(_) => Some(quote! {let #ident = &mut #ident;}),
+                            }
+                        }
+                    }
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
         let return_idents = match item.sig.output {
             ReturnType::Default => vec![],
             ReturnType::Type(_, _) => vec!["result"],
         };
-        let return_types = match item.sig.output {
+        let return_structs = match item.sig.output {
             ReturnType::Default => vec![],
-            ReturnType::Type(_, ref ty) => vec![ty.clone()],
+            ReturnType::Type(_, ref ty) => vec![transformer
+                .as_ref()
+                .map(|_| match unpack_type(ty) {
+                    UnpackedType::Owned(ty) => ty,
+                    UnpackedType::Ref(ty) => ty,
+                    UnpackedType::RefMut(ty) => ty,
+                })
+                .unwrap_or_else(|| *ty.clone())],
+        };
+        let (dependency, return_transform) = if let Some(transformer) = transformer.as_ref() {
+            match item.sig.output {
+                ReturnType::Default => (vec![], vec![]),
+                ReturnType::Type(_, ref ty) => match unpack_type(ty) {
+                    UnpackedType::Owned(_) => (
+                        vec![],
+                        vec![quote! {let result = #transformer::from_owned(result);}],
+                    ),
+                    UnpackedType::Ref(ty) => (
+                        vec![dependency.as_ref().map(|dependency|{
+                            quote! {
+                                let __dependency__ = Some(
+                                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Dependency::as_ref(&#dependency)
+                                );
+                            }
+                        }).unwrap_or_else(|| quote!{let __dependency__ = None;})],
+                        vec![quote! {let result = #transformer::from_ref(result, __dependency__);}],
+                    ),
+                    UnpackedType::RefMut(_) => (
+                        vec![dependency.as_ref().map(|dependency|{
+                            quote! {
+                                let __dependency__ = Some(
+                                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Dependency::as_ref_mut(&#dependency)
+                                );
+                            }
+                        }).unwrap_or_else(|| quote!{let __dependency__ = None;})],
+                        vec![quote! {let result = #transformer::from_ref_mut(result, None);}],
+                    ),
+                },
+            }
+        } else {
+            (vec![], vec![])
         };
         let result = quote! {
             #[allow(dead_code)]
@@ -227,7 +382,13 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 use intuicio_data::data_stack::DataStackPack;
                 #[allow(unused_mut)]
                 let (#(mut #arg_idents,)*) = <(#(#arg_types,)*)>::stack_pop(context.stack());
-                let result = #struct_type::#ident(#(#call_arg_idents,)*);
+                #(#dependency)*
+                let (#(mut #transform_arg_idents,)*) = (#(#arg_transforms,)*);
+                let result = {
+                    #(#transform_arg_deref)*
+                    #struct_type::#ident(#(#call_arg_idents,)*)
+                };
+                #(#return_transform)*
                 (result,).stack_push_reversed(context.stack());
             }
 
@@ -245,7 +406,14 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                     result.inputs.push(
                         intuicio_core::function::FunctionParameter::new(
                             stringify!(#arg_idents),
-                            registry.find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#arg_types>()).unwrap()
+                            registry
+                                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#arg_structs>())
+                                .unwrap_or_else(|| panic!(
+                                    "Could not find struct: `{}` for argument: `{}` for function: `{}`",
+                                    std::any::type_name::<#arg_structs>(),
+                                    stringify!(#arg_idents),
+                                    stringify!(#ident),
+                                ))
                         )
                     );
                 )*
@@ -253,7 +421,14 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                     result.outputs.push(
                         intuicio_core::function::FunctionParameter::new(
                             #return_idents,
-                            registry.find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#return_types>()).unwrap()
+                            registry
+                                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#return_structs>())
+                                .unwrap_or_else(|| panic!(
+                                    "Could not find struct: `{}` for result: `{}` for function: `{}`",
+                                    std::any::type_name::<#return_structs>(),
+                                    stringify!(#return_idents),
+                                    stringify!(#ident),
+                                ))
                         )
                     );
                 )*
@@ -273,7 +448,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         };
         if debug {
             println!(
-                "* Debug of `intuicio_methods` attribute macro\n- Input: {}\n- Result: {}",
+                "* Debug of `intuicio_method` attribute macro\n- Input: {}\n- Result: {}",
                 item.to_token_stream(),
                 result
             );
@@ -288,4 +463,24 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         #item
     }
     .into()
+}
+
+enum UnpackedType {
+    Owned(Type),
+    Ref(Type),
+    RefMut(Type),
+}
+
+fn unpack_type(ty: &Type) -> UnpackedType {
+    match ty {
+        Type::Path(_) => UnpackedType::Owned(ty.clone()),
+        Type::Reference(reference) => {
+            if reference.mutability.is_some() {
+                UnpackedType::RefMut(*reference.elem.clone())
+            } else {
+                UnpackedType::Ref(*reference.elem.clone())
+            }
+        }
+        _ => panic!("Unsupported kind of type to unpack: {:#?}", ty),
+    }
 }

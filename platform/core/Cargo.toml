@@ -15,3 +15,6 @@ intuicio-data = { version = "0.13", path = "../data" }
 serde = { version = "1", features = ["derive", "rc"] }
 memoffset = "0.9"
 typid = "1"
+
+[dev-dependencies]
+intuicio-derive = { version = "0.13", path = "../derive" }

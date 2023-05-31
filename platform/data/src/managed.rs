@@ -51,6 +51,13 @@ impl<T> Managed<T> {
         ))
     }
 
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Managed<U> {
+        Managed {
+            lifetime: Default::default(),
+            data: f(self.data),
+        }
+    }
+
     /// # Safety
     pub unsafe fn as_ptr(&self) -> *const T {
         &self.data as _
@@ -81,7 +88,7 @@ impl<T> ManagedRef<T> {
     pub unsafe fn new_raw(data: *const T, lifetime: LifetimeRef) -> Self {
         Self {
             lifetime,
-            data: NonNull::new_unchecked(data as *mut _),
+            data: NonNull::new_unchecked(data as _),
         }
     }
 
@@ -98,6 +105,16 @@ impl<T> ManagedRef<T> {
 
     pub fn read(&self) -> Option<ValueReadAccess<T>> {
         self.lifetime.read(unsafe { self.data.as_ref() })
+    }
+
+    pub fn map<U>(self, f: impl FnOnce(&T) -> &U) -> ManagedRef<U> {
+        unsafe {
+            let data = f(self.data.as_ref());
+            ManagedRef {
+                lifetime: self.lifetime,
+                data: NonNull::new_unchecked(data as *const U as *mut U),
+            }
+        }
     }
 
     /// # Safety
@@ -156,6 +173,16 @@ impl<T> ManagedRefMut<T> {
 
     pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
         self.lifetime.write(unsafe { self.data.as_mut() })
+    }
+
+    pub fn map<U>(mut self, f: impl FnOnce(&mut T) -> &mut U) -> ManagedRefMut<U> {
+        unsafe {
+            let data = f(self.data.as_mut());
+            ManagedRefMut {
+                lifetime: self.lifetime,
+                data: NonNull::new_unchecked(data as *mut U),
+            }
+        }
     }
 
     /// # Safety
