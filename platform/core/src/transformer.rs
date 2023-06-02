@@ -1,16 +1,16 @@
+use crate::registry::Registry;
 use intuicio_data::{lifetime::*, managed::*, shared::*};
 use std::{
     cell::{Ref, RefMut},
     marker::PhantomData,
-    ops::{Deref, DerefMut},
 };
 
 pub trait ValueTransformer {
     type Type;
-    type Borrow<'r>: Deref<Target = Self::Type>
+    type Borrow<'r>
     where
         Self::Type: 'r;
-    type BorrowMut<'r>: DerefMut<Target = Self::Type>
+    type BorrowMut<'r>
     where
         Self::Type: 'r;
     type Dependency;
@@ -18,9 +18,17 @@ pub trait ValueTransformer {
     type Ref;
     type RefMut;
 
-    fn from_owned(value: Self::Type) -> Self::Owned;
-    fn from_ref(value: &Self::Type, dependency: Option<Self::Dependency>) -> Self::Ref;
-    fn from_ref_mut(value: &mut Self::Type, dependency: Option<Self::Dependency>) -> Self::RefMut;
+    fn from_owned(registry: &Registry, value: Self::Type) -> Self::Owned;
+    fn from_ref(
+        registry: &Registry,
+        value: &Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::Ref;
+    fn from_ref_mut(
+        registry: &Registry,
+        value: &mut Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::RefMut;
     fn into_owned(value: Self::Owned) -> Self::Type;
     fn into_ref(value: &Self::Ref) -> Self::Borrow<'_>;
     fn into_ref_mut(value: &mut Self::RefMut) -> Self::BorrowMut<'_>;
@@ -42,15 +50,19 @@ impl<T: Default + Clone + 'static> ValueTransformer for SharedValueTransformer<T
     type Ref = Shared<T>;
     type RefMut = Shared<T>;
 
-    fn from_owned(value: Self::Type) -> Self::Owned {
+    fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
         Shared::new(value)
     }
 
-    fn from_ref(value: &Self::Type, _: Option<Self::Dependency>) -> Self::Ref {
+    fn from_ref(_: &Registry, value: &Self::Type, _: Option<Self::Dependency>) -> Self::Ref {
         Shared::new(value.clone())
     }
 
-    fn from_ref_mut(value: &mut Self::Type, _: Option<Self::Dependency>) -> Self::RefMut {
+    fn from_ref_mut(
+        _: &Registry,
+        value: &mut Self::Type,
+        _: Option<Self::Dependency>,
+    ) -> Self::RefMut {
         Shared::new(value.clone())
     }
 
@@ -78,11 +90,15 @@ impl<T> ValueTransformer for ManagedValueTransformer<T> {
     type Ref = ManagedRef<T>;
     type RefMut = ManagedRefMut<T>;
 
-    fn from_owned(value: Self::Type) -> Self::Owned {
+    fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
         Managed::new(value)
     }
 
-    fn from_ref(value: &Self::Type, dependency: Option<Self::Dependency>) -> Self::Ref {
+    fn from_ref(
+        _: &Registry,
+        value: &Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::Ref {
         if let ManagedValueDependency::Ref(lifetime) =
             dependency.expect("`ManagedRef` require dependency for lifetime bound!")
         {
@@ -92,7 +108,11 @@ impl<T> ValueTransformer for ManagedValueTransformer<T> {
         }
     }
 
-    fn from_ref_mut(value: &mut Self::Type, dependency: Option<Self::Dependency>) -> Self::RefMut {
+    fn from_ref_mut(
+        _: &Registry,
+        value: &mut Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::RefMut {
         if let ManagedValueDependency::RefMut(lifetime) =
             dependency.expect("`ManagedRefMut` require dependency for lifetime bound!")
         {
@@ -231,7 +251,8 @@ mod tests {
                 let b = &mut b;
                 add(a, b)
             };
-            SharedValueTransformer::from_owned(result)
+            let registry = Registry::default();
+            SharedValueTransformer::from_owned(&registry, result)
         }
 
         assert_eq!(
@@ -247,7 +268,8 @@ mod tests {
                 let foo = &foo;
                 Foo::get(foo)
             };
-            SharedValueTransformer::from_ref(result, None)
+            let registry = Registry::default();
+            SharedValueTransformer::from_ref(&registry, result, None)
         }
 
         let foo = Shared::new(Foo { bar: 42 });
@@ -269,7 +291,8 @@ mod tests {
                 let b = &mut b;
                 add(a, b)
             };
-            ManagedValueTransformer::from_owned(result)
+            let registry = Registry::default();
+            ManagedValueTransformer::from_owned(&registry, result)
         }
 
         let a = Managed::new(40);
@@ -291,7 +314,8 @@ mod tests {
                 let foo = &foo;
                 Foo::get(foo)
             };
-            ManagedValueTransformer::from_ref(result, dependency)
+            let registry = Registry::default();
+            ManagedValueTransformer::from_ref(&registry, result, dependency)
         }
 
         let foo = Managed::new(Foo { bar: 42 });

@@ -293,7 +293,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
             ReturnType::Type(_, ref ty) => match unpack_type(ty) {
                 UnpackedType::Owned(_) => (
                     vec![],
-                    vec![quote! {let result = #transformer::from_owned(result);}],
+                    vec![quote! {let result = #transformer::from_owned(registry, result);}],
                 ),
                 UnpackedType::Ref(ty) => (
                     vec![dependency.as_ref().map(|dependency|{
@@ -303,7 +303,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
                             );
                         }
                     }).unwrap_or_else(|| quote!{let __dependency__ = None;})],
-                    vec![quote! {let result = #transformer::from_ref(result, __dependency__);}],
+                    vec![quote! {let result = #transformer::from_ref(registry, result, __dependency__);}],
                 ),
                 UnpackedType::RefMut(_) => (
                     vec![dependency.as_ref().map(|dependency|{
@@ -313,7 +313,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
                             );
                         }
                     }).unwrap_or_else(|| quote!{let __dependency__ = None;})],
-                    vec![quote! {let result = #transformer::from_ref_mut(result, None);}],
+                    vec![quote! {let result = #transformer::from_ref_mut(registry, result, None);}],
                 ),
             },
         }
