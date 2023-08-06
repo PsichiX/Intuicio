@@ -183,7 +183,7 @@ macro_rules! impl_type {
     };
 }
 
-pub fn install(registry: &mut Registry, memory: Shared<Memory>) {
+pub fn install(registry: &mut Registry, memory: AsyncShared<Memory>) {
     registry.add_struct(NativeStructBuilder::new::<bool>().build());
     registry.add_struct(NativeStructBuilder::new::<i8>().build());
     registry.add_struct(NativeStructBuilder::new::<i16>().build());

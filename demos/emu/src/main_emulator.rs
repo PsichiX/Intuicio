@@ -7,7 +7,8 @@ use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_data::prelude::*;
 use intuicio_frontend_assembler::*;
-use std::path::PathBuf;
+use send_wrapper::SendWrapper;
+use std::{ops::Deref, path::PathBuf};
 use tetra::{
     graphics::{
         self,
@@ -25,14 +26,14 @@ struct Tileset {
     cell_height: usize,
     cols: usize,
     rows: usize,
-    texture: Texture,
+    texture: SendWrapper<Texture>,
 }
 
 struct Tilemap {
     cols: usize,
     tiles: Vec<i16>,
     tileset: usize,
-    mesh: Option<Mesh>,
+    mesh: Option<SendWrapper<Mesh>>,
 }
 
 impl Tilemap {
@@ -109,7 +110,7 @@ impl Tilemap {
             VertexBuffer::new(ctx, &vertices).expect("Could not create vertex buffer!"),
             IndexBuffer::new(ctx, &indices).expect("Could not create index buffer!"),
         );
-        result.set_texture(tileset.texture.clone());
+        result.set_texture(tileset.texture.deref().clone());
         result.set_front_face_winding(VertexWinding::Clockwise);
         result
     }
@@ -139,7 +140,7 @@ impl Default for Object {
 }
 
 pub struct Memory {
-    sprites: Vec<Texture>,
+    sprites: Vec<SendWrapper<Texture>>,
     tilesets: Vec<Tileset>,
     objects: Vec<Object>,
     tilemap: Option<Tilemap>,
@@ -151,7 +152,7 @@ pub struct Memory {
 struct GameState {
     module_name: String,
     host: Host,
-    memory: Shared<Memory>,
+    memory: AsyncShared<Memory>,
 }
 
 impl State for GameState {
@@ -195,7 +196,7 @@ impl State for GameState {
                 .filter(|tilemap| tilemap.mesh.is_none())
                 .map(|tilemap| tilemap.build_mesh(&memory.tilesets, ctx));
             if let Some(mesh) = mesh {
-                memory.tilemap.as_mut().unwrap().mesh = Some(mesh);
+                memory.tilemap.as_mut().unwrap().mesh = Some(SendWrapper::new(mesh));
             }
             let camera_offset =
                 Vec2::new(memory.camera_offset.0 as f32, memory.camera_offset.1 as f32);
@@ -256,13 +257,15 @@ fn main() -> tetra::Result {
         .timestep(Timestep::Fixed(30.0))
         .build()?
         .run(|ctx| {
-            let memory = Shared::new(Memory {
+            let memory = AsyncShared::new(Memory {
                 sprites: cartridge
                     .sprites
                     .iter()
                     .map(|sprite| {
-                        Texture::from_encoded(ctx, &sprite.bytes)
-                            .expect("Could not create texture!")
+                        SendWrapper::new(
+                            Texture::from_encoded(ctx, &sprite.bytes)
+                                .expect("Could not create texture!"),
+                        )
                     })
                     .collect(),
                 tilesets: cartridge
@@ -273,8 +276,10 @@ fn main() -> tetra::Result {
                         cell_height: tileset.cell_height,
                         cols: tileset.cols,
                         rows: tileset.rows,
-                        texture: Texture::from_encoded(ctx, &tileset.bytes)
-                            .expect("Could not create texture!"),
+                        texture: SendWrapper::new(
+                            Texture::from_encoded(ctx, &tileset.bytes)
+                                .expect("Could not create texture!"),
+                        ),
                     })
                     .collect(),
                 objects: vec![Object::default(); cartridge.objects],

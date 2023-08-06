@@ -16,7 +16,7 @@ use std::{
 pub type ScriptHandle<'a, SE> = Arc<Script<'a, SE>>;
 pub type Script<'a, SE> = Vec<ScriptOperation<'a, SE>>;
 
-pub trait ScriptExpression {
+pub trait ScriptExpression: Send + Sync {
     fn evaluate(&self, context: &mut Context, registry: &Registry);
 }
 
@@ -25,22 +25,22 @@ impl ScriptExpression for () {
 }
 
 #[allow(clippy::type_complexity)]
-pub struct InlineExpression(Arc<dyn Fn(&mut Context, &Registry)>);
+pub struct InlineExpression(Arc<dyn Fn(&mut Context, &Registry) + Send + Sync>);
 
 impl InlineExpression {
-    pub fn copied<T: Copy + 'static>(value: T) -> Self {
+    pub fn copied<T: Copy + Send + Sync + 'static>(value: T) -> Self {
         Self(Arc::new(move |context, _| {
             context.stack().push(value);
         }))
     }
 
-    pub fn cloned<T: Clone + 'static>(value: T) -> Self {
+    pub fn cloned<T: Clone + Send + Sync + 'static>(value: T) -> Self {
         Self(Arc::new(move |context, _| {
             context.stack().push(value.clone());
         }))
     }
 
-    pub fn closure<F: Fn(&mut Context, &Registry) + 'static>(f: F) -> Self {
+    pub fn closure<F: Fn(&mut Context, &Registry) + Send + Sync + 'static>(f: F) -> Self {
         Self(Arc::new(f))
     }
 }

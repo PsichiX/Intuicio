@@ -12,7 +12,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-pub type VmDebuggerHandle<SE> = Arc<RwLock<dyn VmDebugger<SE>>>;
+pub type VmDebuggerHandle<SE> = Arc<RwLock<dyn VmDebugger<SE> + Send + Sync>>;
 pub type SourceMapHandle<UL> = Arc<RwLock<SourceMap<UL>>>;
 
 pub trait VmDebugger<SE: ScriptExpression> {
@@ -46,7 +46,7 @@ pub trait VmDebugger<SE: ScriptExpression> {
 
     fn into_handle(self) -> VmDebuggerHandle<SE>
     where
-        Self: Sized + 'static,
+        Self: Sized + Send + Sync + 'static,
     {
         Arc::new(RwLock::new(self))
     }

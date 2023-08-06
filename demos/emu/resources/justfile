@@ -2,10 +2,10 @@ list:
     just --list
 
 package:
-    cargo run --bin packager -- manifest.toml cartridge.bin
+    cargo run --release --bin packager -- manifest.toml cartridge.bin
 
 run:
-    cargo run --bin emulator -- cartridge.bin
+    cargo run --release --bin emulator -- cartridge.bin
 
 package-run:
     just package

@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-nodes"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Node Graph module for Intuicio scripting platform"
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/intuicio-nodes"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-core = { version = "0.15", path = "../core" }
+intuicio-core = { version = "0.16", path = "../core" }
 serde = { version = "1", features = ["derive", "rc"] }
 typid = "1"
 rstar = "0.10"

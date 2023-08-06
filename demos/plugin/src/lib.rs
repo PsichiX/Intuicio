@@ -1,4 +1,4 @@
-use intuicio_core::registry::Registry;
+use intuicio_core::{registry::Registry, IntuicioVersion};
 use intuicio_derive::*;
 use intuicio_frontend_simpleton::{Integer, Reference};
 
@@ -13,6 +13,11 @@ fn fib_inner(n: Integer) -> Integer {
         1 => 1,
         n => fib_inner(n - 1) + fib_inner(n - 2),
     }
+}
+
+#[no_mangle]
+pub extern "C" fn version() -> IntuicioVersion {
+    intuicio_core::core_version()
 }
 
 #[no_mangle]

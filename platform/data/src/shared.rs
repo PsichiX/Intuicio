@@ -1,6 +1,7 @@
 use std::{
     cell::{Ref, RefCell, RefMut},
     rc::Rc,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
 #[derive(Default)]
@@ -49,6 +50,55 @@ impl<T> Shared<T> {
 
     pub fn does_share_reference(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.data, &other.data)
+    }
+}
+
+#[derive(Default)]
+pub struct AsyncShared<T> {
+    data: Arc<RwLock<T>>,
+}
+
+impl<T> Clone for AsyncShared<T> {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
+    }
+}
+
+impl<T> AsyncShared<T> {
+    pub fn new(data: T) -> Self {
+        Self {
+            data: Arc::new(RwLock::new(data)),
+        }
+    }
+
+    pub fn try_consume(self) -> Result<T, Self> {
+        match Arc::try_unwrap(self.data) {
+            Ok(data) => Ok(data.into_inner().unwrap()),
+            Err(data) => Err(Self { data }),
+        }
+    }
+
+    pub fn read(&self) -> Option<RwLockReadGuard<T>> {
+        self.data.read().ok()
+    }
+
+    pub fn write(&self) -> Option<RwLockWriteGuard<T>> {
+        self.data.write().ok()
+    }
+
+    pub fn swap(&self, data: T) -> Option<T> {
+        let mut value = self.data.write().ok()?;
+        Some(std::mem::replace(&mut value, data))
+    }
+
+    pub fn references_count(&self) -> usize {
+        Arc::strong_count(&self.data)
+    }
+
+    pub fn does_share_reference(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.data, &other.data)
     }
 }
 

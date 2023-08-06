@@ -1,15 +1,15 @@
 [package]
 name = "tetra-integration"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2021"
 publish = false
 
 [dependencies]
-intuicio-data = { version = "0.15", path = "../../platform/data" }
-intuicio-core = { version = "0.15", path = "../../platform/core" }
-intuicio-derive = { version = "0.15", path = "../../platform/derive" }
-intuicio-backend-vm = { version = "0.15", path = "../../backends/vm" }
-intuicio-frontend-simpleton = { version = "0.15", path = "../../frontends/simpleton" }
+intuicio-data = { version = "0.16", path = "../../platform/data" }
+intuicio-core = { version = "0.16", path = "../../platform/core" }
+intuicio-derive = { version = "0.16", path = "../../platform/derive" }
+intuicio-backend-vm = { version = "0.16", path = "../../backends/vm" }
+intuicio-frontend-simpleton = { version = "0.16", path = "../../frontends/simpleton" }
 tetra = { version = "0.8", features = ["sdl2_bundled"] }
 toml = "0.7"
 serde = "1"

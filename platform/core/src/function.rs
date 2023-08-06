@@ -13,7 +13,7 @@ pub type FunctionHandle = Arc<Function>;
 pub enum FunctionBody {
     Pointer(fn(&mut Context, &Registry)),
     #[allow(clippy::type_complexity)]
-    Closure(Arc<dyn Fn(&mut Context, &Registry)>),
+    Closure(Arc<dyn Fn(&mut Context, &Registry) + Send + Sync>),
 }
 
 impl FunctionBody {
@@ -23,7 +23,7 @@ impl FunctionBody {
 
     pub fn closure<T>(closure: T) -> Self
     where
-        T: Fn(&mut Context, &Registry) + 'static,
+        T: Fn(&mut Context, &Registry) + Send + Sync + 'static,
     {
         Self::Closure(Arc::new(closure))
     }

@@ -23,8 +23,12 @@ checks:
   just clippy
   just test
 
-demo:
-  cd ./demos/tetra/ && cargo run --release
+demo-emu:
+  cd ./demos/emu/resources && just package-run
+
+demo-tetra:
+  cd ./demos/plugin/ && cargo build
+  cd ./demos/tetra/ && cargo run
 
 demo-node-graph:
   cargo build --release --manifest-path ./demos/godot-node-graph/server/Cargo.toml
