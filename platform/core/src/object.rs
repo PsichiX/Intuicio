@@ -212,6 +212,41 @@ impl DynamicObject {
     }
 }
 
+#[derive(Default)]
+pub struct TypedDynamicObject {
+    properties: HashMap<TypeHash, Object>,
+}
+
+impl TypedDynamicObject {
+    pub fn get<T: 'static>(&self) -> Option<&Object> {
+        self.properties.get(&TypeHash::of::<T>())
+    }
+
+    pub fn get_mut<T: 'static>(&mut self) -> Option<&mut Object> {
+        self.properties.get_mut(&TypeHash::of::<T>())
+    }
+
+    pub fn set<T: 'static>(&mut self, value: Object) {
+        self.properties.insert(TypeHash::of::<T>(), value);
+    }
+
+    pub fn delete<T: 'static>(&mut self) -> Option<Object> {
+        self.properties.remove(&TypeHash::of::<T>())
+    }
+
+    pub fn properties(&self) -> impl Iterator<Item = (&TypeHash, &Object)> + '_ {
+        self.properties.iter()
+    }
+
+    pub fn properties_mut(&mut self) -> impl Iterator<Item = (&TypeHash, &mut Object)> + '_ {
+        self.properties.iter_mut()
+    }
+
+    pub fn property_types(&self) -> impl Iterator<Item = &TypeHash> + '_ {
+        self.properties.keys()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{object::*, struct_type::*};

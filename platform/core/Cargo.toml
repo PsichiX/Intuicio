@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-core"
-version = "0.17.1"
+version = "0.17.2"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Core module for Intuicio scripting platform"
