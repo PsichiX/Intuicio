@@ -9,6 +9,7 @@ use intuicio_data::data_stack::DataStackPack;
 use std::{borrow::Cow, sync::Arc};
 
 pub type FunctionHandle = Arc<Function>;
+pub type FunctionMetaQuery = fn(&Meta) -> bool;
 
 pub enum FunctionBody {
     Pointer(fn(&mut Context, &Registry)),
@@ -277,6 +278,7 @@ pub struct FunctionQuery<'a> {
     pub visibility: Option<Visibility>,
     pub inputs: Cow<'a, [FunctionQueryParameter<'a>]>,
     pub outputs: Cow<'a, [FunctionQueryParameter<'a>]>,
+    pub meta: Option<FunctionMetaQuery>,
 }
 
 impl<'a> FunctionQuery<'a> {
@@ -321,6 +323,17 @@ impl<'a> FunctionQuery<'a> {
                 .iter()
                 .zip(signature.outputs.iter())
                 .all(|(query, parameter)| query.is_valid(parameter))
+            && self
+                .meta
+                .as_ref()
+                .map(|query| {
+                    signature
+                        .meta
+                        .as_ref()
+                        .map(query)
+                        .unwrap_or(false)
+                })
+                .unwrap_or(true)
     }
 }
 

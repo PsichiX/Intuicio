@@ -3,6 +3,7 @@ use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
 use std::{alloc::Layout, borrow::Cow, sync::Arc};
 
 pub type StructHandle = Arc<Struct>;
+pub type StructMetaQuery = fn(&Meta) -> bool;
 
 pub struct RuntimeStructBuilder {
     meta: Option<Meta>,
@@ -407,6 +408,7 @@ pub struct StructQuery<'a> {
     pub type_name: Option<Cow<'a, str>>,
     pub visibility: Option<Visibility>,
     pub fields: Cow<'a, [StructFieldQuery<'a>]>,
+    pub meta: Option<StructMetaQuery>,
 }
 
 impl<'a> StructQuery<'a> {
@@ -466,6 +468,11 @@ impl<'a> StructQuery<'a> {
                 .iter()
                 .zip(struct_type.fields.iter())
                 .all(|(query, field)| query.is_valid(field))
+            && self
+                .meta
+                .as_ref()
+                .map(|query| struct_type.meta.as_ref().map(query).unwrap_or(false))
+                .unwrap_or(true)
     }
 }
 

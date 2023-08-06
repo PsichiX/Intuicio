@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-data"
-version = "0.17.0"
+version = "0.17.1"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Data module for Intuicio scripting platform"
