@@ -169,3 +169,15 @@ impl Registry {
         self.find_structs(query).next()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_async() {
+        fn is_async<T: Send + Sync>() {}
+
+        is_async::<Registry>();
+    }
+}

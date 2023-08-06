@@ -1,13 +1,12 @@
 use crate::Finalize;
 use std::{
     alloc::Layout,
-    cell::RefCell,
     ptr::NonNull,
-    rc::{Rc, Weak},
+    sync::{Arc, RwLock, Weak},
 };
 use typid::ID;
 
-pub type DataHeapMemoryPageHandle = Rc<RefCell<DataHeapMemoryPage>>;
+pub type DataHeapMemoryPageHandle = Arc<RwLock<DataHeapMemoryPage>>;
 pub type DataHeapObjectID = ID<DataHeapMemoryPage>;
 
 const MINIMUM_SIZE: usize = 1024;
@@ -144,7 +143,9 @@ impl DataHeapMemoryPage {
     ) -> Option<DataHeapBox<T>> {
         unsafe {
             let page_weak = DataHeapMemoryPageHandle::downgrade(page);
-            let mut this = page.borrow_mut();
+            let mut this = page
+                .write()
+                .expect("Could not get write access to heap memory page!");
             let header_layout = Layout::new::<DataHeapObjectHeader>().pad_to_align();
             let footer_layout = Layout::new::<DataHeapObjectFooter>().pad_to_align();
             let layout = Layout::new::<T>().pad_to_align();
@@ -248,7 +249,9 @@ impl DataHeapMemoryPage {
         data_pointer: *mut (),
         id: DataHeapObjectID,
     ) -> unsafe fn(*mut ()) {
-        let mut this = page.borrow_mut();
+        let mut this = page
+            .write()
+            .expect("Could not get write access to heap memory page!");
         let header_layout = Layout::new::<DataHeapObjectHeader>().pad_to_align();
         let mut header_pointer = data_pointer.cast::<u8>().sub(header_layout.size());
         let (other_id, layout, finalizer, tail_size) =
@@ -395,7 +398,7 @@ impl DataHeapMemoryPage {
 }
 
 pub struct DataHeap {
-    pages: Vec<Rc<RefCell<DataHeapMemoryPage>>>,
+    pages: Vec<Arc<RwLock<DataHeapMemoryPage>>>,
     page_capacity: usize,
     pub pages_count_limit: Option<usize>,
     position: usize,
@@ -420,22 +423,44 @@ impl DataHeap {
     }
 
     pub fn capacity(&self) -> usize {
-        self.pages.iter().map(|page| page.borrow().capacity()).sum()
+        self.pages
+            .iter()
+            .map(|page| {
+                page.read()
+                    .expect("Could not get read access to heap memory page!")
+                    .capacity()
+            })
+            .sum()
     }
 
     pub fn size(&self) -> usize {
-        self.pages.iter().map(|page| page.borrow().size()).sum()
+        self.pages
+            .iter()
+            .map(|page| {
+                page.read()
+                    .expect("Could not get read access to heap memory page!")
+                    .size()
+            })
+            .sum()
     }
 
     pub fn available_size(&self) -> usize {
         self.pages
             .iter()
-            .map(|page| page.borrow().available_size())
+            .map(|page| {
+                page.read()
+                    .expect("Could not get read access to heap memory page!")
+                    .available_size()
+            })
             .sum()
     }
 
     pub fn has_object<T>(&self, data: &DataHeapBox<T>) -> bool {
-        self.pages.iter().any(|page| page.borrow().has_object(data))
+        self.pages.iter().any(|page| {
+            page.read()
+                .expect("Could not get read access to heap memory page!")
+                .has_object(data)
+        })
     }
 
     pub fn ensure_pages(&mut self, total_pages_count: usize) {
@@ -443,7 +468,7 @@ impl DataHeap {
         let capacity = (self.pages.len() + additional).next_power_of_two() - self.pages.len();
         self.pages.reserve(capacity);
         for _ in 0..additional {
-            let page = Rc::new(RefCell::new(DataHeapMemoryPage::new(self.page_capacity)));
+            let page = Arc::new(RwLock::new(DataHeapMemoryPage::new(self.page_capacity)));
             self.pages.push(page);
         }
     }
@@ -451,7 +476,12 @@ impl DataHeap {
     pub fn collect_empty_pages(&mut self) {
         let mut index = 0;
         while index < self.pages.len() {
-            if self.pages[index].borrow().size() == 0 {
+            if self.pages[index]
+                .read()
+                .expect("Could not get read access to heap memory page!")
+                .size()
+                == 0
+            {
                 self.pages.swap_remove(index);
             } else {
                 index += 1;
@@ -471,7 +501,12 @@ impl DataHeap {
         while accumulator < self.pages.len() {
             self.position %= self.pages.len();
             let page = &self.pages[self.position];
-            if layout.size() <= page.borrow().available_size() {
+            if layout.size()
+                <= page
+                    .read()
+                    .expect("Could not get read access to heap memory page!")
+                    .available_size()
+            {
                 return DataHeapMemoryPage::alloc(page, value);
             }
             self.position += 1;
@@ -483,7 +518,7 @@ impl DataHeap {
             }
         }
         let capacity = self.page_capacity.max(layout.size());
-        let page = Rc::new(RefCell::new(DataHeapMemoryPage::new(capacity)));
+        let page = Arc::new(RwLock::new(DataHeapMemoryPage::new(capacity)));
         let result = DataHeapMemoryPage::alloc(&page, value)?;
         let capacity = (self.pages.len() + 1).next_power_of_two() - self.pages.len();
         self.position = self.pages.len();
@@ -498,14 +533,18 @@ impl DataHeap {
             pages: self
                 .pages
                 .iter()
-                .map(|page| page.borrow().stats())
+                .map(|page| {
+                    page.read()
+                        .expect("Could not get read access to heap memory page!")
+                        .stats()
+                })
                 .collect(),
         }
     }
 }
 
 pub struct DataHeapBox<T> {
-    page: Weak<RefCell<DataHeapMemoryPage>>,
+    page: Weak<RwLock<DataHeapMemoryPage>>,
     data: NonNull<T>,
     id: DataHeapObjectID,
 }
@@ -526,7 +565,11 @@ impl<T> DataHeapBox<T> {
     pub fn exists(&self) -> bool {
         self.page
             .upgrade()
-            .map(|page| page.borrow().has_object(self))
+            .map(|page| {
+                page.read()
+                    .expect("Could not get read access to heap memory page!")
+                    .has_object(self)
+            })
             .unwrap_or(false)
     }
 
@@ -614,7 +657,10 @@ pub struct DataHeapStats {
 #[cfg(test)]
 mod tests {
     use crate::data_heap::{DataHeap, DataHeapBox, DataHeapStats};
-    use std::{cell::RefCell, io::Write, rc::Rc};
+    use std::{
+        io::Write,
+        sync::{Arc, RwLock},
+    };
 
     static ANALIZE_DIAGNOSTICS: bool = false;
 
@@ -682,11 +728,14 @@ mod tests {
 
     #[test]
     fn test_data_heap() {
-        struct Droppable(Rc<RefCell<bool>>);
+        struct Droppable(Arc<RwLock<bool>>);
 
         impl Drop for Droppable {
             fn drop(&mut self) {
-                *self.0.borrow_mut() = true;
+                *self
+                    .0
+                    .write()
+                    .expect("Could not get write access to heap memory page!") = true;
             }
         }
 
@@ -752,12 +801,12 @@ mod tests {
         assert_eq!(heap.size(), 0);
         assert_eq!(heap.available_size(), 1024);
 
-        let dropped = Rc::new(RefCell::new(false));
+        let dropped = Arc::new(RwLock::new(false));
         heap.alloc(Droppable(dropped.clone())).unwrap();
         analize_stats(&heap);
         assert_eq!(heap.size(), 0);
         assert_eq!(heap.available_size(), 1024);
-        assert_eq!(*dropped.borrow(), true);
+        assert_eq!(*dropped.read().unwrap(), true);
         let keep = heap.alloc(42u8).unwrap();
         analize_stats(&heap);
         assert_eq!(heap.size(), 57);

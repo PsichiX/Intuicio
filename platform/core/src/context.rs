@@ -9,7 +9,7 @@ pub struct Context {
     registers: DataStack,
     registers_barriers: Vec<usize>,
     heap: DataHeap,
-    custom: HashMap<String, Box<dyn Any>>,
+    custom: HashMap<String, Box<dyn Any + Send + Sync>>,
 }
 
 impl Context {
@@ -92,15 +92,27 @@ impl Context {
         self.registers.access_register(index)
     }
 
-    pub fn custom<T: 'static>(&self, name: &str) -> Option<&T> {
+    pub fn custom<T: Send + Sync + 'static>(&self, name: &str) -> Option<&T> {
         self.custom.get(name)?.downcast_ref::<T>()
     }
 
-    pub fn custom_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
+    pub fn custom_mut<T: Send + Sync + 'static>(&mut self, name: &str) -> Option<&mut T> {
         self.custom.get_mut(name)?.downcast_mut::<T>()
     }
 
-    pub fn set_custom<T: 'static>(&mut self, name: impl ToString, data: T) {
+    pub fn set_custom<T: Send + Sync + 'static>(&mut self, name: impl ToString, data: T) {
         self.custom.insert(name.to_string(), Box::new(data));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_async() {
+        fn is_async<T: Send + Sync>() {}
+
+        is_async::<Context>();
     }
 }

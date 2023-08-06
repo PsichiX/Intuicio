@@ -1,6 +1,6 @@
 [package]
 name = "simpleton-rtree"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 publish = false
 
@@ -8,8 +8,8 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-intuicio-data = { version = "0.16", path = "../../platform/data" }
-intuicio-core = { version = "0.16", path = "../../platform/core" }
-intuicio-derive = { version = "0.16", path = "../../platform/derive" }
-intuicio-frontend-simpleton = { version = "0.16", path = "../../frontends/simpleton" }
+intuicio-data = { version = "0.17", path = "../../platform/data" }
+intuicio-core = { version = "0.17", path = "../../platform/core" }
+intuicio-derive = { version = "0.17", path = "../../platform/derive" }
+intuicio-frontend-simpleton = { version = "0.17", path = "../../frontends/simpleton" }
 rstar = "0.10"
