@@ -1,6 +1,11 @@
 use crate::struct_type::{StructFieldQuery, StructHandle, StructQuery};
-use intuicio_data::{type_hash::TypeHash, Initialize};
-use std::collections::HashMap;
+use intuicio_data::{
+    lifetime::{ValueReadAccess, ValueWriteAccess},
+    managed::*,
+    type_hash::TypeHash,
+    Initialize,
+};
+use std::{collections::HashMap, mem::MaybeUninit};
 
 pub struct RuntimeObject;
 
@@ -80,6 +85,21 @@ impl Object {
             })
         } else {
             None
+        }
+    }
+
+    pub fn consume<T: 'static>(mut self) -> Result<T, Self> {
+        if self.handle.type_hash() == TypeHash::of::<T>() {
+            self.drop = false;
+            unsafe {
+                let mut result = MaybeUninit::<T>::uninit();
+                result
+                    .as_mut_ptr()
+                    .copy_from(self.memory.as_ptr().cast::<T>(), 1);
+                Ok(result.assume_init())
+            }
+        } else {
+            Err(self)
         }
     }
 
@@ -263,6 +283,100 @@ impl TypedDynamicObject {
 
     pub fn property_types(&self) -> impl Iterator<Item = &TypeHash> + '_ {
         self.properties.keys()
+    }
+}
+
+pub struct ManagedObject(Managed<Object>);
+
+impl ManagedObject {
+    pub fn new(managed: Managed<Object>) -> Self {
+        Self(managed)
+    }
+
+    pub fn consume<T: 'static>(self) -> Result<T, Self> {
+        match self.0.consume() {
+            Ok(data) => match data.consume::<T>() {
+                Ok(data) => Ok(data),
+                Err(error) => Err(Self(Managed::new(error))),
+            },
+            Err(error) => Err(Self(error)),
+        }
+    }
+
+    pub fn into_inner(self) -> Managed<Object> {
+        self.0
+    }
+
+    pub fn inner_ref(&self) -> &Managed<Object> {
+        &self.0
+    }
+
+    pub fn inner_mut(&mut self) -> &mut Managed<Object> {
+        &mut self.0
+    }
+
+    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+        self.0.read()?.remap(|object| object.read::<T>()).ok()
+    }
+
+    pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
+        self.0.write()?.remap(|object| object.write::<T>()).ok()
+    }
+
+    pub fn borrow(&self) -> Option<ManagedObjectRef> {
+        self.0.borrow().map(ManagedObjectRef)
+    }
+
+    pub fn borrow_mut(&mut self) -> Option<ManagedObjectRefMut> {
+        self.0.borrow_mut().map(ManagedObjectRefMut)
+    }
+}
+
+pub struct ManagedObjectRef(ManagedRef<Object>);
+
+impl ManagedObjectRef {
+    pub fn new(managed: ManagedRef<Object>) -> Self {
+        Self(managed)
+    }
+
+    pub fn into_inner(self) -> ManagedRef<Object> {
+        self.0
+    }
+
+    pub fn inner_ref(&self) -> &ManagedRef<Object> {
+        &self.0
+    }
+
+    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+        self.0.read()?.remap(|object| object.read::<T>()).ok()
+    }
+}
+
+pub struct ManagedObjectRefMut(ManagedRefMut<Object>);
+
+impl ManagedObjectRefMut {
+    pub fn new(managed: ManagedRefMut<Object>) -> Self {
+        Self(managed)
+    }
+
+    pub fn into_inner(self) -> ManagedRefMut<Object> {
+        self.0
+    }
+
+    pub fn inner_ref(&self) -> &ManagedRefMut<Object> {
+        &self.0
+    }
+
+    pub fn inner_mut(&mut self) -> &mut ManagedRefMut<Object> {
+        &mut self.0
+    }
+
+    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+        self.0.read()?.remap(|object| object.read::<T>()).ok()
+    }
+
+    pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
+        self.0.write()?.remap(|object| object.write::<T>()).ok()
     }
 }
 

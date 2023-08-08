@@ -67,7 +67,7 @@ impl<T: Default + Clone + 'static> ValueTransformer for SharedValueTransformer<T
     }
 
     fn into_owned(value: Self::Owned) -> Self::Type {
-        value.read().map(|value| value.clone()).unwrap_or_default()
+        value.try_consume().ok().unwrap()
     }
 
     fn into_ref(value: &Self::Ref) -> Self::Borrow<'_> {

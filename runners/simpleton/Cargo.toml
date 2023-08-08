@@ -1,6 +1,6 @@
 [package]
 name = "simpleton"
-version = "0.17.3"
+version = "0.18.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Simpleton runner for Intuicio scripting platform"
@@ -12,10 +12,10 @@ readme = "../../README.md"
 exclude = ["./resources"]
 
 [dependencies]
-intuicio-data = { version = "0.17", path = "../../platform/data" }
-intuicio-core = { version = "0.17", path = "../../platform/core" }
-intuicio-derive = { version = "0.17", path = "../../platform/derive" }
-intuicio-backend-vm = { version = "0.17", path = "../../backends/vm" }
-intuicio-frontend-simpleton = { version = "0.17", path = "../../frontends/simpleton" }
+intuicio-data = { version = "0.18", path = "../../platform/data" }
+intuicio-core = { version = "0.18", path = "../../platform/core" }
+intuicio-derive = { version = "0.18", path = "../../platform/derive" }
+intuicio-backend-vm = { version = "0.18", path = "../../backends/vm" }
+intuicio-frontend-simpleton = { version = "0.18", path = "../../frontends/simpleton" }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"

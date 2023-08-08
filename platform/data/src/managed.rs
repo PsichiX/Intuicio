@@ -15,6 +15,14 @@ impl<T> Managed<T> {
         }
     }
 
+    pub fn new_raw(data: T, lifetime: Lifetime) -> Self {
+        Self { lifetime, data }
+    }
+
+    pub fn into_inner(self) -> (Lifetime, T) {
+        (self.lifetime, self.data)
+    }
+
     pub fn renew(mut self) -> Self {
         self.lifetime = Lifetime::default();
         self
@@ -58,6 +66,13 @@ impl<T> Managed<T> {
         }
     }
 
+    pub fn try_map<U>(self, f: impl FnOnce(T) -> Option<U>) -> Option<Managed<U>> {
+        f(self.data).map(|data| Managed {
+            lifetime: Default::default(),
+            data,
+        })
+    }
+
     /// # Safety
     pub unsafe fn as_ptr(&self) -> *const T {
         &self.data as _
@@ -92,6 +107,10 @@ impl<T> ManagedRef<T> {
         }
     }
 
+    pub fn into_inner(self) -> (LifetimeRef, NonNull<T>) {
+        (self.lifetime, self.data)
+    }
+
     pub fn lifetime(&self) -> &LifetimeRef {
         &self.lifetime
     }
@@ -113,6 +132,19 @@ impl<T> ManagedRef<T> {
             ManagedRef {
                 lifetime: self.lifetime,
                 data: NonNull::new_unchecked(data as *const U as *mut U),
+            }
+        }
+    }
+
+    pub fn try_map<U>(self, f: impl FnOnce(&T) -> Option<&U>) -> Result<ManagedRef<U>, Self> {
+        unsafe {
+            if let Some(data) = f(self.data.as_ref()) {
+                Ok(ManagedRef {
+                    lifetime: self.lifetime,
+                    data: NonNull::new_unchecked(data as *const U as *mut U),
+                })
+            } else {
+                Err(self)
             }
         }
     }
@@ -149,6 +181,10 @@ impl<T> ManagedRefMut<T> {
         }
     }
 
+    pub fn into_inner(self) -> (LifetimeRefMut, NonNull<T>) {
+        (self.lifetime, self.data)
+    }
+
     pub fn lifetime(&self) -> &LifetimeRefMut {
         &self.lifetime
     }
@@ -181,6 +217,22 @@ impl<T> ManagedRefMut<T> {
             ManagedRefMut {
                 lifetime: self.lifetime,
                 data: NonNull::new_unchecked(data as *mut U),
+            }
+        }
+    }
+
+    pub fn try_map<U>(
+        mut self,
+        f: impl FnOnce(&mut T) -> Option<&mut U>,
+    ) -> Result<ManagedRefMut<U>, Self> {
+        unsafe {
+            if let Some(data) = f(self.data.as_mut()) {
+                Ok(ManagedRefMut {
+                    lifetime: self.lifetime,
+                    data: NonNull::new_unchecked(data as *mut U),
+                })
+            } else {
+                Err(self)
             }
         }
     }

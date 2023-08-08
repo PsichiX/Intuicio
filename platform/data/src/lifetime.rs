@@ -494,6 +494,22 @@ impl<'a, T> Deref for ValueReadAccess<'a, T> {
     }
 }
 
+impl<'a, T> ValueReadAccess<'a, T> {
+    pub fn remap<U>(
+        self,
+        f: impl FnOnce(&T) -> Option<&U>,
+    ) -> Result<ValueReadAccess<'a, U>, Self> {
+        if let Some(data) = f(self.data) {
+            Ok(ValueReadAccess {
+                lifetime: self.lifetime.clone(),
+                data,
+            })
+        } else {
+            Err(self)
+        }
+    }
+}
+
 pub struct ValueWriteAccess<'a, T: 'a> {
     lifetime: LifetimeState,
     data: &'a mut T,
@@ -523,6 +539,22 @@ impl<'a, T> Deref for ValueWriteAccess<'a, T> {
 impl<'a, T> DerefMut for ValueWriteAccess<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.data
+    }
+}
+
+impl<'a, T> ValueWriteAccess<'a, T> {
+    pub fn remap<U>(
+        self,
+        f: impl FnOnce(&mut T) -> Option<&mut U>,
+    ) -> Result<ValueWriteAccess<'a, U>, Self> {
+        if let Some(data) = f(unsafe { std::mem::transmute(&mut *self.data) }) {
+            Ok(ValueWriteAccess {
+                lifetime: self.lifetime.clone(),
+                data,
+            })
+        } else {
+            Err(self)
+        }
     }
 }
 
