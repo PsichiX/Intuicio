@@ -1,6 +1,6 @@
 [package]
 name = "simpleton-renderer"
-version = "0.17.2"
+version = "0.17.3"
 edition = "2021"
 publish = false
 

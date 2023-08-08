@@ -326,13 +326,7 @@ impl<'a> FunctionQuery<'a> {
             && self
                 .meta
                 .as_ref()
-                .map(|query| {
-                    signature
-                        .meta
-                        .as_ref()
-                        .map(query)
-                        .unwrap_or(false)
-                })
+                .map(|query| signature.meta.as_ref().map(query).unwrap_or(false))
                 .unwrap_or(true)
     }
 }

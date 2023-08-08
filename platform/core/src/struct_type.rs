@@ -294,8 +294,8 @@ pub struct Struct {
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
-    pub(crate) initializer: unsafe fn(*mut ()),
-    pub(crate) finalizer: unsafe fn(*mut ()),
+    initializer: unsafe fn(*mut ()),
+    finalizer: unsafe fn(*mut ()),
     is_send: bool,
     is_sync: bool,
 }
@@ -358,6 +358,16 @@ impl Struct {
     /// # Safety
     pub unsafe fn finalize(&self, pointer: *mut ()) {
         (self.finalizer)(pointer);
+    }
+
+    /// # Safety
+    pub unsafe fn initializer(&self) -> unsafe fn(*mut ()) {
+        self.initializer
+    }
+
+    /// # Safety
+    pub unsafe fn finalizer(&self) -> unsafe fn(*mut ()) {
+        self.finalizer
     }
 }
 

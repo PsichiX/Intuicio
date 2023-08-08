@@ -8,6 +8,7 @@ pub mod registry;
 pub mod script;
 pub mod struct_type;
 pub mod transformer;
+pub mod utils;
 
 pub mod prelude {
     pub use crate::{

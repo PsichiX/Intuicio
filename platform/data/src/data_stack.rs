@@ -426,6 +426,41 @@ impl DataStack {
         true
     }
 
+    /// # Safety
+    pub unsafe fn push_raw(
+        &mut self,
+        layout: Layout,
+        type_hash: TypeHash,
+        finalizer: unsafe fn(*mut ()),
+        data: &[u8],
+    ) -> bool {
+        if !self.mode.allows_values() {
+            return false;
+        }
+        let value_layout = layout.pad_to_align();
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
+        if data.len() != value_layout.size()
+            && self.position + value_layout.size() + type_layout.size() > self.size()
+        {
+            return false;
+        }
+        self.finalizers
+            .entry(type_hash)
+            .or_insert(DataStackFinalizer {
+                callback: finalizer,
+                layout: value_layout,
+            });
+        self.memory[self.position..(self.position + value_layout.size())].copy_from_slice(data);
+        self.position += value_layout.size();
+        self.memory
+            .as_mut_ptr()
+            .add(self.position)
+            .cast::<TypeHash>()
+            .write(type_hash);
+        self.position += type_layout.size();
+        true
+    }
+
     pub fn push_register<T: Finalize + 'static>(&mut self) -> Option<usize> {
         unsafe { self.push_register_raw(TypeHash::of::<T>(), Layout::new::<T>()) }
     }
@@ -579,6 +614,36 @@ impl DataStack {
         };
         self.position -= value_layout.size();
         Some(result)
+    }
+
+    /// # Safety
+    #[allow(clippy::type_complexity)]
+    pub unsafe fn pop_raw(&mut self) -> Option<(Layout, TypeHash, unsafe fn(*mut ()), Vec<u8>)> {
+        if !self.mode.allows_values() {
+            return None;
+        }
+        let type_layout = Layout::new::<TypeHash>().pad_to_align();
+        if self.position < type_layout.size() {
+            return None;
+        }
+        let type_hash = unsafe {
+            self.memory
+                .as_mut_ptr()
+                .add(self.position - type_layout.size())
+                .cast::<TypeHash>()
+                .read()
+        };
+        if type_hash == TypeHash::of::<DataStackRegisterTag>() {
+            return None;
+        }
+        let finalizer = self.finalizers.get(&type_hash)?;
+        if self.position < type_layout.size() + finalizer.layout.size() {
+            return None;
+        }
+        self.position -= type_layout.size();
+        let data = self.memory[(self.position - finalizer.layout.size())..self.position].to_vec();
+        self.position -= finalizer.layout.size();
+        Some((finalizer.layout, type_hash, finalizer.callback, data))
     }
 
     pub fn drop(&mut self) -> bool {
@@ -961,8 +1026,11 @@ impl_data_stack_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 
 #[cfg(test)]
 mod tests {
-    use crate::data_stack::{DataStack, DataStackMode};
-    use std::{cell::RefCell, rc::Rc};
+    use crate::{
+        data_stack::{DataStack, DataStackMode},
+        type_hash::TypeHash,
+    };
+    use std::{alloc::Layout, cell::RefCell, rc::Rc};
 
     #[test]
     fn test_data_stack() {
@@ -1012,6 +1080,16 @@ mod tests {
         assert_eq!(stack.position(), 24);
         assert_eq!(stack.pop::<()>().unwrap(), ());
         assert_eq!(stack.position(), 16);
+        stack.push(42_usize);
+        unsafe {
+            let (layout, type_hash, finalizer, data) = stack.pop_raw().unwrap();
+            assert_eq!(layout, Layout::new::<usize>().pad_to_align());
+            assert_eq!(type_hash, TypeHash::of::<usize>());
+            assert!(stack.push_raw(layout, type_hash, finalizer, &data));
+            assert_eq!(stack.position(), 32);
+            assert_eq!(stack.pop::<usize>().unwrap(), 42_usize);
+            assert_eq!(stack.position(), 16);
+        }
         drop(stack);
         assert_eq!(*dropped.borrow(), true);
 

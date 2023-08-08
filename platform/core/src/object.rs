@@ -52,7 +52,7 @@ impl Initialize for Object {
 
 impl Object {
     pub fn new(handle: StructHandle) -> Object {
-        let mut memory = vec![0; handle.layout().size()];
+        let mut memory = vec![0; handle.layout().pad_to_align().size()];
         unsafe { handle.initialize(memory.as_mut_ptr().cast::<()>()) };
         Self {
             memory,
@@ -64,10 +64,29 @@ impl Object {
     /// # Safety
     pub unsafe fn new_uninitialized(handle: StructHandle) -> Object {
         Self {
-            memory: vec![0; handle.layout().size()],
+            memory: vec![0; handle.layout().pad_to_align().size()],
             handle,
             drop: true,
         }
+    }
+
+    /// # Safety
+    pub unsafe fn new_raw(handle: StructHandle, memory: Vec<u8>) -> Option<Self> {
+        if memory.len() == handle.layout().pad_to_align().size() {
+            Some(Self {
+                memory,
+                handle,
+                drop: true,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn into_inner(mut self) -> (StructHandle, Vec<u8>) {
+        self.drop = false;
+        (self.handle.clone(), std::mem::take(&mut self.memory))
     }
 
     pub fn struct_handle(&self) -> &StructHandle {
@@ -88,7 +107,7 @@ impl Object {
     pub unsafe fn field_memory<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&[u8]> {
         self.handle.find_field(query).map(|field| {
             let from = field.address_offset();
-            let to = from + field.struct_handle().layout().size();
+            let to = from + field.struct_handle().layout().pad_to_align().size();
             &self.memory[from..to]
         })
     }
@@ -100,7 +119,7 @@ impl Object {
     ) -> Option<&mut [u8]> {
         self.handle.find_field(query).map(|field| {
             let from = field.address_offset();
-            let to = from + field.struct_handle().layout().size();
+            let to = from + field.struct_handle().layout().pad_to_align().size();
             &mut self.memory[from..to]
         })
     }
@@ -249,9 +268,17 @@ impl TypedDynamicObject {
 
 #[cfg(test)]
 mod tests {
-    use crate::{object::*, struct_type::*};
+    use crate::{
+        object::*,
+        registry::Registry,
+        struct_type::*,
+        utils::{object_pop_from_stack, object_push_to_stack},
+    };
     use intuicio_data::prelude::*;
-    use std::rc::{Rc, Weak};
+    use std::{
+        alloc::Layout,
+        rc::{Rc, Weak},
+    };
 
     #[test]
     fn test_send() {
@@ -331,5 +358,30 @@ mod tests {
         assert_eq!(lifetime.state().can_write(), false);
         drop(object);
         assert!(lifetime.state().can_write());
+    }
+
+    #[test]
+    fn test_inner() {
+        let mut stack = DataStack::new(1024, DataStackMode::Values);
+        assert_eq!(stack.position(), 0);
+        let registry = Registry::default().with_basic_types();
+        let handle = registry
+            .find_struct(StructQuery {
+                type_hash: Some(TypeHash::of::<usize>()),
+                ..Default::default()
+            })
+            .unwrap();
+        let mut object = Object::new(handle);
+        *object.write::<usize>().unwrap() = 42;
+        let (handle, data) = unsafe { object.into_inner() };
+        assert_eq!(handle.type_hash(), TypeHash::of::<usize>());
+        assert_eq!(*handle.layout(), Layout::new::<usize>());
+        assert_eq!(data.len(), 8);
+        let object = unsafe { Object::new_raw(handle, data).unwrap() };
+        assert!(object_push_to_stack(object, &mut stack));
+        assert_eq!(stack.position(), 16);
+        let object = object_pop_from_stack(&mut stack, &registry).unwrap();
+        assert_eq!(*object.read::<usize>().unwrap(), 42);
+        assert_eq!(stack.position(), 0);
     }
 }
