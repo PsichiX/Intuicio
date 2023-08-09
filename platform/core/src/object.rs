@@ -350,6 +350,10 @@ impl ManagedObjectRef {
     pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
         self.0.read()?.remap(|object| object.read::<T>()).ok()
     }
+
+    pub fn borrow(&self) -> Option<ManagedObjectRef> {
+        self.0.borrow().map(Self::new)
+    }
 }
 
 pub struct ManagedObjectRefMut(ManagedRefMut<Object>);
@@ -377,6 +381,14 @@ impl ManagedObjectRefMut {
 
     pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
         self.0.write()?.remap(|object| object.write::<T>()).ok()
+    }
+
+    pub fn borrow(&self) -> Option<ManagedObjectRef> {
+        self.0.borrow().map(ManagedObjectRef::new)
+    }
+
+    pub fn borrow_mut(&self) -> Option<Self> {
+        self.0.borrow_mut().map(Self::new)
     }
 }
 
