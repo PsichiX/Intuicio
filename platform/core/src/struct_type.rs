@@ -70,7 +70,7 @@ impl RuntimeStructBuilder {
             type_name: self.type_name,
             fields: self.fields,
             layout: self.layout.pad_to_align(),
-            initializer: self.initializer,
+            initializer: Some(self.initializer),
             finalizer: self.finalizer,
             is_send,
             is_sync,
@@ -93,7 +93,7 @@ impl From<Struct> for RuntimeStructBuilder {
             type_name: value.type_name,
             fields: value.fields,
             layout: value.layout,
-            initializer: value.initializer,
+            initializer: value.initializer.unwrap_or(RuntimeObject::initialize_raw),
             finalizer: value.finalizer,
         }
     }
@@ -108,7 +108,7 @@ pub struct NativeStructBuilder {
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
-    initializer: unsafe fn(*mut ()),
+    initializer: Option<unsafe fn(*mut ())>,
     finalizer: unsafe fn(*mut ()),
     is_send: bool,
     is_sync: bool,
@@ -125,7 +125,7 @@ impl NativeStructBuilder {
             type_name: std::any::type_name::<T>().to_owned(),
             fields: vec![],
             layout: Layout::new::<T>(),
-            initializer: T::initialize_raw,
+            initializer: Some(T::initialize_raw),
             finalizer: T::finalize_raw,
             is_send: is_send::<T>(),
             is_sync: is_sync::<T>(),
@@ -142,7 +142,7 @@ impl NativeStructBuilder {
             type_name: std::any::type_name::<T>().to_owned(),
             fields: vec![],
             layout: Layout::new::<T>(),
-            initializer: T::initialize_raw,
+            initializer: Some(T::initialize_raw),
             finalizer: T::finalize_raw,
             is_send: is_send::<T>(),
             is_sync: is_sync::<T>(),
@@ -294,7 +294,7 @@ pub struct Struct {
     type_name: String,
     fields: Vec<StructField>,
     layout: Layout,
-    initializer: unsafe fn(*mut ()),
+    initializer: Option<unsafe fn(*mut ())>,
     finalizer: unsafe fn(*mut ()),
     is_send: bool,
     is_sync: bool,
@@ -315,6 +315,10 @@ impl Struct {
 
     pub fn is_sync(&self) -> bool {
         self.is_sync
+    }
+
+    pub fn can_initialize(&self) -> bool {
+        self.initializer.is_some()
     }
 
     pub fn type_hash(&self) -> TypeHash {
@@ -351,8 +355,13 @@ impl Struct {
     }
 
     /// # Safety
-    pub unsafe fn initialize(&self, pointer: *mut ()) {
-        (self.initializer)(pointer);
+    pub unsafe fn initialize(&self, pointer: *mut ()) -> bool {
+        if let Some(initializer) = self.initializer {
+            (initializer)(pointer);
+            true
+        } else {
+            false
+        }
     }
 
     /// # Safety
@@ -361,7 +370,7 @@ impl Struct {
     }
 
     /// # Safety
-    pub unsafe fn initializer(&self) -> unsafe fn(*mut ()) {
+    pub unsafe fn initializer(&self) -> Option<unsafe fn(*mut ())> {
         self.initializer
     }
 

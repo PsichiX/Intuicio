@@ -57,12 +57,33 @@ impl Initialize for Object {
 
 impl Object {
     pub fn new(handle: StructHandle) -> Object {
+        if !handle.can_initialize() {
+            panic!(
+                "Objects of type `{}::{}` cannot be initialized!",
+                handle.module_name.as_deref().unwrap_or(""),
+                handle.name
+            );
+        }
         let mut memory = vec![0; handle.layout().pad_to_align().size()];
         unsafe { handle.initialize(memory.as_mut_ptr().cast::<()>()) };
         Self {
             memory,
             handle,
             drop: true,
+        }
+    }
+
+    pub fn try_new(handle: StructHandle) -> Option<Object> {
+        if handle.can_initialize() {
+            let mut memory = vec![0; handle.layout().pad_to_align().size()];
+            unsafe { handle.initialize(memory.as_mut_ptr().cast::<()>()) };
+            Some(Self {
+                memory,
+                handle,
+                drop: true,
+            })
+        } else {
+            None
         }
     }
 
