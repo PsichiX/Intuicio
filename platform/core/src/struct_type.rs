@@ -149,6 +149,40 @@ impl NativeStructBuilder {
         }
     }
 
+    pub fn new_uninitialized<T: Finalize + 'static>() -> Self {
+        Self {
+            meta: None,
+            name: std::any::type_name::<T>().to_owned(),
+            module_name: None,
+            visibility: Visibility::default(),
+            type_hash: TypeHash::of::<T>(),
+            type_name: std::any::type_name::<T>().to_owned(),
+            fields: vec![],
+            layout: Layout::new::<T>(),
+            initializer: None,
+            finalizer: T::finalize_raw,
+            is_send: is_send::<T>(),
+            is_sync: is_sync::<T>(),
+        }
+    }
+
+    pub fn new_named_uninitialized<T: Finalize + 'static>(name: impl ToString) -> Self {
+        Self {
+            meta: None,
+            name: name.to_string(),
+            module_name: None,
+            visibility: Visibility::default(),
+            type_hash: TypeHash::of::<T>(),
+            type_name: std::any::type_name::<T>().to_owned(),
+            fields: vec![],
+            layout: Layout::new::<T>(),
+            initializer: None,
+            finalizer: T::finalize_raw,
+            is_send: is_send::<T>(),
+            is_sync: is_sync::<T>(),
+        }
+    }
+
     pub fn meta(mut self, meta: Meta) -> Self {
         self.meta = Some(meta);
         self

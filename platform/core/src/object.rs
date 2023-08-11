@@ -109,6 +109,18 @@ impl Object {
         }
     }
 
+    pub fn with_value<T: 'static>(handle: StructHandle, value: T) -> Option<Self> {
+        if handle.type_hash() == TypeHash::of::<T>() {
+            unsafe {
+                let mut result = Self::new_uninitialized(handle);
+                result.as_mut_ptr().cast::<T>().write(value);
+                Some(result)
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn consume<T: 'static>(mut self) -> Result<T, Self> {
         if self.handle.type_hash() == TypeHash::of::<T>() {
             self.drop = false;
@@ -490,18 +502,12 @@ mod tests {
 
     #[test]
     fn test_drop() {
-        type Wrapper = Option<LifetimeRefMut>;
+        type Wrapper = LifetimeRefMut;
 
         let lifetime = Lifetime::default();
-        let handle = NativeStructBuilder::new::<Wrapper>().build_handle();
-        let mut object = unsafe { Object::new_uninitialized(handle) };
         assert!(lifetime.state().can_write());
-        unsafe {
-            object
-                .as_mut_ptr()
-                .cast::<Wrapper>()
-                .write(Some(lifetime.borrow_mut().unwrap()))
-        };
+        let handle = NativeStructBuilder::new_uninitialized::<Wrapper>().build_handle();
+        let object = Object::with_value(handle, lifetime.borrow_mut().unwrap()).unwrap();
         assert_eq!(lifetime.state().can_write(), false);
         drop(object);
         assert!(lifetime.state().can_write());
