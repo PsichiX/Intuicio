@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-simpleton"
-version = "0.18.3"
+version = "0.19.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Simpleton frontend module for Intuicio scripting platform"
@@ -20,11 +20,11 @@ jobs = []
 plugins = []
 
 [dependencies]
-intuicio-data = { version = "0.18", path = "../../platform/data" }
-intuicio-core = { version = "0.18", path = "../../platform/core" }
-intuicio-nodes = { version = "0.18", path = "../../platform/nodes" }
-intuicio-plugins = { version = "0.18", path = "../../platform/plugins" }
-intuicio-derive = { version = "0.18", path = "../../platform/derive" }
+intuicio-data = { version = "0.19", path = "../../platform/data" }
+intuicio-core = { version = "0.19", path = "../../platform/core" }
+intuicio-nodes = { version = "0.19", path = "../../platform/nodes" }
+intuicio-plugins = { version = "0.19", path = "../../platform/plugins" }
+intuicio-derive = { version = "0.19", path = "../../platform/derive" }
 pest = "2.5"
 pest_derive = "2.5"
 regex = "1"
@@ -38,4 +38,4 @@ rand = "0.8"
 typid = "1"
 
 [dev-dependencies]
-intuicio-backend-vm = { version = "0.18", path = "../../backends/vm" }
+intuicio-backend-vm = { version = "0.19", path = "../../backends/vm" }
