@@ -100,6 +100,7 @@ pub struct ManagedRef<T> {
 }
 
 unsafe impl<T> Send for ManagedRef<T> where T: Send {}
+unsafe impl<T> Sync for ManagedRef<T> where T: Sync {}
 
 impl<T> ManagedRef<T> {
     pub fn new(data: &T, lifetime: LifetimeRef) -> Self {
@@ -180,7 +181,9 @@ pub struct ManagedRefMut<T> {
     lifetime: LifetimeRefMut,
     data: NonNull<T>,
 }
+
 unsafe impl<T> Send for ManagedRefMut<T> where T: Send {}
+unsafe impl<T> Sync for ManagedRefMut<T> where T: Sync {}
 
 impl<T> ManagedRefMut<T> {
     pub fn new(data: &mut T, lifetime: LifetimeRefMut) -> Self {
@@ -423,6 +426,7 @@ pub struct DynamicManagedRef {
 }
 
 unsafe impl Send for DynamicManagedRef {}
+unsafe impl Sync for DynamicManagedRef {}
 
 impl DynamicManagedRef {
     pub fn new<T: 'static>(data: &T, lifetime: LifetimeRef) -> Self {
@@ -533,6 +537,7 @@ pub struct DynamicManagedRefMut {
 }
 
 unsafe impl Send for DynamicManagedRefMut {}
+unsafe impl Sync for DynamicManagedRefMut {}
 
 impl DynamicManagedRefMut {
     pub fn new<T: 'static>(data: &mut T, lifetime: LifetimeRefMut) -> Self {
@@ -669,9 +674,7 @@ impl DynamicManagedRefMut {
 mod tests {
     use super::*;
 
-    fn is_async<T: Send + 'static>() {
-        println!("{} is send!", std::any::type_name::<T>());
-    }
+    fn is_async<T: Send + Sync + 'static>() {}
 
     #[test]
     fn test_managed() {
