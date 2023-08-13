@@ -135,6 +135,62 @@ impl<T> ValueTransformer for ManagedValueTransformer<T> {
     }
 }
 
+pub struct DynamicManagedValueTransformer<T: 'static>(PhantomData<fn() -> T>);
+
+impl<T: 'static> ValueTransformer for DynamicManagedValueTransformer<T> {
+    type Type = T;
+    type Borrow<'r> = ValueReadAccess<'r, T> where Self::Type: 'r;
+    type BorrowMut<'r> = ValueWriteAccess<'r, T> where Self::Type: 'r;
+    type Dependency = ManagedValueDependency;
+    type Owned = DynamicManaged;
+    type Ref = DynamicManagedRef;
+    type RefMut = DynamicManagedRefMut;
+
+    fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
+        DynamicManaged::new(value)
+    }
+
+    fn from_ref(
+        _: &Registry,
+        value: &Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::Ref {
+        if let ManagedValueDependency::Ref(lifetime) =
+            dependency.expect("`DynamicManagedRef` require dependency for lifetime bound!")
+        {
+            DynamicManagedRef::new(value, lifetime)
+        } else {
+            panic!("Could not borrow lifetime to create `DynamicManagedRef`!")
+        }
+    }
+
+    fn from_ref_mut(
+        _: &Registry,
+        value: &mut Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::RefMut {
+        if let ManagedValueDependency::RefMut(lifetime) =
+            dependency.expect("`DynamicManagedRefMut` require dependency for lifetime bound!")
+        {
+            DynamicManagedRefMut::new(value, lifetime)
+        } else {
+            panic!("Could not borrow lifetime mutably to create `DynamicManagedRefMut`!")
+        }
+    }
+
+    fn into_owned(value: Self::Owned) -> Self::Type {
+        value.consume().ok().unwrap()
+    }
+
+    fn into_ref(value: &Self::Ref) -> Self::Borrow<'_> {
+        value.read().unwrap()
+    }
+
+    fn into_ref_mut(value: &mut Self::RefMut) -> Self::BorrowMut<'_> {
+        value.write().unwrap()
+    }
+}
+
 pub enum ManagedValueDependency {
     Ref(LifetimeRef),
     RefMut(LifetimeRefMut),
@@ -170,6 +226,36 @@ impl<T> ValueDependency<ManagedRefMut<T>> for ManagedValueDependency {
     }
 }
 
+impl ValueDependency<DynamicManaged> for ManagedValueDependency {
+    fn as_ref(value: &DynamicManaged) -> Self {
+        Self::Ref(value.lifetime().borrow().unwrap())
+    }
+
+    fn as_ref_mut(value: &mut DynamicManaged) -> Self {
+        Self::RefMut(value.lifetime().borrow_mut().unwrap())
+    }
+}
+
+impl ValueDependency<DynamicManagedRef> for ManagedValueDependency {
+    fn as_ref(value: &DynamicManagedRef) -> Self {
+        Self::Ref(value.lifetime().borrow().unwrap())
+    }
+
+    fn as_ref_mut(_: &mut DynamicManagedRef) -> Self {
+        panic!("Cannot borrow lifetime mutably from `DynamicManagedRef`!");
+    }
+}
+
+impl ValueDependency<DynamicManagedRefMut> for ManagedValueDependency {
+    fn as_ref(value: &DynamicManagedRefMut) -> Self {
+        Self::Ref(value.lifetime().borrow().unwrap())
+    }
+
+    fn as_ref_mut(value: &mut DynamicManagedRefMut) -> Self {
+        Self::RefMut(value.lifetime().borrow_mut().unwrap())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,6 +266,11 @@ mod tests {
     #[intuicio_function(transformer = "ManagedValueTransformer")]
     fn add(a: &i32, b: &mut i32) -> i32 {
         *a + *b
+    }
+
+    #[intuicio_function(transformer = "DynamicManagedValueTransformer")]
+    fn sub(a: &i32, b: &mut i32) -> i32 {
+        *a - *b
     }
 
     #[derive(IntuicioStruct, Default, Clone)]
@@ -201,11 +292,32 @@ mod tests {
         }
     }
 
+    #[derive(IntuicioStruct, Default, Clone)]
+    #[intuicio(name = "Bar")]
+    struct Bar {
+        foo: i32,
+    }
+
+    #[intuicio_methods()]
+    impl Bar {
+        #[intuicio_method(transformer = "DynamicManagedValueTransformer")]
+        fn new(foo: i32) -> Bar {
+            Bar { foo }
+        }
+
+        #[intuicio_method(transformer = "DynamicManagedValueTransformer", dependency = "bar")]
+        fn get(bar: &Bar) -> &i32 {
+            &bar.foo
+        }
+    }
+
     #[test]
     fn test_derive() {
         let mut registry = Registry::default().with_basic_types();
         registry.add_struct(Foo::define_struct(&registry));
         registry.add_function(Foo::new__define_function(&registry));
+        registry.add_struct(Bar::define_struct(&registry));
+        registry.add_function(Bar::new__define_function(&registry));
         let mut context = Context::new(1024, 1024, 1024);
 
         let a = Managed::new(40);
@@ -224,6 +336,22 @@ mod tests {
             42
         );
 
+        let a = DynamicManaged::new(40);
+        let mut b = DynamicManaged::new(2);
+        context.stack().push(b.borrow_mut().unwrap());
+        context.stack().push(a.borrow().unwrap());
+        sub::intuicio_function(&mut context, &registry);
+        assert_eq!(
+            context
+                .stack()
+                .pop::<DynamicManaged>()
+                .unwrap()
+                .consume::<i32>()
+                .ok()
+                .unwrap(),
+            38
+        );
+
         let foo = Managed::new(Foo::new(42));
         context.stack().push(foo.borrow().unwrap());
         Foo::get__intuicio_function(&mut context, &registry);
@@ -233,6 +361,19 @@ mod tests {
                 .pop::<ManagedRef<i32>>()
                 .unwrap()
                 .read()
+                .unwrap(),
+            42
+        );
+
+        let bar = DynamicManaged::new(Bar::new(42));
+        context.stack().push(bar.borrow().unwrap());
+        Bar::get__intuicio_function(&mut context, &registry);
+        assert_eq!(
+            *context
+                .stack()
+                .pop::<DynamicManagedRef>()
+                .unwrap()
+                .read::<i32>()
                 .unwrap(),
             42
         );
