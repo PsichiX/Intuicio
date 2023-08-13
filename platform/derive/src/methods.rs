@@ -372,6 +372,23 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         } else {
             (vec![], vec![])
         };
+        let result = if return_structs.is_empty() {
+            quote! {
+                {
+                    #(#transform_arg_deref)*
+                    #struct_type::#ident(#(#call_arg_idents,)*)
+                }
+            }
+        } else {
+            quote! {
+                let result = {
+                    #(#transform_arg_deref)*
+                    #struct_type::#ident(#(#call_arg_idents,)*)
+                };
+                #(#return_transform)*
+                (result,).stack_push_reversed(context.stack());
+            }
+        };
         let result = quote! {
             #[allow(dead_code)]
             #[allow(non_snake_case)]
@@ -384,12 +401,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 let (#(mut #arg_idents,)*) = <(#(#arg_types,)*)>::stack_pop(context.stack());
                 #(#dependency)*
                 let (#(mut #transform_arg_idents,)*) = (#(#arg_transforms,)*);
-                let result = {
-                    #(#transform_arg_deref)*
-                    #struct_type::#ident(#(#call_arg_idents,)*)
-                };
-                #(#return_transform)*
-                (result,).stack_push_reversed(context.stack());
+                #result
             }
 
             #[allow(dead_code)]

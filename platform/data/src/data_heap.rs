@@ -110,7 +110,7 @@ impl DataHeapMemoryPage {
 
     pub fn has_object<T>(&self, data: &DataHeapBox<T>) -> bool {
         unsafe {
-            let header_layout = Layout::new::<DataHeapObjectHeader>();
+            let header_layout = Layout::new::<DataHeapObjectHeader>().pad_to_align();
             let pointer = data.data.as_ptr().cast::<u8>().cast_const();
             if pointer < self.memory.as_ptr()
                 || pointer >= self.memory.as_ptr().add(self.capacity())

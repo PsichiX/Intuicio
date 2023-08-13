@@ -320,6 +320,23 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
     } else {
         (vec![], vec![])
     };
+    let result = if return_structs.is_empty() {
+        quote! {
+            {
+                #(#transform_arg_deref)*
+                super::#ident(#(#call_arg_idents,)*);
+            }
+        }
+    } else {
+        quote! {
+            let result = {
+                #(#transform_arg_deref)*
+                super::#ident(#(#call_arg_idents,)*)
+            };
+            #(#return_transform)*
+            (result,).stack_push_reversed(context.stack());
+        }
+    };
     let result = quote! {
         pub mod #ident {
             use super::*;
@@ -334,12 +351,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
                 let (#(mut #arg_idents,)*) = <(#(#arg_types,)*)>::stack_pop(context.stack());
                 #(#dependency)*
                 let (#(mut #transform_arg_idents,)*) = (#(#arg_transforms,)*);
-                let result = {
-                    #(#transform_arg_deref)*
-                    super::#ident(#(#call_arg_idents,)*)
-                };
-                #(#return_transform)*
-                (result,).stack_push_reversed(context.stack());
+                #result
             }
 
             #[allow(dead_code)]

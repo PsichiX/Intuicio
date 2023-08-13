@@ -417,7 +417,7 @@ mod tests {
         *object.write::<usize>().unwrap() = 42;
         let (handle, data) = unsafe { object.into_inner() };
         assert_eq!(handle.type_hash(), TypeHash::of::<usize>());
-        assert_eq!(*handle.layout(), Layout::new::<usize>());
+        assert_eq!(*handle.layout(), Layout::new::<usize>().pad_to_align());
         assert_eq!(data.len(), 8);
         let object = unsafe { Object::new_raw(handle, data).unwrap() };
         assert!(object_push_to_stack(object, &mut stack));

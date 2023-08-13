@@ -462,7 +462,7 @@ impl DataStack {
     }
 
     pub fn push_register<T: Finalize + 'static>(&mut self) -> Option<usize> {
-        unsafe { self.push_register_raw(TypeHash::of::<T>(), Layout::new::<T>()) }
+        unsafe { self.push_register_raw(TypeHash::of::<T>(), Layout::new::<T>().pad_to_align()) }
     }
 
     pub fn push_register_value<T: Finalize + 'static>(&mut self, value: T) -> Option<usize> {
