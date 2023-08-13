@@ -394,12 +394,12 @@ mod tests {
         type Wrapper = LifetimeRefMut;
 
         let lifetime = Lifetime::default();
-        assert!(lifetime.state().can_write());
+        assert!(lifetime.state().can_write(0));
         let handle = NativeStructBuilder::new_uninitialized::<Wrapper>().build_handle();
         let object = Object::with_value(handle, lifetime.borrow_mut().unwrap()).unwrap();
-        assert_eq!(lifetime.state().can_write(), false);
+        assert_eq!(lifetime.state().can_write(0), false);
         drop(object);
-        assert!(lifetime.state().can_write());
+        assert!(lifetime.state().can_write(0));
     }
 
     #[test]

@@ -683,6 +683,12 @@ mod tests {
         is_async::<ManagedRefMut<()>>();
 
         let mut value = Managed::new(42);
+        let mut value_ref = value.borrow_mut().unwrap();
+        assert!(value_ref.write().is_some());
+        let mut value_ref2 = value_ref.borrow_mut().unwrap();
+        assert!(value_ref.write().is_some());
+        assert!(value_ref2.write().is_some());
+        drop(value_ref);
         let value_ref = value.borrow().unwrap();
         assert!(value.borrow().is_some());
         assert!(value.borrow_mut().is_none());
@@ -710,6 +716,12 @@ mod tests {
         is_async::<DynamicManagedRefMut>();
 
         let mut value = DynamicManaged::new(42);
+        let mut value_ref = value.borrow_mut().unwrap();
+        assert!(value_ref.write::<i32>().is_some());
+        let mut value_ref2 = value_ref.borrow_mut().unwrap();
+        assert!(value_ref.write::<i32>().is_some());
+        assert!(value_ref2.write::<i32>().is_some());
+        drop(value_ref);
         let value_ref = value.borrow().unwrap();
         assert!(value.borrow().is_some());
         assert!(value.borrow_mut().is_none());

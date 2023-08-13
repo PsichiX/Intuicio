@@ -10,18 +10,22 @@ use std::{
 pub struct LifetimeState {
     locked: Arc<AtomicBool>,
     readers: Arc<AtomicUsize>,
-    writer: Arc<AtomicBool>,
+    writer: Arc<AtomicUsize>,
     read_access: Arc<AtomicUsize>,
     write_access: Arc<AtomicBool>,
 }
 
 impl LifetimeState {
     pub fn can_read(&self) -> bool {
-        !self.writer.load(Ordering::Acquire)
+        self.writer.load(Ordering::Acquire) == 0
     }
 
-    pub fn can_write(&self) -> bool {
-        !self.writer.load(Ordering::Acquire) && self.readers.load(Ordering::Acquire) == 0
+    pub fn can_write(&self, id: usize) -> bool {
+        self.writer.load(Ordering::Acquire) == id && self.readers.load(Ordering::Acquire) == 0
+    }
+
+    pub fn writer_depth(&self) -> usize {
+        self.writer.load(Ordering::Acquire)
     }
 
     pub fn is_read_accessible(&self) -> bool {
@@ -82,7 +86,7 @@ impl LifetimeState {
 pub struct LifetimeWeakState {
     locked: Weak<AtomicBool>,
     readers: Weak<AtomicUsize>,
-    writer: Weak<AtomicBool>,
+    writer: Weak<AtomicUsize>,
     read_access: Weak<AtomicUsize>,
     write_access: Weak<AtomicBool>,
 }
@@ -95,18 +99,6 @@ impl LifetimeWeakState {
             writer: self.writer.upgrade()?,
             read_access: self.read_access.upgrade()?,
             write_access: self.write_access.upgrade()?,
-        })
-    }
-
-    pub fn promote(&self) -> Option<Lifetime> {
-        self.upgrade().map(|state| {
-            Lifetime(LifetimeState {
-                locked: state.locked,
-                readers: Default::default(),
-                writer: Default::default(),
-                read_access: state.read_access,
-                write_access: state.write_access,
-            })
         })
     }
 
@@ -147,12 +139,20 @@ impl<'a> LifetimeStateAccess<'a> {
         self.state.readers.store(v, Ordering::Release);
     }
 
-    pub fn acquire_writer(&mut self) {
-        self.state.writer.store(true, Ordering::Release);
+    #[must_use]
+    pub fn acquire_writer(&mut self) -> usize {
+        let v = self.state.writer.load(Ordering::Acquire) + 1;
+        self.state.writer.store(v, Ordering::Release);
+        v
     }
 
-    pub fn release_writer(&mut self) {
-        self.state.writer.store(false, Ordering::Release);
+    pub fn release_writer(&mut self, id: usize) {
+        let v = self.state.writer.load(Ordering::Acquire);
+        if id <= v {
+            self.state
+                .writer
+                .store(id.saturating_sub(1), Ordering::Release);
+        }
     }
 
     pub fn acquire_read_access(&mut self) {
@@ -199,10 +199,10 @@ impl Lifetime {
     pub fn borrow_mut(&self) -> Option<LifetimeRefMut> {
         self.0
             .try_lock()
-            .filter(|access| access.state.can_write())
+            .filter(|access| access.state.can_write(0))
             .map(|mut access| {
-                access.acquire_writer();
-                LifetimeRefMut(self.0.downgrade())
+                let id = access.acquire_writer();
+                LifetimeRefMut(self.0.downgrade(), id)
             })
     }
 
@@ -331,13 +331,13 @@ impl LifetimeRef {
     }
 }
 
-pub struct LifetimeRefMut(LifetimeWeakState);
+pub struct LifetimeRefMut(LifetimeWeakState, usize);
 
 impl Drop for LifetimeRefMut {
     fn drop(&mut self) {
         if let Some(state) = self.0.upgrade() {
             if let Some(mut access) = state.try_lock() {
-                access.release_writer();
+                access.release_writer(self.1);
             }
         }
     }
@@ -346,6 +346,10 @@ impl Drop for LifetimeRefMut {
 impl LifetimeRefMut {
     pub fn state(&self) -> &LifetimeWeakState {
         &self.0
+    }
+
+    pub fn depth(&self) -> usize {
+        self.1
     }
 
     pub fn exists(&self) -> bool {
@@ -362,7 +366,7 @@ impl LifetimeRefMut {
     pub fn can_write(&self) -> bool {
         self.0
             .upgrade()
-            .map(|state| state.can_write())
+            .map(|state| state.can_write(self.1))
             .unwrap_or(false)
     }
 
@@ -406,10 +410,10 @@ impl LifetimeRefMut {
         self.0
             .upgrade()?
             .try_lock()
-            .filter(|access| access.state.can_write())
+            .filter(|access| access.state.can_write(self.1))
             .map(|mut access| {
-                access.acquire_writer();
-                LifetimeRefMut(self.0.clone())
+                let id = access.acquire_writer();
+                LifetimeRefMut(self.0.clone(), id)
             })
     }
 
@@ -577,7 +581,7 @@ mod tests {
         let lifetime_ref = {
             let lifetime = Lifetime::default();
             assert!(lifetime.state().can_read());
-            assert!(lifetime.state().can_write());
+            assert!(lifetime.state().can_write(0));
             assert!(lifetime.state().is_read_accessible());
             assert!(lifetime.state().is_write_accessible());
             {
@@ -592,34 +596,56 @@ mod tests {
             {
                 let lifetime_ref = lifetime.borrow().unwrap();
                 assert!(lifetime.state().can_read());
-                assert!(!lifetime.state().can_write());
+                assert!(!lifetime.state().can_write(0));
                 assert!(lifetime_ref.exists());
                 assert!(lifetime_ref.is_owned_by(&lifetime));
                 assert!(lifetime.borrow().is_some());
                 assert!(lifetime.borrow_mut().is_none());
                 {
-                    let access = lifetime.read(&value).unwrap();
+                    let access = lifetime_ref.read(&value).unwrap();
+                    assert_eq!(*access, 42);
+                }
+                let lifetime_ref2 = lifetime_ref.borrow().unwrap();
+                {
+                    let access = lifetime_ref2.read(&value).unwrap();
                     assert_eq!(*access, 42);
                 }
             }
             {
                 let lifetime_ref_mut = lifetime.borrow_mut().unwrap();
+                assert_eq!(lifetime.state().writer_depth(), 1);
                 assert!(!lifetime.state().can_read());
-                assert!(!lifetime.state().can_write());
+                assert!(!lifetime.state().can_write(0));
                 assert!(lifetime_ref_mut.exists());
                 assert!(lifetime_ref_mut.is_owned_by(&lifetime));
                 assert!(lifetime.borrow().is_none());
                 assert!(lifetime.borrow_mut().is_none());
                 {
-                    let mut access = lifetime.write(&mut value).unwrap();
+                    let mut access = lifetime_ref_mut.write(&mut value).unwrap();
                     *access = 7;
                     assert_eq!(*access, 7);
                 }
+                let lifetime_ref_mut2 = lifetime_ref_mut.borrow_mut().unwrap();
+                {
+                    assert_eq!(lifetime.state().writer_depth(), 2);
+                    assert!(lifetime.borrow().is_none());
+                    assert!(lifetime_ref_mut.borrow().is_none());
+                    assert!(lifetime.borrow_mut().is_none());
+                    assert!(lifetime_ref_mut.borrow_mut().is_none());
+                    let mut access = lifetime_ref_mut2.write(&mut value).unwrap();
+                    *access = 42;
+                    assert_eq!(*access, 42);
+                    assert!(lifetime.read(&42).is_none());
+                    assert!(lifetime_ref_mut.read(&42).is_none());
+                    assert!(lifetime.write(&mut 42).is_none());
+                    assert!(lifetime_ref_mut.write(&mut 42).is_none());
+                }
             }
+            assert_eq!(lifetime.state().writer_depth(), 0);
             lifetime.borrow().unwrap()
         };
         assert!(!lifetime_ref.exists());
-        assert_eq!(value, 7);
+        assert_eq!(value, 42);
     }
 
     #[test]

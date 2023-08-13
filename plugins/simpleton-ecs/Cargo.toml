@@ -1,6 +1,6 @@
 [package]
 name = "simpleton-ecs"
-version = "0.19.1"
+version = "0.20.0"
 edition = "2021"
 publish = false
 
@@ -8,8 +8,8 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-intuicio-data = { version = "0.19", path = "../../platform/data" }
-intuicio-core = { version = "0.19", path = "../../platform/core" }
-intuicio-derive = { version = "0.19", path = "../../platform/derive" }
-intuicio-frontend-simpleton = { version = "0.19", path = "../../frontends/simpleton" }
+intuicio-data = { version = "0.20", path = "../../platform/data" }
+intuicio-core = { version = "0.20", path = "../../platform/core" }
+intuicio-derive = { version = "0.20", path = "../../platform/derive" }
+intuicio-frontend-simpleton = { version = "0.20", path = "../../frontends/simpleton" }
 bitvec = "1"
