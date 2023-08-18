@@ -94,6 +94,17 @@ impl<T> Managed<T> {
     }
 }
 
+impl<T> TryFrom<ManagedValue<T>> for Managed<T> {
+    type Error = ();
+
+    fn try_from(value: ManagedValue<T>) -> Result<Self, Self::Error> {
+        match value {
+            ManagedValue::Owned(value) => Ok(value),
+            _ => Err(()),
+        }
+    }
+}
+
 pub struct ManagedRef<T> {
     lifetime: LifetimeRef,
     data: NonNull<T>,
@@ -173,6 +184,17 @@ impl<T> ManagedRef<T> {
             Some(self.data.as_ptr())
         } else {
             None
+        }
+    }
+}
+
+impl<T> TryFrom<ManagedValue<T>> for ManagedRef<T> {
+    type Error = ();
+
+    fn try_from(value: ManagedValue<T>) -> Result<Self, Self::Error> {
+        match value {
+            ManagedValue::Ref(value) => Ok(value),
+            _ => Err(()),
         }
     }
 }
@@ -280,6 +302,117 @@ impl<T> ManagedRefMut<T> {
         } else {
             None
         }
+    }
+}
+
+impl<T> TryFrom<ManagedValue<T>> for ManagedRefMut<T> {
+    type Error = ();
+
+    fn try_from(value: ManagedValue<T>) -> Result<Self, Self::Error> {
+        match value {
+            ManagedValue::RefMut(value) => Ok(value),
+            _ => Err(()),
+        }
+    }
+}
+
+pub enum ManagedValue<T> {
+    Owned(Managed<T>),
+    Ref(ManagedRef<T>),
+    RefMut(ManagedRefMut<T>),
+}
+
+impl<T> ManagedValue<T> {
+    pub fn as_owned(&self) -> Option<&Managed<T>> {
+        match self {
+            Self::Owned(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_owned(&mut self) -> Option<&mut Managed<T>> {
+        match self {
+            Self::Owned(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_ref(&self) -> Option<&ManagedRef<T>> {
+        match self {
+            Self::Ref(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_ref(&mut self) -> Option<&mut ManagedRef<T>> {
+        match self {
+            Self::Ref(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_ref_mut(&self) -> Option<&ManagedRefMut<T>> {
+        match self {
+            Self::RefMut(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_ref_mut(&mut self) -> Option<&mut ManagedRefMut<T>> {
+        match self {
+            Self::RefMut(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+        match self {
+            Self::Owned(value) => value.read(),
+            Self::Ref(value) => value.read(),
+            Self::RefMut(value) => value.read(),
+        }
+    }
+
+    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
+        match self {
+            Self::Owned(value) => value.write(),
+            Self::RefMut(value) => value.write(),
+            _ => None,
+        }
+    }
+
+    pub fn borrow(&self) -> Option<ManagedRef<T>> {
+        match self {
+            Self::Owned(value) => value.borrow(),
+            Self::Ref(value) => value.borrow(),
+            Self::RefMut(value) => value.borrow(),
+        }
+    }
+
+    pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
+        match self {
+            Self::Owned(value) => value.borrow_mut(),
+            Self::RefMut(value) => value.borrow_mut(),
+            _ => None,
+        }
+    }
+}
+
+impl<T> From<Managed<T>> for ManagedValue<T> {
+    fn from(value: Managed<T>) -> Self {
+        Self::Owned(value)
+    }
+}
+
+impl<T> From<ManagedRef<T>> for ManagedValue<T> {
+    fn from(value: ManagedRef<T>) -> Self {
+        Self::Ref(value)
+    }
+}
+
+impl<T> From<ManagedRefMut<T>> for ManagedValue<T> {
+    fn from(value: ManagedRefMut<T>) -> Self {
+        Self::RefMut(value)
     }
 }
 
@@ -419,6 +552,17 @@ impl DynamicManaged {
     }
 }
 
+impl TryFrom<DynamicManagedValue> for DynamicManaged {
+    type Error = ();
+
+    fn try_from(value: DynamicManagedValue) -> Result<Self, Self::Error> {
+        match value {
+            DynamicManagedValue::Owned(value) => Ok(value),
+            _ => Err(()),
+        }
+    }
+}
+
 pub struct DynamicManagedRef {
     type_hash: TypeHash,
     lifetime: LifetimeRef,
@@ -526,6 +670,17 @@ impl DynamicManagedRef {
             Some(self.data.as_ptr().cast::<T>())
         } else {
             None
+        }
+    }
+}
+
+impl TryFrom<DynamicManagedValue> for DynamicManagedRef {
+    type Error = ();
+
+    fn try_from(value: DynamicManagedValue) -> Result<Self, Self::Error> {
+        match value {
+            DynamicManagedValue::Ref(value) => Ok(value),
+            _ => Err(()),
         }
     }
 }
@@ -667,6 +822,117 @@ impl DynamicManagedRefMut {
         } else {
             None
         }
+    }
+}
+
+impl TryFrom<DynamicManagedValue> for DynamicManagedRefMut {
+    type Error = ();
+
+    fn try_from(value: DynamicManagedValue) -> Result<Self, Self::Error> {
+        match value {
+            DynamicManagedValue::RefMut(value) => Ok(value),
+            _ => Err(()),
+        }
+    }
+}
+
+pub enum DynamicManagedValue {
+    Owned(DynamicManaged),
+    Ref(DynamicManagedRef),
+    RefMut(DynamicManagedRefMut),
+}
+
+impl DynamicManagedValue {
+    pub fn as_owned(&self) -> Option<&DynamicManaged> {
+        match self {
+            Self::Owned(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_owned(&mut self) -> Option<&mut DynamicManaged> {
+        match self {
+            Self::Owned(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_ref(&self) -> Option<&DynamicManagedRef> {
+        match self {
+            Self::Ref(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_ref(&mut self) -> Option<&mut DynamicManagedRef> {
+        match self {
+            Self::Ref(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_ref_mut(&self) -> Option<&DynamicManagedRefMut> {
+        match self {
+            Self::RefMut(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_ref_mut(&mut self) -> Option<&mut DynamicManagedRefMut> {
+        match self {
+            Self::RefMut(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+        match self {
+            Self::Owned(value) => value.read::<T>(),
+            Self::Ref(value) => value.read::<T>(),
+            Self::RefMut(value) => value.read::<T>(),
+        }
+    }
+
+    pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
+        match self {
+            Self::Owned(value) => value.write::<T>(),
+            Self::RefMut(value) => value.write::<T>(),
+            _ => None,
+        }
+    }
+
+    pub fn borrow(&self) -> Option<DynamicManagedRef> {
+        match self {
+            Self::Owned(value) => value.borrow(),
+            Self::Ref(value) => value.borrow(),
+            Self::RefMut(value) => value.borrow(),
+        }
+    }
+
+    pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
+        match self {
+            Self::Owned(value) => value.borrow_mut(),
+            Self::RefMut(value) => value.borrow_mut(),
+            _ => None,
+        }
+    }
+}
+
+impl From<DynamicManaged> for DynamicManagedValue {
+    fn from(value: DynamicManaged) -> Self {
+        Self::Owned(value)
+    }
+}
+
+impl From<DynamicManagedRef> for DynamicManagedValue {
+    fn from(value: DynamicManagedRef) -> Self {
+        Self::Ref(value)
+    }
+}
+
+impl From<DynamicManagedRefMut> for DynamicManagedValue {
+    fn from(value: DynamicManagedRefMut) -> Self {
+        Self::RefMut(value)
     }
 }
 
