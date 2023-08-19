@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-core"
-version = "0.20.3"
+version = "0.20.4"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Core module for Intuicio scripting platform"
@@ -15,6 +15,9 @@ intuicio-data = { version = "0.20", path = "../data" }
 serde = { version = "1", features = ["derive", "rc"] }
 memoffset = "0.9"
 typid = "1"
+pest = "2.5"
+pest_derive = "2.5"
+snailquote = "0.3"
 
 [dev-dependencies]
 intuicio-derive = { version = "0.20", path = "../derive" }

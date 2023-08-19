@@ -1,0 +1,16 @@
+main             =  { SOI ~ ows ~ meta ~ ows ~ EOI }
+meta             =  { map | array | value | identifier }
+map              =  { "{" ~ ows ~ (map_item ~ (ows ~ "," ~ ows ~ map_item)* ~ ows)? ~ "}" }
+map_item         =  { identifier ~ ows ~ ":" ~ ows ~ meta }
+array            =  { "[" ~ ows ~ (meta ~ (ows ~ "," ~ ows ~ meta)* ~ ows)? ~ "]" }
+value            =  { literal_bool | literal_float | literal_integer | literal_string }
+literal_bool     =  { "true" | "false" }
+literal_integer  = @{ ("+" | "-")? ~ ASCII_DIGIT+ }
+literal_float    = @{ ("+" | "-")? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+literal_string   =  { "\'" ~ string_inner ~ "\'" }
+string_inner     = @{ string_character* }
+string_character =  { !("\'" | "\\") ~ character }
+character        =  { ANY | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t") | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4}) }
+identifier       = @{ XID_START ~ XID_CONTINUE* }
+ws               = _{ " " | "\t" | "\r" | "\n" }
+ows              = _{ ws* }

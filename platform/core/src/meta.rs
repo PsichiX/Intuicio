@@ -1,7 +1,72 @@
+use pest::{iterators::Pair, Parser};
+use pest_derive::Parser;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Write};
 
-pub enum ParseMetaError {}
+#[derive(Parser)]
+#[grammar = "meta.pest"]
+struct MetaParser;
+
+impl MetaParser {
+    fn parse_main(content: &str) -> Result<Meta, String> {
+        match Self::parse(Rule::main, content) {
+            Ok(mut pairs) => {
+                let pair = pairs.next().unwrap().into_inner().next().unwrap();
+                match pair.as_rule() {
+                    Rule::meta => Ok(Self::parse_meta(pair)),
+                    rule => unreachable!("{:?}", rule),
+                }
+            }
+            Err(error) => Err(format!("{}", error)),
+        }
+    }
+
+    fn parse_meta(pair: Pair<Rule>) -> Meta {
+        let pair = pair.into_inner().next().unwrap();
+        match pair.as_rule() {
+            Rule::identifier => Meta::Identifier(Self::parse_identifier(pair)),
+            Rule::value => Meta::Value(Self::parse_value(pair)),
+            Rule::array => Meta::Array(Self::parse_array(pair)),
+            Rule::map => Meta::Map(Self::parse_map(pair)),
+            rule => unreachable!("{:?}", rule),
+        }
+    }
+
+    fn parse_identifier(pair: Pair<Rule>) -> String {
+        pair.as_str().to_owned()
+    }
+
+    fn parse_value(pair: Pair<Rule>) -> MetaValue {
+        let pair = pair.into_inner().next().unwrap();
+        match pair.as_rule() {
+            Rule::literal_bool => MetaValue::Bool(pair.as_str().parse::<bool>().unwrap()),
+            Rule::literal_integer => MetaValue::Integer(pair.as_str().parse::<i64>().unwrap()),
+            Rule::literal_float => MetaValue::Float(pair.as_str().parse::<f64>().unwrap()),
+            Rule::literal_string => {
+                MetaValue::String(pair.into_inner().next().unwrap().as_str().to_owned())
+            }
+            rule => unreachable!("{:?}", rule),
+        }
+    }
+
+    fn parse_array(pair: Pair<Rule>) -> Vec<Meta> {
+        pair.into_inner()
+            .map(|pair| Self::parse_meta(pair))
+            .collect()
+    }
+
+    fn parse_map(pair: Pair<Rule>) -> HashMap<String, Meta> {
+        pair.into_inner()
+            .map(|pair| {
+                let mut pairs = pair.into_inner();
+                (
+                    Self::parse_identifier(pairs.next().unwrap()),
+                    Self::parse_meta(pairs.next().unwrap()),
+                )
+            })
+            .collect()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MetaValue {
@@ -92,6 +157,10 @@ pub enum Meta {
 }
 
 impl Meta {
+    pub fn parse(content: &str) -> Result<Self, String> {
+        MetaParser::parse_main(content)
+    }
+
     pub fn as_identifier(&self) -> Option<&str> {
         match self {
             Self::Identifier(value) => Some(value.as_str()),
@@ -181,7 +250,24 @@ macro_rules! meta {
 
 #[cfg(test)]
 mod tests {
-    use crate::meta::{Meta, MetaValue};
+    use super::*;
+
+    #[test]
+    fn test_parser() {
+        println!("{}", MetaParser::parse_main("foo").unwrap());
+        println!("{}", MetaParser::parse_main("true").unwrap());
+        println!("{}", MetaParser::parse_main("42").unwrap());
+        println!("{}", MetaParser::parse_main("4.2").unwrap());
+        println!("{}", MetaParser::parse_main("'foo'").unwrap());
+        println!(
+            "{}",
+            MetaParser::parse_main("[true, 42, 4.2, 'foo']").unwrap()
+        );
+        println!(
+            "{}",
+            MetaParser::parse_main("{bool: true, integer: 42, float: 4.2, string: 'foo'}").unwrap()
+        );
+    }
 
     #[test]
     fn test_meta() {

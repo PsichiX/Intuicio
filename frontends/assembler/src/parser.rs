@@ -1,5 +1,3 @@
-use std::{fmt::Debug, str::FromStr};
-
 use crate::{
     AsmExpression, AsmFile, AsmFunction, AsmFunctionParameter, AsmLiteral, AsmModule, AsmOperation,
     AsmStruct, AsmStructField,
@@ -7,6 +5,7 @@ use crate::{
 use intuicio_core::Visibility;
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
+use std::{fmt::Debug, str::FromStr};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]

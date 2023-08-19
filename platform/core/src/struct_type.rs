@@ -616,7 +616,20 @@ macro_rules! define_runtime_struct {
 
 #[cfg(test)]
 mod tests {
-    use crate::registry::Registry;
+    use crate as intuicio_core;
+    use crate::{meta::*, registry::*, IntuicioStruct};
+    use intuicio_data;
+    use intuicio_derive::*;
+
+    #[derive(IntuicioStruct, Default)]
+    #[intuicio(meta = "foo")]
+    pub struct Bar {}
+
+    #[intuicio_methods()]
+    impl Bar {
+        #[intuicio_method(meta = "foo")]
+        fn method_meta() {}
+    }
 
     #[test]
     fn test_struct_type() {
@@ -638,5 +651,10 @@ mod tests {
         assert_eq!(struct_type.fields()[0].address_offset(), 0);
         assert_eq!(struct_type.fields()[1].name, "a");
         assert_eq!(struct_type.fields()[1].address_offset(), 8);
+
+        assert_eq!(
+            Bar::define_struct(&registry).meta,
+            Some(Meta::Identifier("foo".to_owned()))
+        );
     }
 }

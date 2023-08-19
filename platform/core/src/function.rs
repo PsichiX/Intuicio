@@ -411,7 +411,13 @@ macro_rules! define_function {
 
 #[cfg(test)]
 mod tests {
+    use crate as intuicio_core;
     use crate::{context::*, function::*, registry::*, struct_type::*};
+    use intuicio_data;
+    use intuicio_derive::*;
+
+    #[intuicio_function(meta = "foo")]
+    fn function_meta() {}
 
     #[test]
     fn test_function() {
@@ -497,5 +503,10 @@ mod tests {
         context.stack().push(40);
         function.invoke(&mut context, &registry);
         assert_eq!(context.stack().pop::<i32>().unwrap(), 42);
+
+        assert_eq!(
+            function_meta::define_signature(&registry).meta,
+            Some(Meta::Identifier("foo".to_owned()))
+        );
     }
 }

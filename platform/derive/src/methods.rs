@@ -18,6 +18,7 @@ struct MethodAttributes {
     pub debug: bool,
     pub transformer: Option<Ident>,
     pub dependency: Option<Ident>,
+    pub meta: Option<String>,
 }
 
 macro_rules! parse_impl_attributes {
@@ -100,6 +101,13 @@ macro_rules! parse_method_attributes {
                                                 }
                                                 _ => {}
                                             }
+                                        } else if name_value.path.is_ident("meta") {
+                                            match &name_value.lit {
+                                                Lit::Str(content) => {
+                                                    result.meta = Some(content.value());
+                                                }
+                                                _ => {}
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -153,6 +161,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 debug,
                 transformer,
                 dependency,
+                meta,
             },
             found,
         ) = parse_method_attributes!(&item.attrs);
@@ -186,6 +195,11 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 quote! { result.visibility = intuicio_core::Visibility::Module; }
             }
             Visibility::Public(_) => quote! {},
+        };
+        let meta = if let Some(meta) = meta {
+            quote! { result.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+        } else {
+            quote! {}
         };
         let arg_idents = item
             .sig
@@ -414,6 +428,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 #name
                 #module_name
                 #struct_handle
+                #meta
                 #(
                     result.inputs.push(
                         intuicio_core::function::FunctionParameter::new(

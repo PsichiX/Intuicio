@@ -9,12 +9,14 @@ struct StructAttributes {
     pub override_send: Option<bool>,
     pub override_sync: Option<bool>,
     pub debug: bool,
+    pub meta: Option<String>,
 }
 
 #[derive(Default)]
 struct FieldAttributes {
     pub name: Option<Ident>,
     pub ignore: bool,
+    pub meta: Option<String>,
 }
 
 macro_rules! parse_struct_attributes {
@@ -71,6 +73,13 @@ macro_rules! parse_struct_attributes {
                                                 }
                                                 _ => {}
                                             }
+                                        } else if name_value.path.is_ident("meta") {
+                                            match &name_value.lit {
+                                                Lit::Str(content) => {
+                                                    result.meta = Some(content.value());
+                                                }
+                                                _ => {}
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -117,6 +126,13 @@ macro_rules! parse_field_attributes {
                                                 }
                                                 _ => {}
                                             }
+                                        } else if name_value.path.is_ident("meta") {
+                                            match &name_value.lit {
+                                                Lit::Str(content) => {
+                                                    result.meta = Some(content.value());
+                                                }
+                                                _ => {}
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -148,6 +164,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
         override_send,
         override_sync,
         debug,
+        meta,
     } = parse_struct_attributes!(attrs);
     let name = if let Some(name) = name {
         quote! { stringify!(#name) }
@@ -176,7 +193,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
         .iter()
         .zip(fields_attributes.into_iter())
         .filter_map(|(field, attributes)| {
-            let FieldAttributes { name, ignore } = attributes;
+            let FieldAttributes { name, ignore, meta } = attributes;
             if ignore {
                 return None;
             }
@@ -199,6 +216,11 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
                 }
                 Visibility::Public(_) => quote! {},
             };
+            let meta = if let Some(meta) = meta {
+                quote! { result.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+            } else {
+                quote! {}
+            };
             Some(quote! {
                 let mut field = intuicio_core::struct_type::StructField::new(
                     #name,
@@ -207,6 +229,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
                         .unwrap(),
                 );
                 #visibility
+                #meta
                 result = result.field(
                     field,
                     intuicio_core::__internal::offset_of!(#ident, #field_name),
@@ -224,6 +247,11 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     } else {
         quote! {}
     };
+    let meta = if let Some(meta) = meta {
+        quote! { result.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+    } else {
+        quote! {}
+    };
     let result = quote! {
         impl intuicio_core::IntuicioStruct for #ident {
             #[allow(dead_code)]
@@ -237,6 +265,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
                 #(#fields)*
                 #override_send
                 #override_sync
+                #meta
                 result.build()
             }
         }

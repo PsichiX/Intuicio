@@ -15,6 +15,7 @@ struct Attributes {
     pub debug: bool,
     pub transformer: Option<Ident>,
     pub dependency: Option<Ident>,
+    pub meta: Option<String>,
 }
 
 macro_rules! parse_attributes {
@@ -37,16 +38,20 @@ macro_rules! parse_attributes {
                         if name_value.path.is_ident("name") {
                             match name_value.lit {
                                 Lit::Str(content) => {
-                                    result.name =
-                                        Some(Ident::new(&content.value(), Span::call_site().into()))
+                                    result.name = Some(Ident::new(
+                                        &content.value(),
+                                        Span::call_site().into(),
+                                    ));
                                 }
                                 _ => {}
                             }
                         } else if name_value.path.is_ident("module_name") {
                             match name_value.lit {
                                 Lit::Str(content) => {
-                                    result.module_name =
-                                        Some(Ident::new(&content.value(), Span::call_site().into()))
+                                    result.module_name = Some(Ident::new(
+                                        &content.value(),
+                                        Span::call_site().into(),
+                                    ));
                                 }
                                 _ => {}
                             }
@@ -56,23 +61,34 @@ macro_rules! parse_attributes {
                                     result.struct_type = Some(TypePath {
                                         qself: None,
                                         path: parse_str::<Path>(&content.value()).unwrap(),
-                                    })
+                                    });
                                 }
                                 _ => {}
                             }
                         } else if name_value.path.is_ident("transformer") {
                             match name_value.lit {
                                 Lit::Str(content) => {
-                                    result.transformer =
-                                        Some(Ident::new(&content.value(), Span::call_site().into()))
+                                    result.transformer = Some(Ident::new(
+                                        &content.value(),
+                                        Span::call_site().into(),
+                                    ));
                                 }
                                 _ => {}
                             }
                         } else if name_value.path.is_ident("dependency") {
                             match name_value.lit {
                                 Lit::Str(content) => {
-                                    result.dependency =
-                                        Some(Ident::new(&content.value(), Span::call_site().into()))
+                                    result.dependency = Some(Ident::new(
+                                        &content.value(),
+                                        Span::call_site().into(),
+                                    ));
+                                }
+                                _ => {}
+                            }
+                        } else if name_value.path.is_ident("meta") {
+                            match name_value.lit {
+                                Lit::Str(content) => {
+                                    result.meta = Some(content.value());
                                 }
                                 _ => {}
                             }
@@ -98,6 +114,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
         debug,
         transformer,
         dependency,
+        meta,
     } = parse_attributes!(attributes2);
     let input2 = input.clone();
     let item = parse_macro_input!(input2 as ItemFn);
@@ -134,6 +151,11 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
                     ))
             );
         }
+    } else {
+        quote! {}
+    };
+    let meta = if let Some(meta) = meta {
+        quote! { result.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
     } else {
         quote! {}
     };
@@ -363,6 +385,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
                 #name
                 #module_name
                 #struct_handle
+                #meta
                 #(
                     result.inputs.push(
                         intuicio_core::function::FunctionParameter::new(
