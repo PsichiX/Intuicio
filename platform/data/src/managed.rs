@@ -472,6 +472,10 @@ impl DynamicManaged {
         &mut self.memory
     }
 
+    pub fn is<T: 'static>(&self) -> bool {
+        self.type_hash == TypeHash::of::<T>()
+    }
+
     pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.read(&*(self.memory.as_ptr() as *const T)) }
@@ -619,6 +623,10 @@ impl DynamicManagedRef {
         })
     }
 
+    pub fn is<T: 'static>(&self) -> bool {
+        self.type_hash == TypeHash::of::<T>()
+    }
+
     pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             self.lifetime
@@ -747,6 +755,10 @@ impl DynamicManagedRefMut {
             lifetime: self.lifetime.borrow_mut()?,
             data: self.data,
         })
+    }
+
+    pub fn is<T: 'static>(&self) -> bool {
+        self.type_hash == TypeHash::of::<T>()
     }
 
     pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
