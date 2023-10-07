@@ -50,9 +50,7 @@ impl MetaParser {
     }
 
     fn parse_array(pair: Pair<Rule>) -> Vec<Meta> {
-        pair.into_inner()
-            .map(|pair| Self::parse_meta(pair))
-            .collect()
+        pair.into_inner().map(Self::parse_meta).collect()
     }
 
     fn parse_map(pair: Pair<Rule>) -> HashMap<String, Meta> {

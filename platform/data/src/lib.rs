@@ -2,13 +2,14 @@ pub mod data_heap;
 pub mod data_stack;
 pub mod lifetime;
 pub mod managed;
+pub mod managed_arena;
 pub mod shared;
 pub mod type_hash;
 
 pub mod prelude {
     pub use crate::{
-        data_heap::*, data_stack::*, lifetime::*, managed::*, shared::*, type_hash::*, Finalize,
-        Initialize,
+        data_heap::*, data_stack::*, lifetime::*, managed::*, managed_arena::*, shared::*,
+        type_hash::*, Finalize, Initialize,
     };
 }
 

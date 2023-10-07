@@ -996,7 +996,11 @@ macro_rules! impl_data_stack_tuple {
 
             #[allow(non_snake_case)]
             fn stack_pop(stack: &mut DataStack) -> Self {
-                ($( stack.pop::<$type>().unwrap(), )+)
+                ($(
+                    stack.pop::<$type>().unwrap_or_else(
+                        || panic!("Could not pop data of type: {}", std::any::type_name::<$type>())
+                    ),
+                )+)
             }
 
             #[allow(non_snake_case)]

@@ -1,6 +1,11 @@
-use crate::Finalize;
+use crate::{
+    lifetime::Lifetime,
+    managed::{ManagedLazy, ManagedRef, ManagedRefMut},
+    Finalize,
+};
 use std::{
     alloc::Layout,
+    ops::{Deref, DerefMut},
     ptr::NonNull,
     sync::{Arc, RwLock, Weak},
 };
@@ -404,6 +409,12 @@ pub struct DataHeap {
     position: usize,
 }
 
+impl Default for DataHeap {
+    fn default() -> Self {
+        Self::new(MINIMUM_SIZE)
+    }
+}
+
 impl DataHeap {
     pub fn new(page_capacity: usize) -> Self {
         Self {
@@ -495,7 +506,7 @@ impl DataHeap {
         self.ensure_pages(count);
     }
 
-    pub fn alloc<T>(&mut self, value: T) -> Option<DataHeapBox<T>> {
+    pub fn alloc<T: Finalize>(&mut self, value: T) -> Option<DataHeapBox<T>> {
         let layout = Layout::new::<T>().pad_to_align();
         let mut accumulator = 0;
         while accumulator < self.pages.len() {
@@ -600,6 +611,76 @@ impl<T> DataHeapBox<T> {
             Err(self)
         }
     }
+
+    pub fn into_managed(self) -> ManagedDataHeapBox<T> {
+        ManagedDataHeapBox {
+            inner: self,
+            lifetime: Default::default(),
+        }
+    }
+}
+
+impl<T> From<ManagedDataHeapBox<T>> for DataHeapBox<T> {
+    fn from(value: ManagedDataHeapBox<T>) -> Self {
+        value.into_box()
+    }
+}
+
+pub struct ManagedDataHeapBox<T> {
+    inner: DataHeapBox<T>,
+    lifetime: Lifetime,
+}
+
+impl<T> ManagedDataHeapBox<T> {
+    pub fn lifetime(&self) -> &Lifetime {
+        &self.lifetime
+    }
+
+    pub fn borrow(&self) -> Option<ManagedRef<T>> {
+        unsafe {
+            Some(ManagedRef::new_raw(
+                self.inner.data.as_ptr(),
+                self.lifetime.borrow()?,
+            ))
+        }
+    }
+
+    pub fn borrow_mut(&self) -> Option<ManagedRefMut<T>> {
+        unsafe {
+            Some(ManagedRefMut::new_raw(
+                self.inner.data.as_ptr(),
+                self.lifetime.borrow_mut()?,
+            ))
+        }
+    }
+
+    pub fn lazy(&mut self) -> ManagedLazy<T> {
+        unsafe { ManagedLazy::new_raw(self.inner.data.as_ptr(), self.lifetime.lazy()) }
+    }
+
+    pub fn into_box(self) -> DataHeapBox<T> {
+        self.inner
+    }
+}
+
+impl<T> Deref for ManagedDataHeapBox<T> {
+    type Target = DataHeapBox<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for ManagedDataHeapBox<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<T> From<DataHeapBox<T>> for ManagedDataHeapBox<T> {
+    fn from(value: DataHeapBox<T>) -> Self {
+        value.into_managed()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -656,7 +737,10 @@ pub struct DataHeapStats {
 
 #[cfg(test)]
 mod tests {
-    use crate::data_heap::{DataHeap, DataHeapBox, DataHeapStats};
+    use crate::{
+        data_heap::{DataHeap, DataHeapBox, DataHeapStats},
+        managed::ManagedRef,
+    };
     use std::{
         io::Write,
         sync::{Arc, RwLock},
@@ -740,6 +824,8 @@ mod tests {
         }
 
         struct Nested(DataHeapBox<usize>);
+
+        struct Managed(ManagedRef<usize>);
 
         let mut heap = DataHeap::new(4);
         analize_stats(&heap);
@@ -837,5 +923,18 @@ mod tests {
         assert_eq!(heap.available_size(), 967);
         drop(heap);
         assert_eq!(keep.exists(), false);
+
+        let mut heap = DataHeap::default();
+        let mut value = heap.alloc(42).unwrap().into_managed();
+        assert_eq!(*value.read().unwrap(), 42);
+        let value_ref = value.borrow().unwrap();
+        assert_eq!(*value_ref.read().unwrap(), 42);
+        let object = heap.alloc(Managed(value_ref)).unwrap();
+        assert_eq!(*object.read().unwrap().0.read().unwrap(), 42);
+        *value.write().unwrap() = 100;
+        assert_eq!(*value.read().unwrap(), 100);
+        assert_eq!(*object.read().unwrap().0.read().unwrap(), 100);
+        let _ = value.into_box();
+        assert!(object.read().unwrap().0.read().is_none());
     }
 }

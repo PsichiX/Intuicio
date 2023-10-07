@@ -206,6 +206,10 @@ impl Lifetime {
             })
     }
 
+    pub fn lazy(&self) -> LifetimeLazy {
+        LifetimeLazy(self.0.downgrade())
+    }
+
     pub fn read<'a, T>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
         self.0
             .try_lock()
@@ -281,7 +285,7 @@ impl LifetimeRef {
         self.0.is_owned_by(&other.0)
     }
 
-    pub fn borrow(&self) -> Option<Self> {
+    pub fn borrow(&self) -> Option<LifetimeRef> {
         self.0
             .upgrade()?
             .try_lock()
@@ -406,11 +410,125 @@ impl LifetimeRefMut {
             })
     }
 
-    pub fn borrow_mut(&self) -> Option<Self> {
+    pub fn borrow_mut(&self) -> Option<LifetimeRefMut> {
         self.0
             .upgrade()?
             .try_lock()
             .filter(|access| access.state.can_write(self.1))
+            .map(|mut access| {
+                let id = access.acquire_writer();
+                LifetimeRefMut(self.0.clone(), id)
+            })
+    }
+
+    pub fn read<'a, T>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
+        let state = self.0.upgrade()?;
+        let mut access = state.try_lock()?;
+        if access.state.is_read_accessible() {
+            access.unlock = false;
+            access.acquire_read_access();
+            drop(access);
+            Some(ValueReadAccess {
+                lifetime: state,
+                data,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn write<'a, T>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
+        let state = self.0.upgrade()?;
+        let mut access = state.try_lock()?;
+        if access.state.is_write_accessible() {
+            access.unlock = false;
+            access.acquire_write_access();
+            drop(access);
+            Some(ValueWriteAccess {
+                lifetime: state,
+                data,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn consume<T>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
+        let state = match self.0.upgrade() {
+            Some(state) => state,
+            None => return Err(self),
+        };
+        let mut access = match state.try_lock() {
+            Some(access) => access,
+            None => return Err(self),
+        };
+        if access.state.is_write_accessible() {
+            access.unlock = false;
+            access.acquire_write_access();
+            drop(access);
+            Ok(ValueWriteAccess {
+                lifetime: state,
+                data,
+            })
+        } else {
+            Err(self)
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct LifetimeLazy(LifetimeWeakState);
+
+impl LifetimeLazy {
+    pub fn state(&self) -> &LifetimeWeakState {
+        &self.0
+    }
+
+    pub fn exists(&self) -> bool {
+        self.0.upgrade().is_some()
+    }
+
+    pub fn is_read_accessible(&self) -> bool {
+        self.0
+            .upgrade()
+            .map(|state| state.is_read_accessible())
+            .unwrap_or(false)
+    }
+
+    pub fn is_write_accessible(&self) -> bool {
+        self.0
+            .upgrade()
+            .map(|state| state.is_write_accessible())
+            .unwrap_or(false)
+    }
+
+    pub fn is_in_use(&self) -> bool {
+        self.0
+            .upgrade()
+            .map(|state| state.is_in_use())
+            .unwrap_or(false)
+    }
+
+    pub fn is_owned_by(&self, other: &Lifetime) -> bool {
+        self.0.is_owned_by(&other.0)
+    }
+
+    pub fn borrow(&self) -> Option<LifetimeRef> {
+        self.0
+            .upgrade()?
+            .try_lock()
+            .filter(|access| access.state.can_read())
+            .map(|mut access| {
+                access.acquire_reader();
+                LifetimeRef(self.0.clone())
+            })
+    }
+
+    pub fn borrow_mut(&self) -> Option<LifetimeRefMut> {
+        self.0
+            .upgrade()?
+            .try_lock()
+            .filter(|access| access.state.can_write(0))
             .map(|mut access| {
                 let id = access.acquire_writer();
                 LifetimeRefMut(self.0.clone(), id)
@@ -576,6 +694,7 @@ mod tests {
         is_async::<Lifetime>();
         is_async::<LifetimeRef>();
         is_async::<LifetimeRefMut>();
+        is_async::<LifetimeLazy>();
 
         let mut value = 0usize;
         let lifetime_ref = {
@@ -584,6 +703,9 @@ mod tests {
             assert!(lifetime.state().can_write(0));
             assert!(lifetime.state().is_read_accessible());
             assert!(lifetime.state().is_write_accessible());
+            let lifetime_lazy = lifetime.lazy();
+            assert!(lifetime_lazy.read(&42).is_some());
+            assert!(lifetime_lazy.write(&mut 42).is_some());
             {
                 let access = lifetime.read(&value).unwrap();
                 assert_eq!(*access, value);
@@ -601,14 +723,20 @@ mod tests {
                 assert!(lifetime_ref.is_owned_by(&lifetime));
                 assert!(lifetime.borrow().is_some());
                 assert!(lifetime.borrow_mut().is_none());
+                assert!(lifetime_lazy.read(&42).is_some());
+                assert!(lifetime_lazy.write(&mut 42).is_some());
                 {
                     let access = lifetime_ref.read(&value).unwrap();
                     assert_eq!(*access, 42);
+                    assert!(lifetime_lazy.read(&42).is_none());
+                    assert!(lifetime_lazy.write(&mut 42).is_none());
                 }
                 let lifetime_ref2 = lifetime_ref.borrow().unwrap();
                 {
                     let access = lifetime_ref2.read(&value).unwrap();
                     assert_eq!(*access, 42);
+                    assert!(lifetime_lazy.read(&42).is_none());
+                    assert!(lifetime_lazy.write(&mut 42).is_none());
                 }
             }
             {
@@ -620,12 +748,18 @@ mod tests {
                 assert!(lifetime_ref_mut.is_owned_by(&lifetime));
                 assert!(lifetime.borrow().is_none());
                 assert!(lifetime.borrow_mut().is_none());
+                assert!(lifetime_lazy.read(&42).is_some());
+                assert!(lifetime_lazy.write(&mut 42).is_some());
                 {
                     let mut access = lifetime_ref_mut.write(&mut value).unwrap();
                     *access = 7;
                     assert_eq!(*access, 7);
+                    assert!(lifetime_lazy.read(&42).is_none());
+                    assert!(lifetime_lazy.write(&mut 42).is_none());
                 }
                 let lifetime_ref_mut2 = lifetime_ref_mut.borrow_mut().unwrap();
+                assert!(lifetime_lazy.read(&42).is_some());
+                assert!(lifetime_lazy.write(&mut 42).is_some());
                 {
                     assert_eq!(lifetime.state().writer_depth(), 2);
                     assert!(lifetime.borrow().is_none());
@@ -639,6 +773,10 @@ mod tests {
                     assert!(lifetime_ref_mut.read(&42).is_none());
                     assert!(lifetime.write(&mut 42).is_none());
                     assert!(lifetime_ref_mut.write(&mut 42).is_none());
+                    assert!(lifetime_lazy.read(&42).is_none());
+                    assert!(lifetime_lazy.write(&mut 42).is_none());
+                    assert!(lifetime_lazy.read(&42).is_none());
+                    assert!(lifetime_lazy.write(&mut 42).is_none());
                 }
             }
             assert_eq!(lifetime.state().writer_depth(), 0);

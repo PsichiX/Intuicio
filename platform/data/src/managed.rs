@@ -1,6 +1,9 @@
 use crate::{
-    lifetime::{Lifetime, LifetimeRef, LifetimeRefMut, ValueReadAccess, ValueWriteAccess},
+    lifetime::{
+        Lifetime, LifetimeLazy, LifetimeRef, LifetimeRefMut, ValueReadAccess, ValueWriteAccess,
+    },
     type_hash::TypeHash,
+    Finalize,
 };
 use std::{alloc::Layout, mem::MaybeUninit, ptr::NonNull};
 
@@ -67,6 +70,10 @@ impl<T> Managed<T> {
             &mut self.data,
             self.lifetime.borrow_mut()?,
         ))
+    }
+
+    pub fn lazy(&mut self) -> ManagedLazy<T> {
+        ManagedLazy::new(&mut self.data, self.lifetime.lazy())
     }
 
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Managed<U> {
@@ -316,10 +323,129 @@ impl<T> TryFrom<ManagedValue<T>> for ManagedRefMut<T> {
     }
 }
 
+#[derive(Clone)]
+pub struct ManagedLazy<T> {
+    lifetime: LifetimeLazy,
+    data: NonNull<T>,
+}
+
+unsafe impl<T> Send for ManagedLazy<T> where T: Send {}
+unsafe impl<T> Sync for ManagedLazy<T> where T: Sync {}
+
+impl<T> ManagedLazy<T> {
+    pub fn new(data: &mut T, lifetime: LifetimeLazy) -> Self {
+        Self {
+            lifetime,
+            data: unsafe { NonNull::new_unchecked(data as *mut T) },
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn new_raw(data: *mut T, lifetime: LifetimeLazy) -> Self {
+        Self {
+            lifetime,
+            data: NonNull::new_unchecked(data),
+        }
+    }
+
+    pub fn into_inner(self) -> (LifetimeLazy, NonNull<T>) {
+        (self.lifetime, self.data)
+    }
+
+    pub fn into_dynamic(mut self) -> DynamicManagedLazy
+    where
+        T: 'static,
+    {
+        DynamicManagedLazy::new(unsafe { self.data.as_mut() }, self.lifetime)
+    }
+
+    pub fn lifetime(&self) -> &LifetimeLazy {
+        &self.lifetime
+    }
+
+    pub fn borrow(&self) -> Option<ManagedRef<T>> {
+        Some(ManagedRef {
+            lifetime: self.lifetime.borrow()?,
+            data: self.data,
+        })
+    }
+
+    pub fn borrow_mut(&self) -> Option<ManagedRefMut<T>> {
+        Some(ManagedRefMut {
+            lifetime: self.lifetime.borrow_mut()?,
+            data: self.data,
+        })
+    }
+
+    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+        self.lifetime.read(unsafe { self.data.as_ref() })
+    }
+
+    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
+        self.lifetime.write(unsafe { self.data.as_mut() })
+    }
+
+    pub fn map<U>(mut self, f: impl FnOnce(&mut T) -> &mut U) -> ManagedLazy<U> {
+        unsafe {
+            let data = f(self.data.as_mut());
+            ManagedLazy {
+                lifetime: self.lifetime,
+                data: NonNull::new_unchecked(data as *mut U),
+            }
+        }
+    }
+
+    pub fn try_map<U>(
+        mut self,
+        f: impl FnOnce(&mut T) -> Option<&mut U>,
+    ) -> Result<ManagedLazy<U>, Self> {
+        unsafe {
+            if let Some(data) = f(self.data.as_mut()) {
+                Ok(ManagedLazy {
+                    lifetime: self.lifetime,
+                    data: NonNull::new_unchecked(data as *mut U),
+                })
+            } else {
+                Err(self)
+            }
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr(&self) -> Option<*const T> {
+        if self.lifetime.exists() {
+            Some(self.data.as_ptr())
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn as_mut_ptr(&mut self) -> Option<*mut T> {
+        if self.lifetime.exists() {
+            Some(self.data.as_ptr())
+        } else {
+            None
+        }
+    }
+}
+
+impl<T> TryFrom<ManagedValue<T>> for ManagedLazy<T> {
+    type Error = ();
+
+    fn try_from(value: ManagedValue<T>) -> Result<Self, Self::Error> {
+        match value {
+            ManagedValue::Lazy(value) => Ok(value),
+            _ => Err(()),
+        }
+    }
+}
+
 pub enum ManagedValue<T> {
     Owned(Managed<T>),
     Ref(ManagedRef<T>),
     RefMut(ManagedRefMut<T>),
+    Lazy(ManagedLazy<T>),
 }
 
 impl<T> ManagedValue<T> {
@@ -365,11 +491,26 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    pub fn as_lazy(&self) -> Option<&ManagedLazy<T>> {
+        match self {
+            Self::Lazy(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_lazy(&mut self) -> Option<&mut ManagedLazy<T>> {
+        match self {
+            Self::Lazy(value) => Some(value),
+            _ => None,
+        }
+    }
+
     pub fn read(&self) -> Option<ValueReadAccess<T>> {
         match self {
             Self::Owned(value) => value.read(),
             Self::Ref(value) => value.read(),
             Self::RefMut(value) => value.read(),
+            Self::Lazy(value) => value.read(),
         }
     }
 
@@ -377,6 +518,7 @@ impl<T> ManagedValue<T> {
         match self {
             Self::Owned(value) => value.write(),
             Self::RefMut(value) => value.write(),
+            Self::Lazy(value) => value.write(),
             _ => None,
         }
     }
@@ -386,6 +528,7 @@ impl<T> ManagedValue<T> {
             Self::Owned(value) => value.borrow(),
             Self::Ref(value) => value.borrow(),
             Self::RefMut(value) => value.borrow(),
+            _ => None,
         }
     }
 
@@ -416,33 +559,67 @@ impl<T> From<ManagedRefMut<T>> for ManagedValue<T> {
     }
 }
 
+impl<T> From<ManagedLazy<T>> for ManagedValue<T> {
+    fn from(value: ManagedLazy<T>) -> Self {
+        Self::Lazy(value)
+    }
+}
+
 pub struct DynamicManaged {
     type_hash: TypeHash,
     lifetime: Lifetime,
     memory: Vec<u8>,
+    finalizer: unsafe fn(*mut ()),
+    drop: bool,
+}
+
+impl Drop for DynamicManaged {
+    fn drop(&mut self) {
+        if self.drop {
+            unsafe {
+                let data_pointer = self.memory.as_mut_ptr().cast::<()>();
+                (self.finalizer)(data_pointer);
+            }
+        }
+    }
 }
 
 impl DynamicManaged {
-    pub fn new<T: 'static>(data: T) -> Self {
+    pub fn new<T: Finalize + 'static>(data: T) -> Self {
         let mut memory = vec![0; Layout::new::<T>().pad_to_align().size()];
         unsafe { memory.as_mut_ptr().cast::<T>().write(data) };
         Self {
             type_hash: TypeHash::of::<T>(),
             lifetime: Default::default(),
             memory,
+            finalizer: T::finalize_raw,
+            drop: true,
         }
     }
 
-    pub fn new_raw(type_hash: TypeHash, lifetime: Lifetime, memory: Vec<u8>) -> Self {
+    pub fn new_raw(
+        type_hash: TypeHash,
+        lifetime: Lifetime,
+        memory: Vec<u8>,
+        finalizer: unsafe fn(*mut ()),
+    ) -> Self {
         Self {
             type_hash,
             lifetime,
             memory,
+            finalizer,
+            drop: true,
         }
     }
 
-    pub fn into_inner(self) -> (TypeHash, Lifetime, Vec<u8>) {
-        (self.type_hash, self.lifetime, self.memory)
+    pub fn into_inner(mut self) -> (TypeHash, Lifetime, Vec<u8>, unsafe fn(*mut ())) {
+        self.drop = false;
+        (
+            self.type_hash,
+            std::mem::take(&mut self.lifetime),
+            std::mem::take(&mut self.memory),
+            self.finalizer,
+        )
     }
 
     pub fn into_typed<T: 'static>(self) -> Result<Managed<T>, Self> {
@@ -529,11 +706,27 @@ impl DynamicManaged {
         }
     }
 
-    pub fn map<T: 'static, U: 'static>(self, f: impl FnOnce(T) -> U) -> Result<Self, Self> {
+    pub fn lazy(&mut self) -> DynamicManagedLazy {
+        unsafe {
+            DynamicManagedLazy::new_raw(
+                self.type_hash,
+                self.lifetime.lazy(),
+                self.memory.as_mut_ptr(),
+            )
+        }
+    }
+
+    pub fn map<T: 'static, U: Finalize + 'static>(
+        self,
+        f: impl FnOnce(T) -> U,
+    ) -> Result<Self, Self> {
         self.consume::<T>().map(|data| Self::new(f(data)))
     }
 
-    pub fn try_map<T: 'static, U: 'static>(self, f: impl FnOnce(T) -> Option<U>) -> Option<Self> {
+    pub fn try_map<T: 'static, U: Finalize + 'static>(
+        self,
+        f: impl FnOnce(T) -> Option<U>,
+    ) -> Option<Self> {
         f(self.consume::<T>().ok()?).map(|data| Self::new(data))
     }
 
@@ -848,10 +1041,150 @@ impl TryFrom<DynamicManagedValue> for DynamicManagedRefMut {
     }
 }
 
+pub struct DynamicManagedLazy {
+    type_hash: TypeHash,
+    lifetime: LifetimeLazy,
+    data: NonNull<u8>,
+}
+
+unsafe impl Send for DynamicManagedLazy {}
+unsafe impl Sync for DynamicManagedLazy {}
+
+impl DynamicManagedLazy {
+    pub fn new<T: 'static>(data: &mut T, lifetime: LifetimeLazy) -> Self {
+        Self {
+            type_hash: TypeHash::of::<T>(),
+            lifetime,
+            data: unsafe { NonNull::new_unchecked(data as *mut T as *mut u8) },
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn new_raw(type_hash: TypeHash, lifetime: LifetimeLazy, data: *mut u8) -> Self {
+        Self {
+            type_hash,
+            lifetime,
+            data: NonNull::new_unchecked(data),
+        }
+    }
+
+    pub fn into_inner(self) -> (TypeHash, LifetimeLazy, NonNull<u8>) {
+        (self.type_hash, self.lifetime, self.data)
+    }
+
+    pub fn into_typed<T: 'static>(self) -> Result<ManagedLazy<T>, Self> {
+        if self.type_hash == TypeHash::of::<T>() {
+            unsafe {
+                Ok(ManagedLazy::new_raw(
+                    self.data.as_ptr().cast::<T>(),
+                    self.lifetime,
+                ))
+            }
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn lifetime(&self) -> &LifetimeLazy {
+        &self.lifetime
+    }
+
+    pub fn is<T: 'static>(&self) -> bool {
+        self.type_hash == TypeHash::of::<T>()
+    }
+
+    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+        if self.type_hash == TypeHash::of::<T>() {
+            self.lifetime
+                .read(unsafe { self.data.as_ptr().cast::<T>().as_ref()? })
+        } else {
+            None
+        }
+    }
+
+    pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
+        if self.type_hash == TypeHash::of::<T>() {
+            self.lifetime
+                .write(unsafe { self.data.as_ptr().cast::<T>().as_mut()? })
+        } else {
+            None
+        }
+    }
+
+    pub fn map<T: 'static, U: 'static>(
+        self,
+        f: impl FnOnce(&mut T) -> &mut U,
+    ) -> Result<Self, Self> {
+        if self.type_hash == TypeHash::of::<T>() {
+            unsafe {
+                let data = f(&mut *(self.data.as_ptr() as *mut T));
+                Ok(Self {
+                    type_hash: TypeHash::of::<U>(),
+                    lifetime: self.lifetime,
+                    data: NonNull::new_unchecked(data as *mut U as *mut u8),
+                })
+            }
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn try_map<T: 'static, U: 'static>(
+        self,
+        f: impl FnOnce(&mut T) -> Option<&mut U>,
+    ) -> Result<Self, Self> {
+        if self.type_hash == TypeHash::of::<T>() {
+            unsafe {
+                if let Some(data) = f(&mut *(self.data.as_ptr() as *mut T)) {
+                    Ok(Self {
+                        type_hash: TypeHash::of::<U>(),
+                        lifetime: self.lifetime,
+                        data: NonNull::new_unchecked(data as *mut U as *mut u8),
+                    })
+                } else {
+                    Err(self)
+                }
+            }
+        } else {
+            Err(self)
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr<T: 'static>(&self) -> Option<*const T> {
+        if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
+            Some(self.data.as_ptr().cast::<T>())
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn as_mut_ptr<T: 'static>(&mut self) -> Option<*mut T> {
+        if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
+            Some(self.data.as_ptr().cast::<T>())
+        } else {
+            None
+        }
+    }
+}
+
+impl TryFrom<DynamicManagedValue> for DynamicManagedLazy {
+    type Error = ();
+
+    fn try_from(value: DynamicManagedValue) -> Result<Self, Self::Error> {
+        match value {
+            DynamicManagedValue::Lazy(value) => Ok(value),
+            _ => Err(()),
+        }
+    }
+}
+
 pub enum DynamicManagedValue {
     Owned(DynamicManaged),
     Ref(DynamicManagedRef),
     RefMut(DynamicManagedRefMut),
+    Lazy(DynamicManagedLazy),
 }
 
 impl DynamicManagedValue {
@@ -897,11 +1230,26 @@ impl DynamicManagedValue {
         }
     }
 
+    pub fn as_lazy(&self) -> Option<&DynamicManagedLazy> {
+        match self {
+            Self::Lazy(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_lazy(&mut self) -> Option<&mut DynamicManagedLazy> {
+        match self {
+            Self::Lazy(value) => Some(value),
+            _ => None,
+        }
+    }
+
     pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
         match self {
             Self::Owned(value) => value.read::<T>(),
             Self::Ref(value) => value.read::<T>(),
             Self::RefMut(value) => value.read::<T>(),
+            Self::Lazy(value) => value.read::<T>(),
         }
     }
 
@@ -909,6 +1257,7 @@ impl DynamicManagedValue {
         match self {
             Self::Owned(value) => value.write::<T>(),
             Self::RefMut(value) => value.write::<T>(),
+            Self::Lazy(value) => value.write::<T>(),
             _ => None,
         }
     }
@@ -918,6 +1267,7 @@ impl DynamicManagedValue {
             Self::Owned(value) => value.borrow(),
             Self::Ref(value) => value.borrow(),
             Self::RefMut(value) => value.borrow(),
+            _ => None,
         }
     }
 
@@ -948,6 +1298,12 @@ impl From<DynamicManagedRefMut> for DynamicManagedValue {
     }
 }
 
+impl From<DynamicManagedLazy> for DynamicManagedValue {
+    fn from(value: DynamicManagedLazy) -> Self {
+        Self::Lazy(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -959,6 +1315,7 @@ mod tests {
         is_async::<Managed<()>>();
         is_async::<ManagedRef<()>>();
         is_async::<ManagedRefMut<()>>();
+        is_async::<ManagedLazy<()>>();
 
         let mut value = Managed::new(42);
         let mut value_ref = value.borrow_mut().unwrap();
@@ -982,9 +1339,14 @@ mod tests {
         drop(value_ref);
         assert!(value_ref2.read().is_some());
         let value_ref = value.borrow().unwrap();
+        let mut value_lazy = value.lazy();
+        assert_eq!(*value_lazy.read().unwrap(), 2);
+        *value_lazy.write().unwrap() = 42;
+        assert_eq!(*value_lazy.read().unwrap(), 42);
         drop(value);
         assert!(value_ref.read().is_none());
         assert!(value_ref2.read().is_none());
+        assert!(value_lazy.read().is_none());
     }
 
     #[test]
@@ -992,6 +1354,7 @@ mod tests {
         is_async::<DynamicManaged>();
         is_async::<DynamicManagedRef>();
         is_async::<DynamicManagedRefMut>();
+        is_async::<DynamicManagedLazy>();
 
         let mut value = DynamicManaged::new(42);
         let mut value_ref = value.borrow_mut().unwrap();
@@ -1015,9 +1378,14 @@ mod tests {
         drop(value_ref);
         assert!(value_ref2.read::<i32>().is_some());
         let value_ref = value.borrow().unwrap();
+        let mut value_lazy = value.lazy();
+        assert_eq!(*value_lazy.read::<i32>().unwrap(), 2);
+        *value_lazy.write::<i32>().unwrap() = 42;
+        assert_eq!(*value_lazy.read::<i32>().unwrap(), 42);
         drop(value);
         assert!(value_ref.read::<i32>().is_none());
         assert!(value_ref2.read::<i32>().is_none());
+        assert!(value_lazy.read::<i32>().is_none());
     }
 
     #[test]
@@ -1037,11 +1405,18 @@ mod tests {
         assert_eq!(*value_ref.read().unwrap(), 42);
         drop(value_ref);
 
-        let value_ref = value.borrow_mut().unwrap();
+        let value_ref_mut = value.borrow_mut().unwrap();
         assert_eq!(*value.read().unwrap(), 42);
-        let value_ref = value_ref.into_dynamic();
-        assert_eq!(*value_ref.read::<i32>().unwrap(), 42);
-        let value_ref = value_ref.into_typed::<i32>().ok().unwrap();
-        assert_eq!(*value_ref.read().unwrap(), 42);
+        let value_ref_mut = value_ref_mut.into_dynamic();
+        assert_eq!(*value_ref_mut.read::<i32>().unwrap(), 42);
+        let value_ref_mut = value_ref_mut.into_typed::<i32>().ok().unwrap();
+        assert_eq!(*value_ref_mut.read().unwrap(), 42);
+
+        let value_lazy = value.lazy();
+        assert_eq!(*value.read().unwrap(), 42);
+        let value_lazy = value_lazy.into_dynamic();
+        assert_eq!(*value_lazy.read::<i32>().unwrap(), 42);
+        let value_lazy = value_lazy.into_typed::<i32>().ok().unwrap();
+        assert_eq!(*value_lazy.read().unwrap(), 42);
     }
 }

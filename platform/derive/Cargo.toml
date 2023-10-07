@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-derive"
-version = "0.20.5"
+version = "0.21.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Procedural macro module for Intuicio scripting platform"
