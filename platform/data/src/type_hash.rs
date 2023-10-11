@@ -9,7 +9,7 @@ pub struct TypeHash {
 }
 
 impl TypeHash {
-    pub fn of<T: 'static>() -> Self {
+    pub fn of<T: ?Sized>() -> Self {
         unsafe { Self::raw(std::any::type_name::<T>()) }
     }
 

@@ -210,7 +210,7 @@ impl Lifetime {
         LifetimeLazy(self.0.downgrade())
     }
 
-    pub fn read<'a, T>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
+    pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
         self.0
             .try_lock()
             .filter(|access| access.state.is_read_accessible())
@@ -224,7 +224,7 @@ impl Lifetime {
             })
     }
 
-    pub fn write<'a, T>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
+    pub fn write<'a, T: ?Sized>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
         self.0
             .try_lock()
             .filter(|access| access.state.is_write_accessible())
@@ -296,7 +296,7 @@ impl LifetimeRef {
             })
     }
 
-    pub fn read<'a, T>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
+    pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -312,7 +312,7 @@ impl LifetimeRef {
         }
     }
 
-    pub fn consume<T>(self, data: &T) -> Result<ValueReadAccess<T>, Self> {
+    pub fn consume<T: ?Sized>(self, data: &T) -> Result<ValueReadAccess<T>, Self> {
         let state = match self.0.upgrade() {
             Some(state) => state,
             None => return Err(self),
@@ -421,7 +421,7 @@ impl LifetimeRefMut {
             })
     }
 
-    pub fn read<'a, T>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
+    pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -437,7 +437,7 @@ impl LifetimeRefMut {
         }
     }
 
-    pub fn write<'a, T>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
+    pub fn write<'a, T: ?Sized>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_write_accessible() {
@@ -453,7 +453,7 @@ impl LifetimeRefMut {
         }
     }
 
-    pub fn consume<T>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
+    pub fn consume<T: ?Sized>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
         let state = match self.0.upgrade() {
             Some(state) => state,
             None => return Err(self),
@@ -535,7 +535,7 @@ impl LifetimeLazy {
             })
     }
 
-    pub fn read<'a, T>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
+    pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -551,7 +551,7 @@ impl LifetimeLazy {
         }
     }
 
-    pub fn write<'a, T>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
+    pub fn write<'a, T: ?Sized>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_write_accessible() {
@@ -567,7 +567,7 @@ impl LifetimeLazy {
         }
     }
 
-    pub fn consume<T>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
+    pub fn consume<T: ?Sized>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
         let state = match self.0.upgrade() {
             Some(state) => state,
             None => return Err(self),
@@ -590,25 +590,25 @@ impl LifetimeLazy {
     }
 }
 
-pub struct ValueReadAccess<'a, T: 'a> {
+pub struct ValueReadAccess<'a, T: 'a + ?Sized> {
     lifetime: LifetimeState,
     data: &'a T,
 }
 
-impl<'a, T> Drop for ValueReadAccess<'a, T> {
+impl<'a, T: ?Sized> Drop for ValueReadAccess<'a, T> {
     fn drop(&mut self) {
         self.lifetime.lock_unchecked().release_read_access();
     }
 }
 
-impl<'a, T> ValueReadAccess<'a, T> {
+impl<'a, T: ?Sized> ValueReadAccess<'a, T> {
     /// # Safety
     pub unsafe fn new_raw(data: &'a T, lifetime: LifetimeState) -> Self {
         Self { lifetime, data }
     }
 }
 
-impl<'a, T> Deref for ValueReadAccess<'a, T> {
+impl<'a, T: ?Sized> Deref for ValueReadAccess<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -616,7 +616,7 @@ impl<'a, T> Deref for ValueReadAccess<'a, T> {
     }
 }
 
-impl<'a, T> ValueReadAccess<'a, T> {
+impl<'a, T: ?Sized> ValueReadAccess<'a, T> {
     pub fn remap<U>(
         self,
         f: impl FnOnce(&T) -> Option<&U>,
@@ -632,25 +632,25 @@ impl<'a, T> ValueReadAccess<'a, T> {
     }
 }
 
-pub struct ValueWriteAccess<'a, T: 'a> {
+pub struct ValueWriteAccess<'a, T: 'a + ?Sized> {
     lifetime: LifetimeState,
     data: &'a mut T,
 }
 
-impl<'a, T> Drop for ValueWriteAccess<'a, T> {
+impl<'a, T: ?Sized> Drop for ValueWriteAccess<'a, T> {
     fn drop(&mut self) {
         self.lifetime.lock_unchecked().release_write_access();
     }
 }
 
-impl<'a, T> ValueWriteAccess<'a, T> {
+impl<'a, T: ?Sized> ValueWriteAccess<'a, T> {
     /// # Safety
     pub unsafe fn new_raw(data: &'a mut T, lifetime: LifetimeState) -> Self {
         Self { lifetime, data }
     }
 }
 
-impl<'a, T> Deref for ValueWriteAccess<'a, T> {
+impl<'a, T: ?Sized> Deref for ValueWriteAccess<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -658,13 +658,13 @@ impl<'a, T> Deref for ValueWriteAccess<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for ValueWriteAccess<'a, T> {
+impl<'a, T: ?Sized> DerefMut for ValueWriteAccess<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.data
     }
 }
 
-impl<'a, T> ValueWriteAccess<'a, T> {
+impl<'a, T: ?Sized> ValueWriteAccess<'a, T> {
     pub fn remap<U>(
         self,
         f: impl FnOnce(&mut T) -> Option<&mut U>,
@@ -685,7 +685,7 @@ mod tests {
     use super::*;
     use std::thread::*;
 
-    fn is_async<T: Send + Sync + 'static>() {
+    fn is_async<T: Send + Sync + ?Sized>() {
         println!("{} is async!", std::any::type_name::<T>());
     }
 

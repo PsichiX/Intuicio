@@ -29,10 +29,7 @@ impl<T> Managed<T> {
         (self.lifetime, self.data)
     }
 
-    pub fn into_dynamic(self) -> DynamicManaged
-    where
-        T: 'static,
-    {
+    pub fn into_dynamic(self) -> DynamicManaged {
         DynamicManaged::new(self.data)
     }
 
@@ -112,15 +109,15 @@ impl<T> TryFrom<ManagedValue<T>> for Managed<T> {
     }
 }
 
-pub struct ManagedRef<T> {
+pub struct ManagedRef<T: ?Sized> {
     lifetime: LifetimeRef,
     data: NonNull<T>,
 }
 
-unsafe impl<T> Send for ManagedRef<T> where T: Send {}
-unsafe impl<T> Sync for ManagedRef<T> where T: Sync {}
+unsafe impl<T: ?Sized> Send for ManagedRef<T> where T: Send {}
+unsafe impl<T: ?Sized> Sync for ManagedRef<T> where T: Sync {}
 
-impl<T> ManagedRef<T> {
+impl<T: ?Sized> ManagedRef<T> {
     pub fn new(data: &T, lifetime: LifetimeRef) -> Self {
         Self {
             lifetime,
@@ -140,10 +137,7 @@ impl<T> ManagedRef<T> {
         (self.lifetime, self.data)
     }
 
-    pub fn into_dynamic(self) -> DynamicManagedRef
-    where
-        T: 'static,
-    {
+    pub fn into_dynamic(self) -> DynamicManagedRef {
         DynamicManagedRef::new(unsafe { self.data.as_ref() }, self.lifetime)
     }
 
@@ -206,15 +200,15 @@ impl<T> TryFrom<ManagedValue<T>> for ManagedRef<T> {
     }
 }
 
-pub struct ManagedRefMut<T> {
+pub struct ManagedRefMut<T: ?Sized> {
     lifetime: LifetimeRefMut,
     data: NonNull<T>,
 }
 
-unsafe impl<T> Send for ManagedRefMut<T> where T: Send {}
-unsafe impl<T> Sync for ManagedRefMut<T> where T: Sync {}
+unsafe impl<T: ?Sized> Send for ManagedRefMut<T> where T: Send {}
+unsafe impl<T: ?Sized> Sync for ManagedRefMut<T> where T: Sync {}
 
-impl<T> ManagedRefMut<T> {
+impl<T: ?Sized> ManagedRefMut<T> {
     pub fn new(data: &mut T, lifetime: LifetimeRefMut) -> Self {
         Self {
             lifetime,
@@ -234,10 +228,7 @@ impl<T> ManagedRefMut<T> {
         (self.lifetime, self.data)
     }
 
-    pub fn into_dynamic(mut self) -> DynamicManagedRefMut
-    where
-        T: 'static,
-    {
+    pub fn into_dynamic(mut self) -> DynamicManagedRefMut {
         DynamicManagedRefMut::new(unsafe { self.data.as_mut() }, self.lifetime)
     }
 
@@ -324,15 +315,15 @@ impl<T> TryFrom<ManagedValue<T>> for ManagedRefMut<T> {
 }
 
 #[derive(Clone)]
-pub struct ManagedLazy<T> {
+pub struct ManagedLazy<T: ?Sized> {
     lifetime: LifetimeLazy,
     data: NonNull<T>,
 }
 
-unsafe impl<T> Send for ManagedLazy<T> where T: Send {}
-unsafe impl<T> Sync for ManagedLazy<T> where T: Sync {}
+unsafe impl<T: ?Sized> Send for ManagedLazy<T> where T: Send {}
+unsafe impl<T: ?Sized> Sync for ManagedLazy<T> where T: Sync {}
 
-impl<T> ManagedLazy<T> {
+impl<T: ?Sized> ManagedLazy<T> {
     pub fn new(data: &mut T, lifetime: LifetimeLazy) -> Self {
         Self {
             lifetime,
@@ -352,10 +343,7 @@ impl<T> ManagedLazy<T> {
         (self.lifetime, self.data)
     }
 
-    pub fn into_dynamic(mut self) -> DynamicManagedLazy
-    where
-        T: 'static,
-    {
+    pub fn into_dynamic(mut self) -> DynamicManagedLazy {
         DynamicManagedLazy::new(unsafe { self.data.as_mut() }, self.lifetime)
     }
 
@@ -585,7 +573,7 @@ impl Drop for DynamicManaged {
 }
 
 impl DynamicManaged {
-    pub fn new<T: Finalize + 'static>(data: T) -> Self {
+    pub fn new<T: Finalize>(data: T) -> Self {
         let mut memory = vec![0; Layout::new::<T>().pad_to_align().size()];
         unsafe { memory.as_mut_ptr().cast::<T>().write(data) };
         Self {
@@ -622,7 +610,7 @@ impl DynamicManaged {
         )
     }
 
-    pub fn into_typed<T: 'static>(self) -> Result<Managed<T>, Self> {
+    pub fn into_typed<T>(self) -> Result<Managed<T>, Self> {
         Ok(Managed::new(self.consume()?))
     }
 
@@ -649,11 +637,11 @@ impl DynamicManaged {
         &mut self.memory
     }
 
-    pub fn is<T: 'static>(&self) -> bool {
+    pub fn is<T>(&self) -> bool {
         self.type_hash == TypeHash::of::<T>()
     }
 
-    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.read(&*(self.memory.as_ptr() as *const T)) }
         } else {
@@ -661,7 +649,7 @@ impl DynamicManaged {
         }
     }
 
-    pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 self.lifetime
@@ -672,7 +660,7 @@ impl DynamicManaged {
         }
     }
 
-    pub fn consume<T: 'static>(self) -> Result<T, Self> {
+    pub fn consume<T>(self) -> Result<T, Self> {
         if self.type_hash == TypeHash::of::<T>() && !self.lifetime.state().is_in_use() {
             let mut result = MaybeUninit::<T>::uninit();
             unsafe {
@@ -716,22 +704,16 @@ impl DynamicManaged {
         }
     }
 
-    pub fn map<T: 'static, U: Finalize + 'static>(
-        self,
-        f: impl FnOnce(T) -> U,
-    ) -> Result<Self, Self> {
+    pub fn map<T, U: Finalize>(self, f: impl FnOnce(T) -> U) -> Result<Self, Self> {
         self.consume::<T>().map(|data| Self::new(f(data)))
     }
 
-    pub fn try_map<T: 'static, U: Finalize + 'static>(
-        self,
-        f: impl FnOnce(T) -> Option<U>,
-    ) -> Option<Self> {
+    pub fn try_map<T, U: Finalize>(self, f: impl FnOnce(T) -> Option<U>) -> Option<Self> {
         f(self.consume::<T>().ok()?).map(|data| Self::new(data))
     }
 
     /// # Safety
-    pub unsafe fn as_ptr<T: 'static>(&self) -> Option<*const T> {
+    pub unsafe fn as_ptr<T>(&self) -> Option<*const T> {
         if self.type_hash == TypeHash::of::<T>() && !self.lifetime.state().is_in_use() {
             Some(self.memory.as_ptr().cast::<T>())
         } else {
@@ -740,7 +722,7 @@ impl DynamicManaged {
     }
 
     /// # Safety
-    pub unsafe fn as_mut_ptr<T: 'static>(&mut self) -> Option<*mut T> {
+    pub unsafe fn as_mut_ptr<T>(&mut self) -> Option<*mut T> {
         if self.type_hash == TypeHash::of::<T>() && !self.lifetime.state().is_in_use() {
             Some(self.memory.as_mut_ptr().cast::<T>())
         } else {
@@ -770,7 +752,7 @@ unsafe impl Send for DynamicManagedRef {}
 unsafe impl Sync for DynamicManagedRef {}
 
 impl DynamicManagedRef {
-    pub fn new<T: 'static>(data: &T, lifetime: LifetimeRef) -> Self {
+    pub fn new<T: ?Sized>(data: &T, lifetime: LifetimeRef) -> Self {
         Self {
             type_hash: TypeHash::of::<T>(),
             lifetime,
@@ -791,7 +773,7 @@ impl DynamicManagedRef {
         (self.type_hash, self.lifetime, self.data)
     }
 
-    pub fn into_typed<T: 'static>(self) -> Result<ManagedRef<T>, Self> {
+    pub fn into_typed<T>(self) -> Result<ManagedRef<T>, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 Ok(ManagedRef::new_raw(
@@ -816,11 +798,11 @@ impl DynamicManagedRef {
         })
     }
 
-    pub fn is<T: 'static>(&self) -> bool {
+    pub fn is<T>(&self) -> bool {
         self.type_hash == TypeHash::of::<T>()
     }
 
-    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             self.lifetime
                 .read(unsafe { self.data.as_ptr().cast::<T>().as_ref()? })
@@ -829,7 +811,7 @@ impl DynamicManagedRef {
         }
     }
 
-    pub fn map<T: 'static, U: 'static>(self, f: impl FnOnce(&T) -> &U) -> Result<Self, Self> {
+    pub fn map<T, U>(self, f: impl FnOnce(&T) -> &U) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 let data = f(&*(self.data.as_ptr() as *const T));
@@ -844,10 +826,7 @@ impl DynamicManagedRef {
         }
     }
 
-    pub fn try_map<T: 'static, U: 'static>(
-        self,
-        f: impl FnOnce(&T) -> Option<&U>,
-    ) -> Result<Self, Self> {
+    pub fn try_map<T, U>(self, f: impl FnOnce(&T) -> Option<&U>) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 if let Some(data) = f(&*(self.data.as_ptr() as *const T)) {
@@ -866,7 +845,7 @@ impl DynamicManagedRef {
     }
 
     /// # Safety
-    pub unsafe fn as_ptr<T: 'static>(&self) -> Option<*const T> {
+    pub unsafe fn as_ptr<T>(&self) -> Option<*const T> {
         if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
             Some(self.data.as_ptr().cast::<T>())
         } else {
@@ -896,7 +875,7 @@ unsafe impl Send for DynamicManagedRefMut {}
 unsafe impl Sync for DynamicManagedRefMut {}
 
 impl DynamicManagedRefMut {
-    pub fn new<T: 'static>(data: &mut T, lifetime: LifetimeRefMut) -> Self {
+    pub fn new<T: ?Sized>(data: &mut T, lifetime: LifetimeRefMut) -> Self {
         Self {
             type_hash: TypeHash::of::<T>(),
             lifetime,
@@ -917,7 +896,7 @@ impl DynamicManagedRefMut {
         (self.type_hash, self.lifetime, self.data)
     }
 
-    pub fn into_typed<T: 'static>(self) -> Result<ManagedRefMut<T>, Self> {
+    pub fn into_typed<T>(self) -> Result<ManagedRefMut<T>, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 Ok(ManagedRefMut::new_raw(
@@ -950,11 +929,11 @@ impl DynamicManagedRefMut {
         })
     }
 
-    pub fn is<T: 'static>(&self) -> bool {
+    pub fn is<T>(&self) -> bool {
         self.type_hash == TypeHash::of::<T>()
     }
 
-    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             self.lifetime
                 .read(unsafe { self.data.as_ptr().cast::<T>().as_ref()? })
@@ -963,7 +942,7 @@ impl DynamicManagedRefMut {
         }
     }
 
-    pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             self.lifetime
                 .write(unsafe { self.data.as_ptr().cast::<T>().as_mut()? })
@@ -972,10 +951,7 @@ impl DynamicManagedRefMut {
         }
     }
 
-    pub fn map<T: 'static, U: 'static>(
-        self,
-        f: impl FnOnce(&mut T) -> &mut U,
-    ) -> Result<Self, Self> {
+    pub fn map<T, U>(self, f: impl FnOnce(&mut T) -> &mut U) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 let data = f(&mut *(self.data.as_ptr() as *mut T));
@@ -990,10 +966,7 @@ impl DynamicManagedRefMut {
         }
     }
 
-    pub fn try_map<T: 'static, U: 'static>(
-        self,
-        f: impl FnOnce(&mut T) -> Option<&mut U>,
-    ) -> Result<Self, Self> {
+    pub fn try_map<T, U>(self, f: impl FnOnce(&mut T) -> Option<&mut U>) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 if let Some(data) = f(&mut *(self.data.as_ptr() as *mut T)) {
@@ -1012,7 +985,7 @@ impl DynamicManagedRefMut {
     }
 
     /// # Safety
-    pub unsafe fn as_ptr<T: 'static>(&self) -> Option<*const T> {
+    pub unsafe fn as_ptr<T>(&self) -> Option<*const T> {
         if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
             Some(self.data.as_ptr().cast::<T>())
         } else {
@@ -1021,7 +994,7 @@ impl DynamicManagedRefMut {
     }
 
     /// # Safety
-    pub unsafe fn as_mut_ptr<T: 'static>(&mut self) -> Option<*mut T> {
+    pub unsafe fn as_mut_ptr<T>(&mut self) -> Option<*mut T> {
         if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
             Some(self.data.as_ptr().cast::<T>())
         } else {
@@ -1051,7 +1024,7 @@ unsafe impl Send for DynamicManagedLazy {}
 unsafe impl Sync for DynamicManagedLazy {}
 
 impl DynamicManagedLazy {
-    pub fn new<T: 'static>(data: &mut T, lifetime: LifetimeLazy) -> Self {
+    pub fn new<T: ?Sized>(data: &mut T, lifetime: LifetimeLazy) -> Self {
         Self {
             type_hash: TypeHash::of::<T>(),
             lifetime,
@@ -1072,7 +1045,7 @@ impl DynamicManagedLazy {
         (self.type_hash, self.lifetime, self.data)
     }
 
-    pub fn into_typed<T: 'static>(self) -> Result<ManagedLazy<T>, Self> {
+    pub fn into_typed<T>(self) -> Result<ManagedLazy<T>, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 Ok(ManagedLazy::new_raw(
@@ -1089,11 +1062,11 @@ impl DynamicManagedLazy {
         &self.lifetime
     }
 
-    pub fn is<T: 'static>(&self) -> bool {
+    pub fn is<T>(&self) -> bool {
         self.type_hash == TypeHash::of::<T>()
     }
 
-    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             self.lifetime
                 .read(unsafe { self.data.as_ptr().cast::<T>().as_ref()? })
@@ -1102,7 +1075,7 @@ impl DynamicManagedLazy {
         }
     }
 
-    pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             self.lifetime
                 .write(unsafe { self.data.as_ptr().cast::<T>().as_mut()? })
@@ -1111,10 +1084,7 @@ impl DynamicManagedLazy {
         }
     }
 
-    pub fn map<T: 'static, U: 'static>(
-        self,
-        f: impl FnOnce(&mut T) -> &mut U,
-    ) -> Result<Self, Self> {
+    pub fn map<T, U>(self, f: impl FnOnce(&mut T) -> &mut U) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 let data = f(&mut *(self.data.as_ptr() as *mut T));
@@ -1129,10 +1099,7 @@ impl DynamicManagedLazy {
         }
     }
 
-    pub fn try_map<T: 'static, U: 'static>(
-        self,
-        f: impl FnOnce(&mut T) -> Option<&mut U>,
-    ) -> Result<Self, Self> {
+    pub fn try_map<T, U>(self, f: impl FnOnce(&mut T) -> Option<&mut U>) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 if let Some(data) = f(&mut *(self.data.as_ptr() as *mut T)) {
@@ -1151,7 +1118,7 @@ impl DynamicManagedLazy {
     }
 
     /// # Safety
-    pub unsafe fn as_ptr<T: 'static>(&self) -> Option<*const T> {
+    pub unsafe fn as_ptr<T>(&self) -> Option<*const T> {
         if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
             Some(self.data.as_ptr().cast::<T>())
         } else {
@@ -1160,7 +1127,7 @@ impl DynamicManagedLazy {
     }
 
     /// # Safety
-    pub unsafe fn as_mut_ptr<T: 'static>(&mut self) -> Option<*mut T> {
+    pub unsafe fn as_mut_ptr<T>(&mut self) -> Option<*mut T> {
         if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
             Some(self.data.as_ptr().cast::<T>())
         } else {
@@ -1244,7 +1211,7 @@ impl DynamicManagedValue {
         }
     }
 
-    pub fn read<T: 'static>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
         match self {
             Self::Owned(value) => value.read::<T>(),
             Self::Ref(value) => value.read::<T>(),
@@ -1253,7 +1220,7 @@ impl DynamicManagedValue {
         }
     }
 
-    pub fn write<T: 'static>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
         match self {
             Self::Owned(value) => value.write::<T>(),
             Self::RefMut(value) => value.write::<T>(),
@@ -1307,8 +1274,9 @@ impl From<DynamicManagedLazy> for DynamicManagedValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::any::Any;
 
-    fn is_async<T: Send + Sync + 'static>() {}
+    fn is_async<T: Send + Sync + ?Sized>() {}
 
     #[test]
     fn test_managed() {
@@ -1418,5 +1386,44 @@ mod tests {
         assert_eq!(*value_lazy.read::<i32>().unwrap(), 42);
         let value_lazy = value_lazy.into_typed::<i32>().ok().unwrap();
         assert_eq!(*value_lazy.read().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_unsized() {
+        let lifetime = Lifetime::default();
+        let mut data = 42usize;
+        {
+            let foo = ManagedRef::<dyn Any>::new(&data, lifetime.borrow().unwrap());
+            assert_eq!(
+                *foo.read().unwrap().downcast_ref::<usize>().unwrap(),
+                42usize
+            );
+        }
+        {
+            let mut foo = ManagedRefMut::<dyn Any>::new(&mut data, lifetime.borrow_mut().unwrap());
+            *foo.write().unwrap().downcast_mut::<usize>().unwrap() = 100;
+        }
+        {
+            let foo = ManagedLazy::<dyn Any>::new(&mut data, lifetime.lazy());
+            assert_eq!(
+                *foo.read().unwrap().downcast_ref::<usize>().unwrap(),
+                100usize
+            );
+        }
+
+        let lifetime = Lifetime::default();
+        let mut data = [0, 1, 2, 3];
+        {
+            let foo = ManagedRef::<[i32]>::new(&data, lifetime.borrow().unwrap());
+            assert_eq!(*foo.read().unwrap(), [0, 1, 2, 3]);
+        }
+        {
+            let mut foo = ManagedRefMut::<[i32]>::new(&mut data, lifetime.borrow_mut().unwrap());
+            foo.write().unwrap().sort_by(|a, b| a.cmp(&b).reverse());
+        }
+        {
+            let foo = ManagedLazy::<[i32]>::new(&mut data, lifetime.lazy());
+            assert_eq!(*foo.read().unwrap(), [3, 2, 1, 0]);
+        }
     }
 }
