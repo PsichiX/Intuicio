@@ -314,7 +314,6 @@ impl<T> TryFrom<ManagedValue<T>> for ManagedRefMut<T> {
     }
 }
 
-#[derive(Clone)]
 pub struct ManagedLazy<T: ?Sized> {
     lifetime: LifetimeLazy,
     data: NonNull<T>,
@@ -322,6 +321,15 @@ pub struct ManagedLazy<T: ?Sized> {
 
 unsafe impl<T: ?Sized> Send for ManagedLazy<T> where T: Send {}
 unsafe impl<T: ?Sized> Sync for ManagedLazy<T> where T: Sync {}
+
+impl<T: ?Sized> Clone for ManagedLazy<T> {
+    fn clone(&self) -> Self {
+        Self {
+            lifetime: self.lifetime.clone(),
+            data: self.data,
+        }
+    }
+}
 
 impl<T: ?Sized> ManagedLazy<T> {
     pub fn new(data: &mut T, lifetime: LifetimeLazy) -> Self {
