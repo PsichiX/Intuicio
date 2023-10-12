@@ -69,8 +69,8 @@ impl<T> Managed<T> {
         ))
     }
 
-    pub fn lazy(&mut self) -> ManagedLazy<T> {
-        ManagedLazy::new(&mut self.data, self.lifetime.lazy())
+    pub fn lazy(&self) -> ManagedLazy<T> {
+        ManagedLazy::new(&self.data, self.lifetime.lazy())
     }
 
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Managed<U> {
@@ -332,18 +332,18 @@ impl<T: ?Sized> Clone for ManagedLazy<T> {
 }
 
 impl<T: ?Sized> ManagedLazy<T> {
-    pub fn new(data: &mut T, lifetime: LifetimeLazy) -> Self {
+    pub fn new(data: &T, lifetime: LifetimeLazy) -> Self {
         Self {
             lifetime,
-            data: unsafe { NonNull::new_unchecked(data as *mut T) },
+            data: unsafe { NonNull::new_unchecked(data as *const T as *mut T) },
         }
     }
 
     /// # Safety
-    pub unsafe fn new_raw(data: *mut T, lifetime: LifetimeLazy) -> Self {
+    pub unsafe fn new_raw(data: *const T, lifetime: LifetimeLazy) -> Self {
         Self {
             lifetime,
-            data: NonNull::new_unchecked(data),
+            data: NonNull::new_unchecked(data as *mut T),
         }
     }
 
@@ -351,8 +351,8 @@ impl<T: ?Sized> ManagedLazy<T> {
         (self.lifetime, self.data)
     }
 
-    pub fn into_dynamic(mut self) -> DynamicManagedLazy {
-        DynamicManagedLazy::new(unsafe { self.data.as_mut() }, self.lifetime)
+    pub fn into_dynamic(self) -> DynamicManagedLazy {
+        DynamicManagedLazy::new(unsafe { self.data.as_ref() }, self.lifetime)
     }
 
     pub fn lifetime(&self) -> &LifetimeLazy {
@@ -377,8 +377,8 @@ impl<T: ?Sized> ManagedLazy<T> {
         self.lifetime.read(unsafe { self.data.as_ref() })
     }
 
-    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
-        self.lifetime.write(unsafe { self.data.as_mut() })
+    pub fn write(&self) -> Option<ValueWriteAccess<T>> {
+        self.lifetime.write(unsafe { self.data.as_ptr().as_mut()? })
     }
 
     pub fn map<U>(mut self, f: impl FnOnce(&mut T) -> &mut U) -> ManagedLazy<U> {
@@ -417,7 +417,7 @@ impl<T: ?Sized> ManagedLazy<T> {
     }
 
     /// # Safety
-    pub unsafe fn as_mut_ptr(&mut self) -> Option<*mut T> {
+    pub unsafe fn as_mut_ptr(&self) -> Option<*mut T> {
         if self.lifetime.exists() {
             Some(self.data.as_ptr())
         } else {
@@ -532,6 +532,14 @@ impl<T> ManagedValue<T> {
         match self {
             Self::Owned(value) => value.borrow_mut(),
             Self::RefMut(value) => value.borrow_mut(),
+            _ => None,
+        }
+    }
+
+    pub fn lazy(&self) -> Option<ManagedLazy<T>> {
+        match self {
+            Self::Owned(value) => Some(value.lazy()),
+            Self::Lazy(value) => Some(value.clone()),
             _ => None,
         }
     }
@@ -702,12 +710,12 @@ impl DynamicManaged {
         }
     }
 
-    pub fn lazy(&mut self) -> DynamicManagedLazy {
+    pub fn lazy(&self) -> DynamicManagedLazy {
         unsafe {
             DynamicManagedLazy::new_raw(
                 self.type_hash,
                 self.lifetime.lazy(),
-                self.memory.as_mut_ptr(),
+                self.memory.as_ptr().cast_mut(),
             )
         }
     }
@@ -1031,21 +1039,31 @@ pub struct DynamicManagedLazy {
 unsafe impl Send for DynamicManagedLazy {}
 unsafe impl Sync for DynamicManagedLazy {}
 
+impl Clone for DynamicManagedLazy {
+    fn clone(&self) -> Self {
+        Self {
+            type_hash: self.type_hash,
+            lifetime: self.lifetime.clone(),
+            data: self.data,
+        }
+    }
+}
+
 impl DynamicManagedLazy {
-    pub fn new<T: ?Sized>(data: &mut T, lifetime: LifetimeLazy) -> Self {
+    pub fn new<T: ?Sized>(data: &T, lifetime: LifetimeLazy) -> Self {
         Self {
             type_hash: TypeHash::of::<T>(),
             lifetime,
-            data: unsafe { NonNull::new_unchecked(data as *mut T as *mut u8) },
+            data: unsafe { NonNull::new_unchecked(data as *const T as *mut T as *mut u8) },
         }
     }
 
     /// # Safety
-    pub unsafe fn new_raw(type_hash: TypeHash, lifetime: LifetimeLazy, data: *mut u8) -> Self {
+    pub unsafe fn new_raw(type_hash: TypeHash, lifetime: LifetimeLazy, data: *const u8) -> Self {
         Self {
             type_hash,
             lifetime,
-            data: NonNull::new_unchecked(data),
+            data: NonNull::new_unchecked(data as *mut u8),
         }
     }
 
@@ -1083,7 +1101,7 @@ impl DynamicManagedLazy {
         }
     }
 
-    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&self) -> Option<ValueWriteAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
             self.lifetime
                 .write(unsafe { self.data.as_ptr().cast::<T>().as_mut()? })
@@ -1135,7 +1153,7 @@ impl DynamicManagedLazy {
     }
 
     /// # Safety
-    pub unsafe fn as_mut_ptr<T>(&mut self) -> Option<*mut T> {
+    pub unsafe fn as_mut_ptr<T>(&self) -> Option<*mut T> {
         if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
             Some(self.data.as_ptr().cast::<T>())
         } else {
@@ -1253,6 +1271,14 @@ impl DynamicManagedValue {
             _ => None,
         }
     }
+
+    pub fn lazy(&self) -> Option<DynamicManagedLazy> {
+        match self {
+            Self::Owned(value) => Some(value.lazy()),
+            Self::Lazy(value) => Some(value.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl From<DynamicManaged> for DynamicManagedValue {
@@ -1315,7 +1341,7 @@ mod tests {
         drop(value_ref);
         assert!(value_ref2.read().is_some());
         let value_ref = value.borrow().unwrap();
-        let mut value_lazy = value.lazy();
+        let value_lazy = value.lazy();
         assert_eq!(*value_lazy.read().unwrap(), 2);
         *value_lazy.write().unwrap() = 42;
         assert_eq!(*value_lazy.read().unwrap(), 42);
@@ -1354,7 +1380,7 @@ mod tests {
         drop(value_ref);
         assert!(value_ref2.read::<i32>().is_some());
         let value_ref = value.borrow().unwrap();
-        let mut value_lazy = value.lazy();
+        let value_lazy = value.lazy();
         assert_eq!(*value_lazy.read::<i32>().unwrap(), 2);
         *value_lazy.write::<i32>().unwrap() = 42;
         assert_eq!(*value_lazy.read::<i32>().unwrap(), 42);

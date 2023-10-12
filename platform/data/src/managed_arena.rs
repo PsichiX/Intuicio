@@ -45,7 +45,7 @@ impl ManagedArenaPage {
 
     pub fn alloc<T: Finalize>(&mut self, value: T) -> Option<ManagedLazy<T>> {
         unsafe {
-            let mut result = self.alloc_uninitialized::<T>()?;
+            let result = self.alloc_uninitialized::<T>()?;
             result.as_mut_ptr().unwrap().write(value);
             Some(result)
         }
@@ -141,7 +141,7 @@ impl ManagedArena {
 
     pub fn alloc<T: Finalize>(&mut self, value: T) -> ManagedLazy<T> {
         unsafe {
-            let mut result = self.alloc_uninitialized::<T>();
+            let result = self.alloc_uninitialized::<T>();
             result.as_mut_ptr().unwrap().write(value);
             result
         }
@@ -198,7 +198,7 @@ mod tests {
         assert_eq!(arena.capacity(), 0);
         assert_eq!(arena.size(), 0);
         assert_eq!(arena.available_size(), 0);
-        let mut object = arena.alloc(42u32);
+        let object = arena.alloc(42u32);
         assert_eq!(arena.pages_count(), 1);
         assert_eq!(arena.capacity(), 1024);
         assert_eq!(arena.size(), 68);
@@ -217,7 +217,7 @@ mod tests {
         assert_eq!(arena.size(), 2252);
         assert_eq!(arena.available_size(), 2868);
         assert_eq!(*droppable_inner.read().unwrap(), false);
-        let mut nested = arena.alloc(Nested(object.clone()));
+        let nested = arena.alloc(Nested(object.clone()));
         assert_eq!(arena.pages_count(), 2);
         assert_eq!(arena.capacity(), 5120);
         assert_eq!(arena.size(), 2364);

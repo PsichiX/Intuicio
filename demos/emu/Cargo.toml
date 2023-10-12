@@ -1,6 +1,6 @@
 [package]
 name = "emu"
-version = "0.22.1"
+version = "0.23.0"
 edition = "2021"
 publish = false
 
@@ -13,11 +13,11 @@ name = "packager"
 path = "src/main_packager.rs"
 
 [dependencies]
-intuicio-data = { version = "0.22", path = "../../platform/data" }
-intuicio-core = { version = "0.22", path = "../../platform/core" }
-intuicio-derive = { version = "0.22", path = "../../platform/derive" }
-intuicio-backend-vm = { version = "0.22", path = "../../backends/vm" }
-intuicio-frontend-assembler = { version = "0.22", path = "../../frontends/assembler" }
+intuicio-data = { version = "0.23", path = "../../platform/data" }
+intuicio-core = { version = "0.23", path = "../../platform/core" }
+intuicio-derive = { version = "0.23", path = "../../platform/derive" }
+intuicio-backend-vm = { version = "0.23", path = "../../backends/vm" }
+intuicio-frontend-assembler = { version = "0.23", path = "../../frontends/assembler" }
 tetra = { version = "0.8", features = ["sdl2_bundled"] }
 pot = "2"
 toml = "0.7"
