@@ -802,6 +802,10 @@ impl DynamicManagedRef {
         }
     }
 
+    pub fn type_hash(&self) -> &TypeHash {
+        &self.type_hash
+    }
+
     pub fn lifetime(&self) -> &LifetimeRef {
         &self.lifetime
     }
@@ -923,6 +927,10 @@ impl DynamicManagedRefMut {
         } else {
             Err(self)
         }
+    }
+
+    pub fn type_hash(&self) -> &TypeHash {
+        &self.type_hash
     }
 
     pub fn lifetime(&self) -> &LifetimeRefMut {
@@ -1082,6 +1090,10 @@ impl DynamicManagedLazy {
         } else {
             Err(self)
         }
+    }
+
+    pub fn type_hash(&self) -> &TypeHash {
+        &self.type_hash
     }
 
     pub fn lifetime(&self) -> &LifetimeLazy {
