@@ -10,7 +10,7 @@ const PROCESSING_N: usize = 10000;
 
 pub fn bench() {
     println!();
-    println!("=== PROCESSING | BENCHMARKS ===");
+    println!("--- PROCESSING | BENCHMARKS ---");
 
     // native
     let native_result = {
@@ -268,7 +268,7 @@ pub fn bench() {
     // };
 
     println!();
-    println!("=== PROCESSING | RESULTS ===");
+    println!("--- PROCESSING | RESULTS ---");
 
     println!();
     println!("= Host vs Native:");

@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "platform/*",
     "backends/*",
@@ -6,10 +7,6 @@ members = [
     "plugins/*",
     "runners/*",
     "essentials",
-    "demos/tetra",
-    "demos/plugin",
-    "demos/emu",
-    "demos/custom",
-    "demos/godot-node-graph/server",
+    "demos/*",
     "tests",
 ]

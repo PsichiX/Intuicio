@@ -27,7 +27,7 @@ pub struct Jobs {
 
 #[intuicio_methods(module_name = "jobs")]
 impl Jobs {
-    pub const HOST_PRODUCER_CUSTOM: &str = "Jobs::host_producer";
+    pub const HOST_PRODUCER_CUSTOM: &'static str = "Jobs::host_producer";
 
     #[allow(clippy::new_ret_no_self)]
     #[intuicio_method(use_context, use_registry)]

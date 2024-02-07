@@ -30,11 +30,6 @@ demo-tetra:
   cd ./demos/plugin/ && cargo build
   cd ./demos/tetra/ && cargo run
 
-demo-node-graph:
-  cargo build --release --manifest-path ./demos/godot-node-graph/server/Cargo.toml
-  godot --path ./demos/godot-node-graph/editor --export "Windows Desktop" ../../../target/release/godot-node-graph.exe
-  ./target/release/godot-node-graph.exe
-
 clean:
   find . -name target -type d -exec rm -r {} +
   just remove-lockfiles

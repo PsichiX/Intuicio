@@ -191,7 +191,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     }
     let fields = fields
         .iter()
-        .zip(fields_attributes.into_iter())
+        .zip(fields_attributes)
         .filter_map(|(field, attributes)| {
             let FieldAttributes { name, ignore, meta } = attributes;
             if ignore {

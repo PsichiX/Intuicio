@@ -7,7 +7,7 @@ use std::time::Duration;
 
 pub fn bench() {
     println!();
-    println!("=== ALLOCATOR | BENCHMARKS ===");
+    println!("--- ALLOCATOR | BENCHMARKS ---");
 
     // native
     let native_alloc_result = {
@@ -118,7 +118,7 @@ pub fn bench() {
     };
 
     println!();
-    println!("=== ALLOCATOR | RESULTS ===");
+    println!("--- ALLOCATOR | RESULTS ---");
 
     println!();
     println!("Managed heap vs Native heap alloc:");

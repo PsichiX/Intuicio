@@ -73,14 +73,16 @@ impl<T> Managed<T> {
         ManagedLazy::new(&self.data, self.lifetime.lazy())
     }
 
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Managed<U> {
+    /// # Safety
+    pub unsafe fn map<U>(self, f: impl FnOnce(T) -> U) -> Managed<U> {
         Managed {
             lifetime: Default::default(),
             data: f(self.data),
         }
     }
 
-    pub fn try_map<U>(self, f: impl FnOnce(T) -> Option<U>) -> Option<Managed<U>> {
+    /// # Safety
+    pub unsafe fn try_map<U>(self, f: impl FnOnce(T) -> Option<U>) -> Option<Managed<U>> {
         f(self.data).map(|data| Managed {
             lifetime: Default::default(),
             data,
@@ -156,7 +158,8 @@ impl<T: ?Sized> ManagedRef<T> {
         self.lifetime.read(unsafe { self.data.as_ref() })
     }
 
-    pub fn map<U>(self, f: impl FnOnce(&T) -> &U) -> ManagedRef<U> {
+    /// # Safety
+    pub unsafe fn map<U>(self, f: impl FnOnce(&T) -> &U) -> ManagedRef<U> {
         unsafe {
             let data = f(self.data.as_ref());
             ManagedRef {
@@ -166,7 +169,8 @@ impl<T: ?Sized> ManagedRef<T> {
         }
     }
 
-    pub fn try_map<U>(self, f: impl FnOnce(&T) -> Option<&U>) -> Result<ManagedRef<U>, Self> {
+    /// # Safety
+    pub unsafe fn try_map<U>(self, f: impl FnOnce(&T) -> Option<&U>) -> Result<ManagedRef<U>, Self> {
         unsafe {
             if let Some(data) = f(self.data.as_ref()) {
                 Ok(ManagedRef {
@@ -258,7 +262,8 @@ impl<T: ?Sized> ManagedRefMut<T> {
         self.lifetime.write(unsafe { self.data.as_mut() })
     }
 
-    pub fn map<U>(mut self, f: impl FnOnce(&mut T) -> &mut U) -> ManagedRefMut<U> {
+    /// # Safety
+    pub unsafe fn map<U>(mut self, f: impl FnOnce(&mut T) -> &mut U) -> ManagedRefMut<U> {
         unsafe {
             let data = f(self.data.as_mut());
             ManagedRefMut {
@@ -268,7 +273,8 @@ impl<T: ?Sized> ManagedRefMut<T> {
         }
     }
 
-    pub fn try_map<U>(
+    /// # Safety
+    pub unsafe fn try_map<U>(
         mut self,
         f: impl FnOnce(&mut T) -> Option<&mut U>,
     ) -> Result<ManagedRefMut<U>, Self> {
@@ -381,7 +387,8 @@ impl<T: ?Sized> ManagedLazy<T> {
         self.lifetime.write(unsafe { self.data.as_ptr().as_mut()? })
     }
 
-    pub fn map<U>(mut self, f: impl FnOnce(&mut T) -> &mut U) -> ManagedLazy<U> {
+    /// # Safety
+    pub unsafe fn map<U>(mut self, f: impl FnOnce(&mut T) -> &mut U) -> ManagedLazy<U> {
         unsafe {
             let data = f(self.data.as_mut());
             ManagedLazy {
@@ -391,7 +398,8 @@ impl<T: ?Sized> ManagedLazy<T> {
         }
     }
 
-    pub fn try_map<U>(
+    /// # Safety
+    pub unsafe fn try_map<U>(
         mut self,
         f: impl FnOnce(&mut T) -> Option<&mut U>,
     ) -> Result<ManagedLazy<U>, Self> {
@@ -720,11 +728,13 @@ impl DynamicManaged {
         }
     }
 
-    pub fn map<T, U: Finalize>(self, f: impl FnOnce(T) -> U) -> Result<Self, Self> {
+    /// # Safety
+    pub unsafe fn map<T, U: Finalize>(self, f: impl FnOnce(T) -> U) -> Result<Self, Self> {
         self.consume::<T>().map(|data| Self::new(f(data)))
     }
 
-    pub fn try_map<T, U: Finalize>(self, f: impl FnOnce(T) -> Option<U>) -> Option<Self> {
+    /// # Safety
+    pub unsafe fn try_map<T, U: Finalize>(self, f: impl FnOnce(T) -> Option<U>) -> Option<Self> {
         f(self.consume::<T>().ok()?).map(|data| Self::new(data))
     }
 
@@ -831,7 +841,8 @@ impl DynamicManagedRef {
         }
     }
 
-    pub fn map<T, U>(self, f: impl FnOnce(&T) -> &U) -> Result<Self, Self> {
+    /// # Safety
+    pub unsafe fn map<T, U>(self, f: impl FnOnce(&T) -> &U) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 let data = f(&*(self.data.as_ptr() as *const T));
@@ -846,7 +857,8 @@ impl DynamicManagedRef {
         }
     }
 
-    pub fn try_map<T, U>(self, f: impl FnOnce(&T) -> Option<&U>) -> Result<Self, Self> {
+    /// # Safety
+    pub unsafe fn try_map<T, U>(self, f: impl FnOnce(&T) -> Option<&U>) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 if let Some(data) = f(&*(self.data.as_ptr() as *const T)) {
@@ -975,7 +987,8 @@ impl DynamicManagedRefMut {
         }
     }
 
-    pub fn map<T, U>(self, f: impl FnOnce(&mut T) -> &mut U) -> Result<Self, Self> {
+    /// # Safety
+    pub unsafe fn map<T, U>(self, f: impl FnOnce(&mut T) -> &mut U) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 let data = f(&mut *(self.data.as_ptr() as *mut T));
@@ -990,7 +1003,8 @@ impl DynamicManagedRefMut {
         }
     }
 
-    pub fn try_map<T, U>(self, f: impl FnOnce(&mut T) -> Option<&mut U>) -> Result<Self, Self> {
+    /// # Safety
+    pub unsafe fn try_map<T, U>(self, f: impl FnOnce(&mut T) -> Option<&mut U>) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 if let Some(data) = f(&mut *(self.data.as_ptr() as *mut T)) {
@@ -1122,7 +1136,8 @@ impl DynamicManagedLazy {
         }
     }
 
-    pub fn map<T, U>(self, f: impl FnOnce(&mut T) -> &mut U) -> Result<Self, Self> {
+    /// # Safety
+    pub unsafe fn map<T, U>(self, f: impl FnOnce(&mut T) -> &mut U) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 let data = f(&mut *(self.data.as_ptr() as *mut T));
@@ -1137,7 +1152,8 @@ impl DynamicManagedLazy {
         }
     }
 
-    pub fn try_map<T, U>(self, f: impl FnOnce(&mut T) -> Option<&mut U>) -> Result<Self, Self> {
+    /// # Safety
+    pub unsafe fn try_map<T, U>(self, f: impl FnOnce(&mut T) -> Option<&mut U>) -> Result<Self, Self> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe {
                 if let Some(data) = f(&mut *(self.data.as_ptr() as *mut T)) {

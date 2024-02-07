@@ -167,7 +167,7 @@ pub fn collect(context: &mut Context, registry: &Registry, iterator: Reference) 
             break;
         }
         if let Some(pair) = value.read::<Array>() {
-            let key = pair.get(0).unwrap().read::<Text>().unwrap().to_owned();
+            let key = pair.first().unwrap().read::<Text>().unwrap().to_owned();
             let value = pair.get(1).unwrap().clone();
             result.insert(key, value);
         } else if let Some(pair) = value.read::<Map>() {

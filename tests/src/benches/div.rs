@@ -5,14 +5,14 @@ use crate::{
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_frontend_vault::*;
-use std::time::Duration;
+use std::{error::Error, time::Duration};
 
 const DIV_A: f64 = 2.0;
 const DIV_B: f64 = 40.0;
 
-pub fn bench() {
+pub fn bench() -> Result<(), Box<dyn Error>> {
     println!();
-    println!("=== DIV | BENCHMARKS ===");
+    println!("--- DIV | BENCHMARKS ---");
 
     // native
     let native_result = {
@@ -183,7 +183,7 @@ pub fn bench() {
             let mut writer = StandardStream::stderr(ColorChoice::Always);
             diagnostics.emit(&mut writer, &sources).unwrap();
         }
-        let mut vm = Vm::new(Arc::new(context.runtime()), Arc::new(result));
+        let mut vm = Vm::new(Arc::new(context.runtime().unwrap()), Arc::new(result));
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "rune div",
             || {},
@@ -223,7 +223,7 @@ pub fn bench() {
     };
 
     println!();
-    println!("=== DIV | RESULTS ===");
+    println!("--- DIV | RESULTS ---");
 
     println!();
     println!("= Host vs Native:");
@@ -248,4 +248,6 @@ pub fn bench() {
     println!();
     println!("= Script vs Rhai:");
     script_result.print_comparison(&rhai_result, COMPARISON_FORMAT);
+
+    Ok(())
 }

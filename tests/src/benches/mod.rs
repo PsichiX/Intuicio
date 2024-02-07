@@ -14,8 +14,8 @@ const COMPARISON_FORMAT: ComparisonFormat = ComparisonFormat::Scale;
 fn bench() {
     access::bench();
     allocator::bench();
-    div::bench();
+    let _ = div::bench();
     sqrt::bench();
     processing::bench();
-    fib::bench();
+    let _ = fib::bench();
 }

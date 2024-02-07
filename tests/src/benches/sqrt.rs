@@ -11,7 +11,7 @@ const SQRT_N: f32 = 424242.424242;
 
 pub fn bench() {
     println!();
-    println!("=== SQRT | BENCHMARKS ===");
+    println!("--- SQRT | BENCHMARKS ---");
 
     // native
     let native_result = {
@@ -144,7 +144,7 @@ pub fn bench() {
     };
 
     println!();
-    println!("=== SQRT | RESULTS ===");
+    println!("--- SQRT | RESULTS ---");
 
     println!();
     println!("= Host vs Native:");

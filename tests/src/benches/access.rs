@@ -7,7 +7,7 @@ use std::time::Duration;
 
 pub fn bench() {
     println!();
-    println!("=== ACCESS | BENCHMARKS ===");
+    println!("--- ACCESS | BENCHMARKS ---");
 
     // native
     let native_access_result = {
@@ -39,7 +39,7 @@ pub fn bench() {
     };
 
     println!();
-    println!("=== ACCESS | RESULTS ===");
+    println!("--- ACCESS | RESULTS ---");
 
     println!();
     println!("Managed vs Native:");
