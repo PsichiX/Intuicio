@@ -6,7 +6,12 @@ use crate::{
     Visibility,
 };
 use intuicio_data::data_stack::DataStackPack;
-use std::{borrow::Cow, sync::Arc};
+use std::{
+    borrow::Cow,
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 pub type FunctionHandle = Arc<Function>;
 pub type FunctionMetaQuery = fn(&Meta) -> bool;
@@ -250,7 +255,7 @@ impl Function {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Hash)]
 pub struct FunctionQueryParameter<'a> {
     pub name: Option<Cow<'a, str>>,
     pub struct_query: Option<StructQuery<'a>>,
@@ -270,7 +275,7 @@ impl<'a> FunctionQueryParameter<'a> {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Hash)]
 pub struct FunctionQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub module_name: Option<Cow<'a, str>>,
@@ -328,6 +333,12 @@ impl<'a> FunctionQuery<'a> {
                 .as_ref()
                 .map(|query| signature.meta.as_ref().map(query).unwrap_or(false))
                 .unwrap_or(true)
+    }
+
+    pub fn as_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
 

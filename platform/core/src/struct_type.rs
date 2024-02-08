@@ -1,6 +1,12 @@
 use crate::{is_send, is_sync, meta::Meta, prelude::RuntimeObject, Visibility};
 use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
-use std::{alloc::Layout, borrow::Cow, sync::Arc};
+use std::{
+    alloc::Layout,
+    borrow::Cow,
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 pub type StructHandle = Arc<Struct>;
 pub type StructMetaQuery = fn(&Meta) -> bool;
@@ -428,7 +434,7 @@ impl PartialEq for Struct {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Hash)]
 pub struct StructFieldQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub struct_query: Option<StructQuery<'a>>,
@@ -453,7 +459,7 @@ impl<'a> StructFieldQuery<'a> {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Hash)]
 pub struct StructQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub module_name: Option<Cow<'a, str>>,
@@ -526,6 +532,12 @@ impl<'a> StructQuery<'a> {
                 .as_ref()
                 .map(|query| struct_type.meta.as_ref().map(query).unwrap_or(false))
                 .unwrap_or(true)
+    }
+
+    pub fn as_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
 

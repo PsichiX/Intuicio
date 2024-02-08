@@ -3,14 +3,46 @@ use crate::{
     prelude::{NativeStructBuilder, StructQuery},
     struct_type::{Struct, StructHandle},
 };
-use std::sync::Arc;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
 
 pub type RegistryHandle = Arc<Registry>;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct Registry {
     functions: Vec<FunctionHandle>,
     structs: Vec<StructHandle>,
+    pub index_capacity: usize,
+    pub use_indexing_threshold: usize,
+    functions_index: RwLock<BTreeMap<u64, FunctionHandle>>,
+    structs_index: RwLock<BTreeMap<u64, StructHandle>>,
+}
+
+impl Clone for Registry {
+    fn clone(&self) -> Self {
+        Self {
+            functions: self.functions.clone(),
+            structs: self.structs.clone(),
+            index_capacity: self.index_capacity,
+            use_indexing_threshold: self.use_indexing_threshold,
+            functions_index: RwLock::new(
+                self.functions_index
+                    .read()
+                    .ok()
+                    .map(|items| items.clone())
+                    .unwrap_or_default(),
+            ),
+            structs_index: RwLock::new(
+                self.structs_index
+                    .read()
+                    .ok()
+                    .map(|items| items.clone())
+                    .unwrap_or_default(),
+            ),
+        }
+    }
 }
 
 impl Registry {
@@ -33,6 +65,21 @@ impl Registry {
             .with_struct(NativeStructBuilder::new::<f64>().build())
             .with_struct(NativeStructBuilder::new::<char>().build())
             .with_struct(NativeStructBuilder::new_named::<String>("String").build())
+    }
+
+    pub fn with_index_capacity(mut self, capacity: usize) -> Self {
+        self.index_capacity = capacity;
+        self
+    }
+
+    pub fn with_max_index_capacity(mut self) -> Self {
+        self.index_capacity = usize::MAX;
+        self
+    }
+
+    pub fn with_use_indexing_threshold(mut self, threshold: usize) -> Self {
+        self.use_indexing_threshold = threshold;
+        self
     }
 
     pub fn with_function(mut self, function: Function) -> Self {
@@ -104,7 +151,26 @@ impl Registry {
     }
 
     pub fn find_function<'a>(&'a self, query: FunctionQuery<'a>) -> Option<FunctionHandle> {
-        self.find_functions(query).next()
+        if self.index_capacity == 0 || self.functions.len() < self.use_indexing_threshold {
+            self.find_functions(query).next()
+        } else if let Ok(mut index) = self.functions_index.try_write() {
+            let hash = query.as_hash();
+            if let Some(found) = index.get(&hash) {
+                Some(found.clone())
+            } else if let Some(found) = self.find_functions(query).next() {
+                for _ in 0..(index.len().saturating_sub(self.index_capacity)) {
+                    if let Some(hash) = index.keys().next().copied() {
+                        index.remove(&hash);
+                    }
+                }
+                index.insert(hash, found.clone());
+                Some(found)
+            } else {
+                None
+            }
+        } else {
+            self.find_functions(query).next()
+        }
     }
 
     pub fn add_struct_handle(&mut self, struct_handle: StructHandle) {
@@ -166,7 +232,26 @@ impl Registry {
     }
 
     pub fn find_struct<'a>(&'a self, query: StructQuery<'a>) -> Option<StructHandle> {
-        self.find_structs(query).next()
+        if self.index_capacity == 0 || self.structs.len() < self.use_indexing_threshold {
+            self.find_structs(query).next()
+        } else if let Ok(mut index) = self.structs_index.try_write() {
+            let hash = query.as_hash();
+            if let Some(found) = index.get(&hash) {
+                Some(found.clone())
+            } else if let Some(found) = self.find_structs(query).next() {
+                for _ in 0..(index.len().saturating_sub(self.index_capacity)) {
+                    if let Some(hash) = index.keys().next().copied() {
+                        index.remove(&hash);
+                    }
+                }
+                index.insert(hash, found.clone());
+                Some(found)
+            } else {
+                None
+            }
+        } else {
+            self.find_structs(query).next()
+        }
     }
 }
 

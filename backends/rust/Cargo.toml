@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-backend-rust"
-version = "0.24.0"
+version = "0.24.1"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Rust backend module for Intuicio scripting platform"

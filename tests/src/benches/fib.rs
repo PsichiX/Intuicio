@@ -67,7 +67,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
     };
 
     // host
-    let host_result = {
+    let (host_result, host_indexed_result) = {
         fn fib(context: &mut Context, registry: &Registry) {
             let fib = registry
                 .find_function(FunctionQuery {
@@ -92,29 +92,67 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
             context.stack().push(result);
         }
 
-        println!();
-        let mut registry = Registry::default().with_basic_types();
-        let fib = registry.add_function(Function::new(
-            function_signature! {
-                registry => fn fib(n: usize) -> (result: usize)
-            },
-            FunctionBody::pointer(fib),
-        ));
-        let mut context = Context::new(1024, 1024, 1024);
-        Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
-            "host fib",
-            || {},
-            |_| {
-                context.stack().push(black_box(FIB_N));
-                fib.invoke(&mut context, &registry);
-                context.stack().pop::<usize>();
-            },
-            |_| {},
-        )
+        let host_result = {
+            println!();
+            let mut registry = Registry::default().with_basic_types();
+            registry.add_function(Function::new(
+                function_signature! {
+                    registry => fn fib(n: usize) -> (result: usize)
+                },
+                FunctionBody::pointer(fib),
+            ));
+            let mut context = Context::new(1024, 1024, 1024);
+            Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
+                "host fib",
+                || {},
+                |_| {
+                    let fib = registry
+                        .find_function(FunctionQuery {
+                            name: Some("fib".into()),
+                            ..Default::default()
+                        })
+                        .unwrap();
+                    context.stack().push(black_box(FIB_N));
+                    fib.invoke(&mut context, &registry);
+                    context.stack().pop::<usize>();
+                },
+                |_| {},
+            )
+        };
+        let host_indexed_result = {
+            println!();
+            let mut registry = Registry::default()
+                .with_basic_types()
+                .with_max_index_capacity();
+            registry.add_function(Function::new(
+                function_signature! {
+                    registry => fn fib(n: usize) -> (result: usize)
+                },
+                FunctionBody::pointer(fib),
+            ));
+            let mut context = Context::new(1024, 1024, 1024);
+            Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
+                "host indexed fib",
+                || {},
+                |_| {
+                    let fib = registry
+                        .find_function(FunctionQuery {
+                            name: Some("fib".into()),
+                            ..Default::default()
+                        })
+                        .unwrap();
+                    context.stack().push(black_box(FIB_N));
+                    fib.invoke(&mut context, &registry);
+                    context.stack().pop::<usize>();
+                },
+                |_| {},
+            )
+        };
+        (host_result, host_indexed_result)
     };
 
     // vm
-    let vm_result = {
+    let (vm_result, vm_indexed_result) = {
         fn fib(context: &mut Context, registry: &Registry) {
             let fib = registry
                 .find_function(FunctionQuery {
@@ -139,39 +177,79 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
             context.stack().push(result);
         }
 
-        println!();
-        let mut registry = Registry::default().with_basic_types();
-        registry.add_function(Function::new(
-            function_signature! {
-                registry => fn fib(n: usize) -> (result: usize)
-            },
-            FunctionBody::pointer(fib),
-        ));
-        let fib = registry.add_function(Function::new(
-            function_signature! {
-                registry => fn fib_script(n: usize) -> (result: usize)
-            },
-            VmScope::<()>::generate_function_body(
-                ScriptBuilder::<()>::default()
-                    .call_function(FunctionQuery {
-                        name: Some("fib".into()),
-                        ..Default::default()
-                    })
-                    .build(),
-                None,
+        let vm_result = {
+            println!();
+            let mut registry = Registry::default().with_basic_types();
+            registry.add_function(Function::new(
+                function_signature! {
+                    registry => fn fib(n: usize) -> (result: usize)
+                },
+                FunctionBody::pointer(fib),
+            ));
+            let fib = registry.add_function(Function::new(
+                function_signature! {
+                    registry => fn fib_script(n: usize) -> (result: usize)
+                },
+                VmScope::<()>::generate_function_body(
+                    ScriptBuilder::<()>::default()
+                        .call_function(FunctionQuery {
+                            name: Some("fib".into()),
+                            ..Default::default()
+                        })
+                        .build(),
+                    None,
+                )
+                .unwrap()
+                .0,
+            ));
+            let mut context = Context::new(1024, 1024, 1024);
+            Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
+                "vm fib",
+                || {},
+                |_| {
+                    fib.call::<(usize,), _>(&mut context, &registry, (black_box(FIB_N),), true);
+                },
+                |_| {},
             )
-            .unwrap()
-            .0,
-        ));
-        let mut context = Context::new(1024, 1024, 1024);
-        Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
-            "vm fib",
-            || {},
-            |_| {
-                fib.call::<(usize,), _>(&mut context, &registry, (black_box(FIB_N),), true);
-            },
-            |_| {},
-        )
+        };
+        let vm_indexed_result = {
+            println!();
+            let mut registry = Registry::default()
+                .with_basic_types()
+                .with_max_index_capacity();
+            registry.add_function(Function::new(
+                function_signature! {
+                    registry => fn fib(n: usize) -> (result: usize)
+                },
+                FunctionBody::pointer(fib),
+            ));
+            let fib = registry.add_function(Function::new(
+                function_signature! {
+                    registry => fn fib_script(n: usize) -> (result: usize)
+                },
+                VmScope::<()>::generate_function_body(
+                    ScriptBuilder::<()>::default()
+                        .call_function(FunctionQuery {
+                            name: Some("fib".into()),
+                            ..Default::default()
+                        })
+                        .build(),
+                    None,
+                )
+                .unwrap()
+                .0,
+            ));
+            let mut context = Context::new(1024, 1024, 1024);
+            Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
+                "vm indexed fib",
+                || {},
+                |_| {
+                    fib.call::<(usize,), _>(&mut context, &registry, (black_box(FIB_N),), true);
+                },
+                |_| {},
+            )
+        };
+        (vm_result, vm_indexed_result)
     };
 
     // script
@@ -213,6 +291,53 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
         let mut context = Context::new(1024, 1024, 1024);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "script fib",
+            || {},
+            |_| {
+                fib.call::<(usize,), _>(&mut context, &registry, (black_box(FIB_N),), true);
+            },
+            |_| {},
+        )
+    };
+    let script_indexed_result = {
+        println!();
+        let mut registry = Registry::default()
+            .with_basic_types()
+            .with_max_index_capacity();
+        registry.add_function(define_vault_function! {
+            registry => mod intrinsics fn add(a: usize, b: usize) -> usize {
+                a + b
+            }
+        });
+        registry.add_function(define_vault_function! {
+            registry => mod intrinsics fn sub(a: usize, b: usize) -> usize {
+                a - b
+            }
+        });
+        registry.add_function(define_vault_function! {
+            registry => mod intrinsics fn less_than(a: usize, b: usize) -> bool {
+                a < b
+            }
+        });
+        registry.add_function(define_function! {
+            registry => mod intrinsics struct (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
+                (this, this)
+            }
+        });
+        let mut content_provider = FileContentProvider::new("vault", VaultContentParser);
+        VaultPackage::new("../resources/package.vault", &mut content_provider)
+            .unwrap()
+            .compile()
+            .install::<VmScope<VaultScriptExpression>>(&mut registry, None);
+        let fib = registry
+            .find_function(FunctionQuery {
+                name: Some("fib".into()),
+                module_name: Some("test".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        let mut context = Context::new(1024, 1024, 1024);
+        Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
+            "script indexed fib",
             || {},
             |_| {
                 fib.call::<(usize,), _>(&mut context, &registry, (black_box(FIB_N),), true);
@@ -320,6 +445,18 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
     println!();
     println!("= Script vs Rhai:");
     script_result.print_comparison(&rhai_result, COMPARISON_FORMAT);
+
+    println!();
+    println!("= Host vs Host Indexed:");
+    host_result.print_comparison(&host_indexed_result, COMPARISON_FORMAT);
+
+    println!();
+    println!("= Vm vs Vm Indexed:");
+    vm_result.print_comparison(&vm_indexed_result, COMPARISON_FORMAT);
+
+    println!();
+    println!("= Script vs Script Indexed:");
+    script_result.print_comparison(&script_indexed_result, COMPARISON_FORMAT);
 
     Ok(())
 }
