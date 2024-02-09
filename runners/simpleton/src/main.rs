@@ -27,6 +27,14 @@ struct Cli {
     #[arg(short, long, value_name = "NAME")]
     module_name: Option<String>,
 
+    /// Registry indexing capacity.
+    #[arg(long, value_name = "COUNT")]
+    indexing_capacity: Option<usize>,
+
+    /// Registry use indexing threshold.
+    #[arg(long, value_name = "COUNT")]
+    use_indexing_threshold: Option<usize>,
+
     /// VM stack capacity in bytes.
     #[arg(long, value_name = "BYTES")]
     stack_capacity: Option<usize>,
@@ -111,6 +119,8 @@ fn main() {
         }
         return;
     }
+    let indexing_capacity = cli.indexing_capacity.unwrap_or(256);
+    let use_indexing_threshold = cli.use_indexing_threshold.unwrap_or(256);
     let stack_capacity = cli.stack_capacity.unwrap_or(1024);
     let registers_capacity = cli.registers_capacity.unwrap_or(1024);
     let heap_page_capacity = cli.heap_page_capacity.unwrap_or(1024);
@@ -125,7 +135,9 @@ fn main() {
         if let Some(path) = &cli.plugins {
             plugin_search_paths.push(path.as_str());
         }
-        let mut registry = Registry::default();
+        let mut registry = Registry::default()
+            .with_index_capacity(indexing_capacity)
+            .with_use_indexing_threshold(use_indexing_threshold);
         intuicio_frontend_simpleton::library::install(&mut registry);
         crate::library::install(&mut registry);
         package.install_plugins(&mut registry, &plugin_search_paths);

@@ -53,7 +53,9 @@ fn main() {
         if let Some(path) = &cli.plugins {
             plugin_search_paths.push(path.as_str());
         }
-        let mut registry = Registry::default();
+        let mut registry = Registry::default()
+            .with_index_capacity(256)
+            .with_use_indexing_threshold(256);
         intuicio_frontend_simpleton::library::install(&mut registry);
         crate::library::install(&mut registry);
         package.install_plugins(&mut registry, &plugin_search_paths);
