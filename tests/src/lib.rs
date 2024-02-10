@@ -1,6 +1,7 @@
 #[cfg(all(feature = "bench", not(feature = "all")))]
 #[cfg(test)]
 mod benches;
+#[cfg(not(feature = "bench"))]
 #[cfg(test)]
 mod tests;
 
