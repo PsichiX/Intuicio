@@ -116,7 +116,7 @@ pub struct PrintDebugger {
     pub step_through: bool,
     pub mode: PrintDebuggerMode,
     #[allow(clippy::type_complexity)]
-    printable: HashMap<TypeHash, (&'static str, Box<dyn Fn(&[u8]) -> String>)>,
+    printable: HashMap<TypeHash, (&'static str, Box<dyn Fn(&[u8]) -> String + Send + Sync>)>,
     step: usize,
 }
 
