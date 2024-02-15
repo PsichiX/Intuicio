@@ -1,4 +1,4 @@
-use crate::{is_send, is_sync, meta::Meta, prelude::RuntimeObject, Visibility};
+use crate::{is_copy, is_send, is_sync, meta::Meta, prelude::RuntimeObject, Visibility};
 use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
 use std::{
     alloc::Layout,
@@ -67,6 +67,7 @@ impl RuntimeStructBuilder {
         self.fields.sort_by(|a, b| a.offset.cmp(&b.offset));
         let is_send = self.fields.iter().all(|field| field.struct_handle.is_send);
         let is_sync = self.fields.iter().all(|field| field.struct_handle.is_sync);
+        let is_copy = self.fields.iter().all(|field| field.struct_handle.is_copy);
         Struct {
             meta: self.meta,
             name: self.name,
@@ -80,6 +81,7 @@ impl RuntimeStructBuilder {
             finalizer: self.finalizer,
             is_send,
             is_sync,
+            is_copy,
         }
     }
 
@@ -118,6 +120,7 @@ pub struct NativeStructBuilder {
     finalizer: unsafe fn(*mut ()),
     is_send: bool,
     is_sync: bool,
+    is_copy: bool,
 }
 
 impl NativeStructBuilder {
@@ -135,6 +138,7 @@ impl NativeStructBuilder {
             finalizer: T::finalize_raw,
             is_send: is_send::<T>(),
             is_sync: is_sync::<T>(),
+            is_copy: is_copy::<T>(),
         }
     }
 
@@ -152,6 +156,7 @@ impl NativeStructBuilder {
             finalizer: T::finalize_raw,
             is_send: is_send::<T>(),
             is_sync: is_sync::<T>(),
+            is_copy: is_copy::<T>(),
         }
     }
 
@@ -169,6 +174,7 @@ impl NativeStructBuilder {
             finalizer: T::finalize_raw,
             is_send: is_send::<T>(),
             is_sync: is_sync::<T>(),
+            is_copy: is_copy::<T>(),
         }
     }
 
@@ -186,6 +192,7 @@ impl NativeStructBuilder {
             finalizer: T::finalize_raw,
             is_send: is_send::<T>(),
             is_sync: is_sync::<T>(),
+            is_copy: is_copy::<T>(),
         }
     }
 
@@ -208,6 +215,7 @@ impl NativeStructBuilder {
         field.offset = offset;
         self.is_send = self.is_send && field.struct_handle.is_send;
         self.is_sync = self.is_sync && field.struct_handle.is_sync;
+        self.is_copy = self.is_copy && field.struct_handle.is_copy;
         self.fields.push(field);
         self
     }
@@ -221,6 +229,12 @@ impl NativeStructBuilder {
     /// # Safety
     pub unsafe fn override_sync(mut self, mode: bool) -> Self {
         self.is_sync = mode;
+        self
+    }
+
+    /// # Safety
+    pub unsafe fn override_copy(mut self, mode: bool) -> Self {
+        self.is_copy = mode;
         self
     }
 
@@ -239,6 +253,7 @@ impl NativeStructBuilder {
             finalizer: self.finalizer,
             is_send: self.is_send,
             is_sync: self.is_sync,
+            is_copy: self.is_copy,
         }
     }
 
@@ -262,6 +277,7 @@ impl From<Struct> for NativeStructBuilder {
             finalizer: value.finalizer,
             is_send: value.is_send,
             is_sync: value.is_sync,
+            is_copy: value.is_copy,
         }
     }
 }
@@ -338,6 +354,7 @@ pub struct Struct {
     finalizer: unsafe fn(*mut ()),
     is_send: bool,
     is_sync: bool,
+    is_copy: bool,
 }
 
 impl Struct {
@@ -355,6 +372,10 @@ impl Struct {
 
     pub fn is_sync(&self) -> bool {
         self.is_sync
+    }
+
+    pub fn is_copy(&self) -> bool {
+        self.is_copy
     }
 
     pub fn can_initialize(&self) -> bool {

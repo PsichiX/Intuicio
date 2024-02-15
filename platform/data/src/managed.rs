@@ -5,7 +5,11 @@ use crate::{
     type_hash::TypeHash,
     Finalize,
 };
-use std::{alloc::Layout, mem::MaybeUninit, ptr::NonNull};
+use std::{
+    alloc::{alloc, dealloc, Layout},
+    mem::MaybeUninit,
+    ptr::NonNull,
+};
 
 #[derive(Default)]
 pub struct Managed<T> {
@@ -583,17 +587,22 @@ impl<T> From<ManagedLazy<T>> for ManagedValue<T> {
 pub struct DynamicManaged {
     type_hash: TypeHash,
     lifetime: Lifetime,
-    memory: Vec<u8>,
+    memory: NonNull<u8>,
+    layout: Layout,
     finalizer: unsafe fn(*mut ()),
     drop: bool,
 }
+
+unsafe impl Send for DynamicManaged {}
+unsafe impl Sync for DynamicManaged {}
 
 impl Drop for DynamicManaged {
     fn drop(&mut self) {
         if self.drop {
             unsafe {
-                let data_pointer = self.memory.as_mut_ptr().cast::<()>();
+                let data_pointer = self.memory.as_ptr().cast::<()>();
                 (self.finalizer)(data_pointer);
+                dealloc(self.memory.as_ptr(), self.layout);
             }
         }
     }
@@ -601,12 +610,14 @@ impl Drop for DynamicManaged {
 
 impl DynamicManaged {
     pub fn new<T: Finalize>(data: T) -> Self {
-        let mut memory = vec![0; Layout::new::<T>().pad_to_align().size()];
-        unsafe { memory.as_mut_ptr().cast::<T>().write(data) };
+        let layout = Layout::new::<T>().pad_to_align();
+        let memory = unsafe { NonNull::new(alloc(layout)).unwrap() };
+        unsafe { memory.as_ptr().cast::<T>().write(data) };
         Self {
             type_hash: TypeHash::of::<T>(),
             lifetime: Default::default(),
             memory,
+            layout,
             finalizer: T::finalize_raw,
             drop: true,
         }
@@ -615,24 +626,50 @@ impl DynamicManaged {
     pub fn new_raw(
         type_hash: TypeHash,
         lifetime: Lifetime,
-        memory: Vec<u8>,
+        memory: NonNull<u8>,
+        layout: Layout,
         finalizer: unsafe fn(*mut ()),
     ) -> Self {
         Self {
             type_hash,
             lifetime,
             memory,
+            layout,
             finalizer,
             drop: true,
         }
     }
 
-    pub fn into_inner(mut self) -> (TypeHash, Lifetime, Vec<u8>, unsafe fn(*mut ())) {
+    /// # Safety
+    pub unsafe fn from_bytes(
+        type_hash: TypeHash,
+        lifetime: Lifetime,
+        bytes: Vec<u8>,
+        layout: Layout,
+        finalizer: unsafe fn(*mut ()),
+    ) -> Self {
+        let memory = NonNull::new(alloc(layout)).unwrap();
+        memory
+            .as_ptr()
+            .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
+        Self {
+            type_hash,
+            lifetime,
+            memory,
+            layout,
+            finalizer,
+            drop: true,
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn into_inner(mut self) -> (TypeHash, Lifetime, NonNull<u8>, Layout, unsafe fn(*mut ())) {
         self.drop = false;
         (
             self.type_hash,
             std::mem::take(&mut self.lifetime),
-            std::mem::take(&mut self.memory),
+            self.memory,
+            self.layout,
             self.finalizer,
         )
     }
@@ -656,12 +693,12 @@ impl DynamicManaged {
 
     /// # Safety
     pub unsafe fn memory(&self) -> &[u8] {
-        &self.memory
+        std::slice::from_raw_parts(self.memory.as_ptr(), self.layout.size())
     }
 
     /// # Safety
     pub unsafe fn memory_mut(&mut self) -> &mut [u8] {
-        &mut self.memory
+        std::slice::from_raw_parts_mut(self.memory.as_ptr(), self.layout.size())
     }
 
     pub fn is<T>(&self) -> bool {
@@ -678,10 +715,7 @@ impl DynamicManaged {
 
     pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
         if self.type_hash == TypeHash::of::<T>() {
-            unsafe {
-                self.lifetime
-                    .write(&mut *(self.memory.as_mut_ptr() as *mut T))
-            }
+            unsafe { self.lifetime.write(&mut *(self.memory.as_ptr() as *mut T)) }
         } else {
             None
         }
@@ -693,7 +727,7 @@ impl DynamicManaged {
             unsafe {
                 result
                     .as_mut_ptr()
-                    .copy_from(self.memory.as_ptr() as *const T, 1);
+                    .copy_from_nonoverlapping(self.memory.as_ptr() as *const T, 1);
                 Ok(result.assume_init())
             }
         } else {
@@ -716,18 +750,14 @@ impl DynamicManaged {
             Some(DynamicManagedRefMut::new_raw(
                 self.type_hash,
                 self.lifetime.borrow_mut()?,
-                self.memory.as_mut_ptr(),
+                self.memory.as_ptr(),
             ))
         }
     }
 
     pub fn lazy(&self) -> DynamicManagedLazy {
         unsafe {
-            DynamicManagedLazy::new_raw(
-                self.type_hash,
-                self.lifetime.lazy(),
-                self.memory.as_ptr().cast_mut(),
-            )
+            DynamicManagedLazy::new_raw(self.type_hash, self.lifetime.lazy(), self.memory.as_ptr())
         }
     }
 
@@ -753,7 +783,7 @@ impl DynamicManaged {
     /// # Safety
     pub unsafe fn as_mut_ptr<T>(&mut self) -> Option<*mut T> {
         if self.type_hash == TypeHash::of::<T>() && !self.lifetime.state().is_in_use() {
-            Some(self.memory.as_mut_ptr().cast::<T>())
+            Some(self.memory.as_ptr().cast::<T>())
         } else {
             None
         }

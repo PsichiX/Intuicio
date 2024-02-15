@@ -1,16 +1,22 @@
 use crate::struct_type::{StructFieldQuery, StructHandle, StructQuery};
 use intuicio_data::{type_hash::TypeHash, Initialize};
-use std::{collections::HashMap, mem::MaybeUninit};
+use std::{
+    alloc::{alloc, dealloc},
+    collections::HashMap,
+    ptr::NonNull,
+};
 
 pub struct RuntimeObject;
 
 impl Initialize for RuntimeObject {
-    fn initialize(&mut self) {}
+    fn initialize() -> Self {
+        Self
+    }
 }
 
 pub struct Object {
     handle: StructHandle,
-    memory: Vec<u8>,
+    memory: NonNull<u8>,
     drop: bool,
 }
 
@@ -19,39 +25,25 @@ impl Drop for Object {
         if self.drop {
             unsafe {
                 if self.handle.is_native() {
-                    self.handle.finalize(self.memory.as_mut_ptr().cast::<()>());
+                    self.handle.finalize(self.memory.as_ptr().cast::<()>());
                 } else {
                     for field in self.handle.fields() {
                         field.struct_handle().finalize(
                             self.memory
-                                .as_mut_ptr()
+                                .as_ptr()
                                 .add(field.address_offset())
                                 .cast::<()>(),
                         );
                     }
                 }
-            }
-        }
-    }
-}
-
-impl Initialize for Object {
-    fn initialize(&mut self) {
-        unsafe {
-            for field in self.handle.fields() {
-                field.struct_handle().initialize(
-                    self.memory
-                        .as_mut_ptr()
-                        .add(field.address_offset())
-                        .cast::<()>(),
-                );
+                dealloc(self.memory.as_ptr(), *self.handle.layout());
             }
         }
     }
 }
 
 impl Object {
-    pub fn new(handle: StructHandle) -> Object {
+    pub fn new(handle: StructHandle) -> Self {
         if !handle.can_initialize() {
             panic!(
                 "Objects of type `{}::{}` cannot be initialized!",
@@ -59,8 +51,42 @@ impl Object {
                 handle.name
             );
         }
-        let mut memory = vec![0; handle.layout().pad_to_align().size()];
-        unsafe { handle.initialize(memory.as_mut_ptr().cast::<()>()) };
+        let memory = unsafe { NonNull::new(alloc(*handle.layout())).unwrap() };
+        let mut result = Self {
+            memory,
+            handle,
+            drop: true,
+        };
+        unsafe { result.initialize() };
+        result
+    }
+
+    pub fn try_new(handle: StructHandle) -> Option<Self> {
+        if handle.can_initialize() {
+            let memory = unsafe { NonNull::new(alloc(*handle.layout())).unwrap() };
+            let mut result = Self {
+                memory,
+                handle,
+                drop: true,
+            };
+            unsafe { result.initialize() };
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn new_uninitialized(handle: StructHandle) -> Self {
+        Self {
+            memory: NonNull::new(alloc(*handle.layout())).unwrap(),
+            handle,
+            drop: true,
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn new_raw(handle: StructHandle, memory: NonNull<u8>) -> Self {
         Self {
             memory,
             handle,
@@ -68,32 +94,13 @@ impl Object {
         }
     }
 
-    pub fn try_new(handle: StructHandle) -> Option<Object> {
-        if handle.can_initialize() {
-            let mut memory = vec![0; handle.layout().pad_to_align().size()];
-            unsafe { handle.initialize(memory.as_mut_ptr().cast::<()>()) };
-            Some(Self {
-                memory,
-                handle,
-                drop: true,
-            })
-        } else {
-            None
-        }
-    }
-
     /// # Safety
-    pub unsafe fn new_uninitialized(handle: StructHandle) -> Object {
-        Self {
-            memory: vec![0; handle.layout().pad_to_align().size()],
-            handle,
-            drop: true,
-        }
-    }
-
-    /// # Safety
-    pub unsafe fn new_raw(handle: StructHandle, memory: Vec<u8>) -> Option<Self> {
-        if memory.len() == handle.layout().pad_to_align().size() {
+    pub unsafe fn from_bytes(handle: StructHandle, bytes: &[u8]) -> Option<Self> {
+        if handle.layout().size() == bytes.len() {
+            let memory = NonNull::new(alloc(*handle.layout())).unwrap();
+            memory
+                .as_ptr()
+                .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
             Some(Self {
                 memory,
                 handle,
@@ -116,25 +123,35 @@ impl Object {
         }
     }
 
+    /// # Safety
+    pub unsafe fn initialize(&mut self) {
+        if self.handle.is_native() {
+            self.handle.initialize(self.memory.as_ptr().cast::<()>());
+        } else {
+            for field in self.handle.fields() {
+                field.struct_handle().initialize(
+                    self.memory
+                        .as_ptr()
+                        .add(field.address_offset())
+                        .cast::<()>(),
+                );
+            }
+        }
+    }
+
     pub fn consume<T: 'static>(mut self) -> Result<T, Self> {
         if self.handle.type_hash() == TypeHash::of::<T>() {
             self.drop = false;
-            unsafe {
-                let mut result = MaybeUninit::<T>::uninit();
-                result
-                    .as_mut_ptr()
-                    .copy_from(self.memory.as_ptr().cast::<T>(), 1);
-                Ok(result.assume_init())
-            }
+            unsafe { Ok(*Box::from_raw(self.memory.as_ptr().cast::<T>())) }
         } else {
             Err(self)
         }
     }
 
     /// # Safety
-    pub unsafe fn into_inner(mut self) -> (StructHandle, Vec<u8>) {
+    pub unsafe fn into_inner(mut self) -> (StructHandle, NonNull<u8>) {
         self.drop = false;
-        (self.handle.clone(), std::mem::take(&mut self.memory))
+        (self.handle.clone(), self.memory)
     }
 
     pub fn struct_handle(&self) -> &StructHandle {
@@ -143,20 +160,21 @@ impl Object {
 
     /// # Safety
     pub unsafe fn memory(&self) -> &[u8] {
-        &self.memory
+        std::slice::from_raw_parts(self.memory.as_ptr(), self.struct_handle().layout().size())
     }
 
     /// # Safety
     pub unsafe fn memory_mut(&mut self) -> &mut [u8] {
-        &mut self.memory
+        std::slice::from_raw_parts_mut(self.memory.as_ptr(), self.struct_handle().layout().size())
     }
 
     /// # Safety
     pub unsafe fn field_memory<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&[u8]> {
         self.handle.find_field(query).map(|field| {
-            let from = field.address_offset();
-            let to = from + field.struct_handle().layout().pad_to_align().size();
-            &self.memory[from..to]
+            std::slice::from_raw_parts(
+                self.memory.as_ptr().add(field.address_offset()),
+                field.struct_handle().layout().size(),
+            )
         })
     }
 
@@ -166,9 +184,10 @@ impl Object {
         query: StructFieldQuery<'a>,
     ) -> Option<&mut [u8]> {
         self.handle.find_field(query).map(|field| {
-            let from = field.address_offset();
-            let to = from + field.struct_handle().layout().pad_to_align().size();
-            &mut self.memory[from..to]
+            std::slice::from_raw_parts_mut(
+                self.memory.as_ptr().add(field.address_offset()),
+                field.struct_handle().layout().size(),
+            )
         })
     }
 
@@ -182,7 +201,7 @@ impl Object {
 
     pub fn write<T: 'static>(&mut self) -> Option<&mut T> {
         if self.handle.type_hash() == TypeHash::of::<T>() {
-            unsafe { self.memory.as_mut_ptr().cast::<T>().as_mut() }
+            unsafe { self.memory.as_ptr().cast::<T>().as_mut() }
         } else {
             None
         }
@@ -217,7 +236,7 @@ impl Object {
         })?;
         unsafe {
             self.memory
-                .as_mut_ptr()
+                .as_ptr()
                 .add(field.address_offset())
                 .cast::<T>()
                 .as_mut()
@@ -231,7 +250,7 @@ impl Object {
 
     /// # Safety
     pub unsafe fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.memory.as_mut_ptr()
+        self.memory.as_ptr()
     }
 
     /// # Safety
@@ -329,62 +348,79 @@ mod tests {
     };
 
     #[test]
-    fn test_send() {
-        fn ensure_send<T: Send>() {
-            println!("{} is send!", std::any::type_name::<T>());
-        }
-
-        ensure_send::<Object>();
-    }
-
-    #[test]
     fn test_object() {
-        #[derive(Default)]
         struct Droppable(Option<Weak<()>>);
+
+        impl Default for Droppable {
+            fn default() -> Self {
+                println!("Wrapper created!");
+                Self(None)
+            }
+        }
 
         impl Drop for Droppable {
             fn drop(&mut self) {
-                println!("Dropped!");
+                println!("Wrapper dropped!");
+            }
+        }
+
+        struct Pass;
+
+        impl Default for Pass {
+            fn default() -> Self {
+                println!("Pass created!");
+                Self
+            }
+        }
+
+        impl Drop for Pass {
+            fn drop(&mut self) {
+                println!("Pass dropped!");
             }
         }
 
         let bool_handle = NativeStructBuilder::new::<bool>().build_handle();
-        let usize_handle = NativeStructBuilder::new::<usize>().build_handle();
         let f32_handle = NativeStructBuilder::new::<f32>().build_handle();
+        let usize_handle = NativeStructBuilder::new::<usize>().build_handle();
+        let pass_handle = NativeStructBuilder::new::<Pass>().build_handle();
         let droppable_handle = NativeStructBuilder::new::<Droppable>().build_handle();
         let handle = RuntimeStructBuilder::new("Foo")
             .field(StructField::new("a", bool_handle))
-            .field(StructField::new("b", usize_handle))
-            .field(StructField::new("c", f32_handle))
-            .field(StructField::new("d", droppable_handle))
+            .field(StructField::new("b", f32_handle))
+            .field(StructField::new("c", usize_handle))
+            .field(StructField::new("d", pass_handle))
+            .field(StructField::new("e", droppable_handle))
             .build_handle();
-        assert_eq!(handle.layout().size(), 32);
+        assert_eq!(handle.layout().size(), 24);
         assert_eq!(handle.layout().align(), 8);
-        assert_eq!(handle.fields().len(), 4);
+        assert_eq!(handle.fields().len(), 5);
         assert_eq!(handle.fields()[0].struct_handle().layout().size(), 1);
         assert_eq!(handle.fields()[0].struct_handle().layout().align(), 1);
         assert_eq!(handle.fields()[0].address_offset(), 0);
-        assert_eq!(handle.fields()[1].struct_handle().layout().size(), 8);
-        assert_eq!(handle.fields()[1].struct_handle().layout().align(), 8);
-        assert_eq!(handle.fields()[1].address_offset(), 8);
-        assert_eq!(handle.fields()[2].struct_handle().layout().size(), 4);
-        assert_eq!(handle.fields()[2].struct_handle().layout().align(), 4);
-        assert_eq!(handle.fields()[2].address_offset(), 16);
-        assert_eq!(handle.fields()[3].struct_handle().layout().size(), 8);
-        assert_eq!(handle.fields()[3].struct_handle().layout().align(), 8);
-        assert_eq!(handle.fields()[3].address_offset(), 24);
+        assert_eq!(handle.fields()[1].struct_handle().layout().size(), 4);
+        assert_eq!(handle.fields()[1].struct_handle().layout().align(), 4);
+        assert_eq!(handle.fields()[1].address_offset(), 4);
+        assert_eq!(handle.fields()[2].struct_handle().layout().size(), 8);
+        assert_eq!(handle.fields()[2].struct_handle().layout().align(), 8);
+        assert_eq!(handle.fields()[2].address_offset(), 8);
+        assert_eq!(handle.fields()[3].struct_handle().layout().size(), 0);
+        assert_eq!(handle.fields()[3].struct_handle().layout().align(), 1);
+        assert_eq!(handle.fields()[3].address_offset(), 16);
+        assert_eq!(handle.fields()[4].struct_handle().layout().size(), 8);
+        assert_eq!(handle.fields()[4].struct_handle().layout().align(), 8);
+        assert_eq!(handle.fields()[4].address_offset(), 16);
         let mut object = Object::new(handle);
         *object.write_field::<bool>("a").unwrap() = true;
-        *object.write_field::<usize>("b").unwrap() = 42;
-        *object.write_field::<f32>("c").unwrap() = 4.2;
+        *object.write_field::<f32>("b").unwrap() = 4.2;
+        *object.write_field::<usize>("c").unwrap() = 42;
         let dropped = Rc::new(());
         let dropped_weak = Rc::downgrade(&dropped);
-        object.write_field::<Droppable>("d").unwrap().0 = Some(dropped_weak);
+        object.write_field::<Droppable>("e").unwrap().0 = Some(dropped_weak);
         assert_eq!(*object.read_field::<bool>("a").unwrap(), true);
-        assert_eq!(*object.read_field::<usize>("b").unwrap(), 42);
-        assert_eq!(*object.read_field::<f32>("c").unwrap(), 4.2);
+        assert_eq!(*object.read_field::<f32>("b").unwrap(), 4.2);
+        assert_eq!(*object.read_field::<usize>("c").unwrap(), 42);
         assert_eq!(Rc::weak_count(&dropped), 1);
-        assert!(object.read_field::<()>("d").is_none());
+        assert!(object.read_field::<()>("e").is_none());
         drop(object);
         assert_eq!(Rc::weak_count(&dropped), 0);
     }
@@ -418,8 +454,7 @@ mod tests {
         let (handle, data) = unsafe { object.into_inner() };
         assert_eq!(handle.type_hash(), TypeHash::of::<usize>());
         assert_eq!(*handle.layout(), Layout::new::<usize>().pad_to_align());
-        assert_eq!(data.len(), 8);
-        let object = unsafe { Object::new_raw(handle, data).unwrap() };
+        let object = unsafe { Object::new_raw(handle, data) };
         assert!(object_push_to_stack(object, &mut stack));
         assert_eq!(stack.position(), 16);
         let object = object_pop_from_stack(&mut stack, &registry).unwrap();

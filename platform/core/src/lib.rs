@@ -184,6 +184,33 @@ pub fn is_sync<T>() -> bool {
     is_sync.get()
 }
 
+struct IsCopy<'a, T> {
+    is_copy: &'a Cell<bool>,
+    _marker: PhantomData<T>,
+}
+
+impl<T> Clone for IsCopy<'_, T> {
+    fn clone(&self) -> Self {
+        self.is_copy.set(false);
+        IsCopy {
+            is_copy: self.is_copy,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T: Sync> Copy for IsCopy<'_, T> {}
+
+pub fn is_copy<T>() -> bool {
+    let is_copy = Cell::new(true);
+    let _ = [IsCopy::<T> {
+        is_copy: &is_copy,
+        _marker: PhantomData,
+    }]
+    .clone();
+    is_copy.get()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::Visibility;

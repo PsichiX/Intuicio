@@ -445,6 +445,13 @@ pub struct Transferable {
     tree: TransferableTree,
 }
 
+// TODO: evaluate soundness of this in regards to Transferables being bag of
+// consumed objects that has to be moved to another thread.
+// Object itself cannot be shared between threads, but Transferable entire
+// purpose is to consume objects from one thread and move them to another.
+unsafe impl Send for Transferable {}
+unsafe impl Sync for Transferable {}
+
 impl From<Reference> for Transferable {
     fn from(value: Reference) -> Self {
         let mut objects = Default::default();
@@ -497,7 +504,16 @@ mod tests {
     use intuicio_backend_vm::prelude::*;
     use intuicio_core::prelude::*;
     use intuicio_derive::IntuicioStruct;
-    use std::thread::spawn;
+    use std::{
+        cell::{OnceCell, RefCell},
+        thread::spawn,
+    };
+
+    thread_local! { static FOO: OnceCell<&'static RefCell<usize>> = OnceCell::new(); }
+
+    pub fn get_foo() -> &'static RefCell<usize> {
+        FOO.with(|foo| *foo.get_or_init(move || Box::leak(Box::new(RefCell::new(0)))))
+    }
 
     #[test]
     fn test_transfer() {
@@ -510,6 +526,7 @@ mod tests {
         let mut registry = Registry::default();
         crate::library::install(&mut registry);
         let foo_type = registry.add_struct(Foo::define_struct(&registry));
+        assert!(foo_type.is_send());
         let integer_type = registry
             .find_struct(StructQuery {
                 name: Some("Integer".into()),
@@ -524,7 +541,6 @@ mod tests {
             })
             .unwrap();
         assert!(reference_type.is_send());
-        assert!(foo_type.is_send());
 
         let a = Reference::new_integer(42, &registry);
         let b = Reference::new_array(vec![], &registry);
@@ -542,26 +558,55 @@ mod tests {
 
     #[test]
     fn test_threading() {
+        #[derive(IntuicioStruct, Default)]
+        #[intuicio(name = "Foo", module_name = "test", override_send = true)]
+        struct Foo {
+            #[intuicio(ignore)]
+            pub v: Option<&'static RefCell<usize>>,
+            pub me: Reference,
+        }
+
         let mut registry = Registry::default();
         crate::library::install(&mut registry);
+        let foo_type = registry.add_struct(Foo::define_struct(&registry));
+        assert!(foo_type.is_send());
 
-        // TODO: test if cycles make freeze.
-        let value = Reference::new_integer(42, &registry);
+        let mut value = Reference::new(
+            Foo {
+                v: Some(get_foo()),
+                me: Default::default(),
+            },
+            &registry,
+        );
+        let value2 = value.clone();
+        assert!(value.does_share_reference(&value2, true));
+        value.write::<Foo>().unwrap().me = value2;
+
         let transferable = Transferable::from(value.clone());
         assert!(value.is_transferred());
+
         let handle = spawn(|| {
             let mut registry = Registry::default();
             crate::library::install(&mut registry);
             let mut object = Reference::from(transferable);
-            let mut value = object.write::<Integer>().unwrap();
-            while *value < 42 {
-                *value += 1;
+
+            let value = object.write::<Foo>().unwrap();
+            if let Some(value) = value.v.as_ref() {
+                let mut value = value.borrow_mut();
+                while *value < 42 {
+                    *value += 1;
+                }
             }
             drop(value);
+
             Transferable::from(object)
         });
+
         let value = Reference::from(handle.join().unwrap());
-        assert_eq!(*value.read::<Integer>().unwrap(), 42);
+        assert_eq!(*value.read::<Foo>().unwrap().v.unwrap().borrow(), 42);
+        let value2 = value.read::<Foo>().unwrap().me.clone();
+        // TODO: reconstruct references to self.
+        assert_eq!(value.does_share_reference(&value2, true), false);
     }
 
     #[test]

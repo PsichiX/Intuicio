@@ -8,6 +8,7 @@ struct StructAttributes {
     pub module_name: Option<Ident>,
     pub override_send: Option<bool>,
     pub override_sync: Option<bool>,
+    pub override_copy: Option<bool>,
     pub debug: bool,
     pub meta: Option<String>,
 }
@@ -70,6 +71,13 @@ macro_rules! parse_struct_attributes {
                                             match &name_value.lit {
                                                 Lit::Bool(content) => {
                                                     result.override_sync = Some(content.value)
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if name_value.path.is_ident("override_copy") {
+                                            match &name_value.lit {
+                                                Lit::Bool(content) => {
+                                                    result.override_copy = Some(content.value)
                                                 }
                                                 _ => {}
                                             }
@@ -163,6 +171,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
         module_name,
         override_send,
         override_sync,
+        override_copy,
         debug,
         meta,
     } = parse_struct_attributes!(attrs);
@@ -247,6 +256,11 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     } else {
         quote! {}
     };
+    let override_copy = if let Some(override_copy) = override_copy {
+        quote! { result = unsafe { result.override_copy(#override_copy) }; }
+    } else {
+        quote! {}
+    };
     let meta = if let Some(meta) = meta {
         quote! { result.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
     } else {
@@ -265,6 +279,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
                 #(#fields)*
                 #override_send
                 #override_sync
+                #override_copy
                 #meta
                 result.build()
             }

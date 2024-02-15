@@ -14,11 +14,11 @@ pub mod prelude {
 }
 
 pub trait Initialize: Sized {
-    fn initialize(&mut self);
+    fn initialize() -> Self;
 
     /// # Safety
     unsafe fn initialize_raw(data: *mut ()) {
-        Self::initialize(data.cast::<Self>().as_mut().unwrap());
+        data.cast::<Self>().write(Self::initialize());
     }
 }
 
@@ -26,8 +26,8 @@ impl<T> Initialize for T
 where
     T: Default,
 {
-    fn initialize(&mut self) {
-        *self = Self::default();
+    fn initialize() -> Self {
+        Self::default()
     }
 }
 
