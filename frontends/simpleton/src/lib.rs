@@ -299,150 +299,93 @@ impl Reference {
     }
 }
 
+impl std::fmt::Debug for Reference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.data.as_ref() {
+            Some(object) => {
+                if let Some(object) = object.read() {
+                    f.debug_struct("Reference").field("data", &*object).finish()
+                } else {
+                    f.debug_struct("Reference").field("data", &()).finish()
+                }
+            }
+            None => f.debug_struct("Reference").finish(),
+        }
+    }
+}
+
 impl From<Transferable> for Reference {
-    fn from(mut value: Transferable) -> Self {
-        let mut references = Default::default();
-        value.tree.reproduce(&mut value.objects, &mut references)
+    fn from(value: Transferable) -> Self {
+        value.reproduce()
     }
 }
 
 #[derive(Debug)]
-enum TransferableTree {
-    Null,
+enum TransferableObject {
     Array {
-        address: usize,
-        items: Vec<TransferableTree>,
+        object: Object,
+        items: Vec<Option<usize>>,
     },
     Map {
-        address: usize,
-        pairs: Vec<(String, TransferableTree)>,
+        object: Object,
+        pairs: HashMap<String, Option<usize>>,
     },
     Object {
-        address: usize,
-        fields: Vec<(String, TransferableTree)>,
-    },
-    Link {
-        address: usize,
+        object: Object,
+        fields: HashMap<String, Option<usize>>,
     },
 }
 
-impl TransferableTree {
-    fn produce(value: Reference, objects: &mut HashMap<usize, Object>) -> TransferableTree {
-        let mut object = match unsafe { value.transfer() } {
-            Some(object) => match object {
-                Ok(object) => object,
-                Err(address) => return TransferableTree::Link { address },
+#[derive(Debug)]
+enum TransferableReference {
+    Array {
+        reference: Reference,
+        items: Vec<Option<usize>>,
+    },
+    Map {
+        reference: Reference,
+        pairs: HashMap<String, Option<usize>>,
+    },
+    Object {
+        reference: Reference,
+        fields: HashMap<String, Option<usize>>,
+    },
+}
+
+impl From<TransferableObject> for TransferableReference {
+    fn from(value: TransferableObject) -> Self {
+        match value {
+            TransferableObject::Array { object, items } => TransferableReference::Array {
+                reference: Reference::new_raw(object),
+                items,
             },
-            None => return TransferableTree::Null,
-        };
-        let address = unsafe { object.as_ptr() as usize };
-        if objects.iter().any(|object| *object.0 == address) {
-            return TransferableTree::Link { address };
-        }
-        let result = if let Some(array) = object.write::<Array>() {
-            TransferableTree::Array {
-                address,
-                items: array
-                    .iter_mut()
-                    .map(|value| {
-                        Self::produce(std::mem::replace(value, Reference::null()), objects)
-                    })
-                    .collect(),
-            }
-        } else if let Some(map) = object.write::<Map>() {
-            TransferableTree::Map {
-                address,
-                pairs: map
-                    .iter_mut()
-                    .map(|(key, value)| {
-                        (
-                            key.to_owned(),
-                            Self::produce(std::mem::replace(value, Reference::null()), objects),
-                        )
-                    })
-                    .collect(),
-            }
-        } else {
-            let ty = object.struct_handle().clone();
-            TransferableTree::Object {
-                address,
-                fields: ty
-                    .fields()
-                    .iter()
-                    .filter_map(|field| {
-                        let value = object.write_field::<Reference>(&field.name)?;
-                        Some((
-                            field.name.to_owned(),
-                            Self::produce(std::mem::replace(value, Reference::null()), objects),
-                        ))
-                    })
-                    .collect(),
-            }
-        };
-        objects.insert(address, object);
-        result
-    }
-
-    fn reproduce(
-        self,
-        objects: &mut HashMap<usize, Object>,
-        references: &mut HashMap<usize, Reference>,
-    ) -> Reference {
-        match self {
-            Self::Null => Reference::null(),
-            Self::Array { address, items } => {
-                if let Some(result) = references.get(&address) {
-                    return result.clone();
-                }
-                let mut object = objects.remove(&address).unwrap();
-                if let Some(array) = object.write::<Array>() {
-                    for (item, value) in items.into_iter().zip(array.iter_mut()) {
-                        let _ = std::mem::replace(value, item.reproduce(objects, references));
-                    }
-                }
-                let result = Reference::new_raw(object);
-                references.insert(address, result.clone());
-                result
-            }
-            Self::Map { address, pairs } => {
-                if let Some(result) = references.get(&address) {
-                    return result.clone();
-                }
-                let mut object = objects.remove(&address).unwrap();
-                if let Some(map) = object.write::<Map>() {
-                    for (key, item) in pairs {
-                        if let Some(value) = map.get_mut(&key) {
-                            let _ = std::mem::replace(value, item.reproduce(objects, references));
-                        }
-                    }
-                }
-                let result = Reference::new_raw(object);
-                references.insert(address, result.clone());
-                result
-            }
-            Self::Object { address, fields } => {
-                if let Some(result) = references.get(&address) {
-                    return result.clone();
-                }
-                let mut object = objects.remove(&address).unwrap();
-                for (name, item) in fields {
-                    if let Some(value) = object.write_field::<Reference>(&name) {
-                        let _ = std::mem::replace(value, item.reproduce(objects, references));
-                    }
-                }
-                let result = Reference::new_raw(object);
-                references.insert(address, result.clone());
-                result
-            }
-            Self::Link { address } => references.get(&address).cloned().unwrap_or_default(),
+            TransferableObject::Map { object, pairs } => TransferableReference::Map {
+                reference: Reference::new_raw(object),
+                pairs,
+            },
+            TransferableObject::Object { object, fields } => TransferableReference::Object {
+                reference: Reference::new_raw(object),
+                fields,
+            },
         }
     }
 }
 
+impl TransferableReference {
+    fn reference(&self) -> Reference {
+        match self {
+            TransferableReference::Array { reference, .. }
+            | TransferableReference::Map { reference, .. }
+            | TransferableReference::Object { reference, .. } => reference.clone(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Transferable {
     /// { reference's object address as its unique ID: object behind reference}
-    objects: HashMap<usize, Object>,
-    tree: TransferableTree,
+    objects: HashMap<usize, TransferableObject>,
+    root: Option<usize>,
 }
 
 // TODO: evaluate soundness of this in regards to Transferables being bag of
@@ -452,42 +395,131 @@ pub struct Transferable {
 unsafe impl Send for Transferable {}
 unsafe impl Sync for Transferable {}
 
-impl From<Reference> for Transferable {
-    fn from(value: Reference) -> Self {
-        let mut objects = Default::default();
-        let tree = TransferableTree::produce(value, &mut objects);
-        Self { objects, tree }
+impl Transferable {
+    fn produce(
+        value: Reference,
+        objects: &mut HashMap<usize, TransferableObject>,
+    ) -> Option<usize> {
+        let mut object = match unsafe { value.transfer() } {
+            Some(object) => match object {
+                Ok(object) => object,
+                Err(address) => return Some(address),
+            },
+            None => return None,
+        };
+        let address = unsafe { object.as_ptr() as usize };
+        if objects.iter().any(|object| *object.0 == address) {
+            return Some(address);
+        }
+        if let Some(array) = object.write::<Array>() {
+            let items = array
+                .iter_mut()
+                .map(|value| Self::produce(std::mem::replace(value, Reference::null()), objects))
+                .collect();
+            objects.insert(address, TransferableObject::Array { object, items });
+        } else if let Some(map) = object.write::<Map>() {
+            let pairs = map
+                .iter_mut()
+                .map(|(key, value)| {
+                    (
+                        key.to_owned(),
+                        Self::produce(std::mem::replace(value, Reference::null()), objects),
+                    )
+                })
+                .collect();
+            objects.insert(address, TransferableObject::Map { object, pairs });
+        } else {
+            let fields = object
+                .struct_handle()
+                .clone()
+                .fields()
+                .iter()
+                .filter_map(|field| {
+                    let value = object.write_field::<Reference>(&field.name)?;
+                    Some((
+                        field.name.to_owned(),
+                        Self::produce(std::mem::replace(value, Reference::null()), objects),
+                    ))
+                })
+                .collect();
+            objects.insert(address, TransferableObject::Object { object, fields });
+        }
+        Some(address)
+    }
+
+    fn reproduce(self) -> Reference {
+        let Some(root) = self.root else {
+            return Reference::null();
+        };
+        let mut results = self
+            .objects
+            .into_iter()
+            .map(|(address, object)| (address, TransferableReference::from(object)))
+            .collect::<HashMap<_, _>>();
+        let references = results
+            .iter()
+            .map(|(address, reference)| (*address, reference.reference()))
+            .collect::<HashMap<_, _>>();
+        for reference in results.values_mut() {
+            match reference {
+                TransferableReference::Array { reference, items } => {
+                    if let Some(mut array) = reference.write::<Array>() {
+                        for (index, value) in array.iter_mut().enumerate() {
+                            if let Some(address) = items.get(index) {
+                                *value = address
+                                    .and_then(|address| references.get(&address).cloned())
+                                    .unwrap_or_default();
+                            } else {
+                                *value = Reference::null();
+                            }
+                        }
+                    }
+                }
+                TransferableReference::Map { reference, pairs } => {
+                    if let Some(mut map) = reference.write::<Map>() {
+                        for (key, value) in map.iter_mut() {
+                            if let Some(address) = pairs.get(key) {
+                                *value = address
+                                    .and_then(|address| references.get(&address).cloned())
+                                    .unwrap_or_default();
+                            } else {
+                                *value = Reference::null();
+                            }
+                        }
+                    }
+                }
+                TransferableReference::Object { reference, fields } => {
+                    if let Some(mut object) = reference.write_object() {
+                        let names = object
+                            .struct_handle()
+                            .fields()
+                            .iter()
+                            .map(|field| field.name.to_owned())
+                            .collect::<Vec<_>>();
+                        for name in names {
+                            if let Some(value) = object.write_field::<Reference>(&name) {
+                                if let Some(address) = fields.get(&name) {
+                                    *value = address
+                                        .and_then(|address| references.get(&address).cloned())
+                                        .unwrap_or_default();
+                                } else {
+                                    *value = Reference::null();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        references.get(&root).cloned().unwrap_or_default()
     }
 }
 
-impl std::fmt::Debug for Transferable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[derive(Debug)]
-        #[allow(dead_code)]
-        struct Object<'a> {
-            name: &'a str,
-            module_name: Option<&'a str>,
-        }
-
-        f.debug_struct("Transferable")
-            .field(
-                "objects",
-                &self
-                    .objects
-                    .iter()
-                    .map(|(key, value)| {
-                        (
-                            key,
-                            Object {
-                                name: &value.struct_handle().name,
-                                module_name: value.struct_handle().module_name.as_deref(),
-                            },
-                        )
-                    })
-                    .collect::<HashMap<_, _>>(),
-            )
-            .field("tree", &self.tree)
-            .finish()
+impl From<Reference> for Transferable {
+    fn from(value: Reference) -> Self {
+        let mut objects = Default::default();
+        let root = Transferable::produce(value, &mut objects);
+        Self { objects, root }
     }
 }
 
@@ -504,16 +536,7 @@ mod tests {
     use intuicio_backend_vm::prelude::*;
     use intuicio_core::prelude::*;
     use intuicio_derive::IntuicioStruct;
-    use std::{
-        cell::{OnceCell, RefCell},
-        thread::spawn,
-    };
-
-    thread_local! { static FOO: OnceCell<&'static RefCell<usize>> = OnceCell::new(); }
-
-    pub fn get_foo() -> &'static RefCell<usize> {
-        FOO.with(|foo| *foo.get_or_init(move || Box::leak(Box::new(RefCell::new(0)))))
-    }
+    use std::thread::spawn;
 
     #[test]
     fn test_transfer() {
@@ -561,8 +584,7 @@ mod tests {
         #[derive(IntuicioStruct, Default)]
         #[intuicio(name = "Foo", module_name = "test", override_send = true)]
         struct Foo {
-            #[intuicio(ignore)]
-            pub v: Option<&'static RefCell<usize>>,
+            pub v: Reference,
             pub me: Reference,
         }
 
@@ -573,40 +595,45 @@ mod tests {
 
         let mut value = Reference::new(
             Foo {
-                v: Some(get_foo()),
+                v: Reference::new(0 as Integer, &registry),
                 me: Default::default(),
             },
             &registry,
         );
-        let value2 = value.clone();
-        assert!(value.does_share_reference(&value2, true));
-        value.write::<Foo>().unwrap().me = value2;
-
+        let me = value.clone();
+        value.write::<Foo>().unwrap().me = me;
         let transferable = Transferable::from(value.clone());
         assert!(value.is_transferred());
 
         let handle = spawn(|| {
             let mut registry = Registry::default();
             crate::library::install(&mut registry);
-            let mut object = Reference::from(transferable);
+            let object = Reference::from(transferable);
 
-            let value = object.write::<Foo>().unwrap();
-            if let Some(value) = value.v.as_ref() {
-                let mut value = value.borrow_mut();
+            // we need to keep it in scope, because references being
+            // actively written are not able to be transferred.
+            {
+                let mut value = object.clone();
+                let mut value = value.write::<Foo>().unwrap();
+                let mut value = value.v.write::<Integer>().unwrap();
                 while *value < 42 {
                     *value += 1;
                 }
             }
-            drop(value);
 
             Transferable::from(object)
         });
 
-        let value = Reference::from(handle.join().unwrap());
-        assert_eq!(*value.read::<Foo>().unwrap().v.unwrap().borrow(), 42);
-        let value2 = value.read::<Foo>().unwrap().me.clone();
-        // TODO: reconstruct references to self.
-        assert_eq!(value.does_share_reference(&value2, true), false);
+        let object = Reference::from(handle.join().unwrap());
+        assert_eq!(object.is_null(), false);
+        assert!(object.type_of().unwrap().is::<Foo>());
+        let value = object.read::<Foo>().unwrap();
+        assert_eq!(value.v.is_null(), false);
+        assert!(value.v.type_of().unwrap().is::<Integer>());
+        assert_eq!(*value.v.read::<Integer>().unwrap(), 42);
+        assert_eq!(value.me.is_null(), false);
+        assert!(value.me.type_of().unwrap().is::<Foo>());
+        assert!(value.me.does_share_reference(&object, true));
     }
 
     #[test]

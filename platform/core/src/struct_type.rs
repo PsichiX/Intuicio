@@ -573,6 +573,7 @@ macro_rules! define_native_struct {
         }
         $( [override_send = $override_send:literal] )?
         $( [override_sync = $override_sync:literal] )?
+        $( [override_copy = $override_copy:literal] )?
     ) => {
         {
             #[allow(unused_mut)]
@@ -584,6 +585,11 @@ macro_rules! define_native_struct {
             let mut override_sync = Option::<bool>::None;
             $(
                 override_sync = Some($override_sync as bool);
+            )?
+            #[allow(unused_mut)]
+            let mut override_copy = Option::<bool>::None;
+            $(
+                override_copy = Some($override_copy as bool);
             )?
             #[allow(unused_mut)]
             let mut name = std::any::type_name::<$type>().to_owned();
@@ -611,6 +617,9 @@ macro_rules! define_native_struct {
             }
             if let Some(mode) = override_sync {
                 result = unsafe { result.override_sync(mode) };
+            }
+            if let Some(mode) = override_copy {
+                result = unsafe { result.override_copy(mode) };
             }
             result.build()
         }

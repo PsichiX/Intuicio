@@ -259,6 +259,24 @@ impl Object {
     }
 }
 
+impl std::fmt::Debug for Object {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unsafe {
+            f.debug_struct("Object")
+                .field("address", &(self.as_ptr() as usize))
+                .field(
+                    "type",
+                    &format!(
+                        "{}::{}",
+                        self.handle.module_name.as_deref().unwrap_or_default(),
+                        self.handle.name
+                    ),
+                )
+                .finish()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct DynamicObject {
     properties: HashMap<String, Object>,

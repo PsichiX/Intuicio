@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-backend-rust"
-version = "0.25.0"
+version = "0.26.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Rust backend module for Intuicio scripting platform"
@@ -12,6 +12,6 @@ readme = "../../README.md"
 exclude = ["./resources/"]
 
 [dependencies]
-intuicio-data = { version = "0.25", path = "../../platform/data" }
-intuicio-core = { version = "0.25", path = "../../platform/core" }
+intuicio-data = { version = "0.26", path = "../../platform/data" }
+intuicio-core = { version = "0.26", path = "../../platform/core" }
 serde = { version = "1", features = ["derive", "rc"] }
