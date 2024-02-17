@@ -1,0 +1,15 @@
+[package]
+name = "intuicio-framework-pointer"
+version = "0.26.0"
+edition = "2021"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Raw pointer framework module for Intuicio scripting platform"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/intuicio"
+repository = "https://github.com/PsichiX/intuicio"
+documentation = "https://docs.rs/intuicio-framework-dynamic"
+readme = "../../README.md"
+
+[dependencies]
+intuicio-data = { version = "0.26", path = "../../platform/data" }
+intuicio-core = { version = "0.26", path = "../../platform/core" }

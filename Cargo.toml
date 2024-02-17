@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "platform/*",
     "backends/*",
+    "frameworks/*",
     "frontends/*",
     "plugins/*",
     "runners/*",

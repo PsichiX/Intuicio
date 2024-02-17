@@ -1,9 +1,15 @@
-use std::ops::{Deref, DerefMut};
+//! Experiments with highly unsafe pointer access.
+//! A.k.a. what could go wrong when trying to emulate direct pointer access in scripting.
+
+use std::{
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+};
+
+use intuicio_core::{registry::Registry, transformer::ValueTransformer};
 
 pub type VoidPtr = Ptr<()>;
 
-// Experiments with highly unsafe pointer access.
-// A.k.a. what could go wrong when trying to emulate direct pointer access.
 #[repr(transparent)]
 pub struct Ptr<T> {
     pointer: *mut T,
@@ -135,8 +141,8 @@ impl<T> Clone for Ptr<T> {
     }
 }
 
+// NOTE: I know this si bad, don't kill me - again, it's for experiments only sake.
 unsafe impl<T> Send for Ptr<T> where T: Send {}
-
 unsafe impl<T> Sync for Ptr<T> where T: Sync {}
 
 impl<T> std::fmt::Debug for Ptr<T> {
@@ -148,6 +154,46 @@ impl<T> std::fmt::Debug for Ptr<T> {
 impl<T> std::fmt::Display for Ptr<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.pointer)
+    }
+}
+
+pub struct PtrValueTransformer<T: Default + Clone + 'static>(PhantomData<fn() -> T>);
+
+impl<T: Default + Clone + 'static> ValueTransformer for PtrValueTransformer<T> {
+    type Type = T;
+    type Borrow<'r> = &'r T;
+    type BorrowMut<'r> = &'r mut T;
+    type Dependency = ();
+    type Owned = T;
+    type Ref = Ptr<T>;
+    type RefMut = Ptr<T>;
+
+    fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
+        value
+    }
+
+    fn from_ref(_: &Registry, value: &Self::Type, _: Option<Self::Dependency>) -> Self::Ref {
+        Ptr::from(value)
+    }
+
+    fn from_ref_mut(
+        _: &Registry,
+        value: &mut Self::Type,
+        _: Option<Self::Dependency>,
+    ) -> Self::RefMut {
+        Ptr::from(value)
+    }
+
+    fn into_owned(value: Self::Owned) -> Self::Type {
+        value
+    }
+
+    fn into_ref(value: &Self::Ref) -> Self::Borrow<'_> {
+        unsafe { value.as_ref().unwrap() }
+    }
+
+    fn into_ref_mut(value: &mut Self::RefMut) -> Self::BorrowMut<'_> {
+        unsafe { value.as_ref_mut().unwrap() }
     }
 }
 
@@ -165,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    fn test_raw_pointers() {
+    fn test_raw_pointer_on_stack() {
         let mut registry = Registry::default().with_basic_types();
         registry.add_struct(define_native_struct! {
             registry => struct (Ptr<usize>) {}

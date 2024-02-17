@@ -1,21 +1,18 @@
 [package]
-name = "intuicio-frontend-mercury"
+name = "intuicio-framework-dynamic"
 version = "0.26.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
-description = "Mercury frontend module for Intuicio scripting platform"
+description = "Dynamic type framework module for Intuicio scripting platform"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
-documentation = "https://docs.rs/intuicio-frontend-mercury"
+documentation = "https://docs.rs/intuicio-framework-dynamic"
 readme = "../../README.md"
 
 [dependencies]
 intuicio-data = { version = "0.26", path = "../../platform/data" }
 intuicio-core = { version = "0.26", path = "../../platform/core" }
-pest = "2.5"
-pest_derive = "2.5"
-snailquote = "0.3"
 
 [dev-dependencies]
-intuicio-backend-vm = { version = "0.26", path = "../../backends/vm" }
+intuicio-derive = { version = "0.26", path = "../../platform/derive" }

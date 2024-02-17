@@ -48,11 +48,12 @@ update:
   cargo update --manifest-path ./platform/nodes/Cargo.toml --aggressive
   cargo update --manifest-path ./backends/vm/Cargo.toml --aggressive
   cargo update --manifest-path ./backends/rust/Cargo.toml --aggressive
+  cargo update --manifest-path ./frameworks/dynamic/Cargo.toml --aggressive
+  cargo update --manifest-path ./frameworks/pointer/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/serde/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/assembler/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/simpleton/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/vault/Cargo.toml --aggressive
-  cargo update --manifest-path ./frontends/mercury/Cargo.toml --aggressive
   cargo update --manifest-path ./plugins/simpleton-http/Cargo.toml --aggressive
   cargo update --manifest-path ./plugins/simpleton-ecs/Cargo.toml --aggressive
   cargo update --manifest-path ./plugins/simpleton-window/Cargo.toml --aggressive
@@ -85,6 +86,10 @@ publish:
   sleep 1
   cargo publish --no-verify --manifest-path ./backends/rust/Cargo.toml
   sleep 1
+  cargo publish --no-verify --manifest-path ./frameworks/dynamic/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./frameworks/pointer/Cargo.toml
+  sleep 1
   cargo publish --no-verify --manifest-path ./frontends/serde/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./frontends/assembler/Cargo.toml
@@ -92,8 +97,6 @@ publish:
   cargo publish --no-verify --manifest-path ./frontends/vault/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./frontends/simpleton/Cargo.toml
-  sleep 1
-  cargo publish --no-verify --manifest-path ./frontends/mercury/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./runners/simpleton/Cargo.toml
   sleep 1

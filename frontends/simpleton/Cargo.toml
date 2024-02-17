@@ -25,6 +25,7 @@ intuicio-core = { version = "0.26", path = "../../platform/core" }
 intuicio-nodes = { version = "0.26", path = "../../platform/nodes" }
 intuicio-plugins = { version = "0.26", path = "../../platform/plugins" }
 intuicio-derive = { version = "0.26", path = "../../platform/derive" }
+intuicio-framework-dynamic = { version = "0.26", path = "../../frameworks/dynamic" }
 pest = "2.5"
 pest_derive = "2.5"
 regex = "1"
