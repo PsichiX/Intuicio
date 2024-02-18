@@ -1,6 +1,6 @@
 # Building custom runner
 
-Inthis part of tutorial we will be creating REPL solution that will prompts users to type operations in each next line and issue execution of collected operations as single script.
+In this part of tutorial we will be creating REPL solution that will prompts users to type operations in each next line and issue execution of collected operations as single script.
 
 ---
 

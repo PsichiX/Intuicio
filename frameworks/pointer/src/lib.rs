@@ -141,7 +141,8 @@ impl<T> Clone for Ptr<T> {
     }
 }
 
-// NOTE: I know this si bad, don't kill me - again, it's for experiments only sake.
+// NOTE: I know this is bad, don't kill me - again, it's for experiments only sake,
+// some day it might disappear in favor of some smarter solution.
 unsafe impl<T> Send for Ptr<T> where T: Send {}
 unsafe impl<T> Sync for Ptr<T> where T: Sync {}
 

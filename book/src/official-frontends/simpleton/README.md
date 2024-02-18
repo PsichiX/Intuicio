@@ -31,8 +31,8 @@ mod main {
             return n;
         } else {
             return math::add(
-                main::fib(math::sub(n - 1)),
-                main::fib(math::sub(n - 2)),
+                main::fib(math::sub(n, 1)),
+                main::fib(math::sub(n, 2)),
             );
         }
     }
