@@ -969,7 +969,7 @@ use intuicio_core::prelude::*;
 ));</code></pre></pre>
 <p>So it will generate function body that runs custom VM scope with previously compiled script.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="building-custom-runner"><a class="header" href="#building-custom-runner">Building custom runner</a></h1>
-<p>Inthis part of tutorial we will be creating REPL solution that will prompts users to type operations in each next line and issue execution of collected operations as single script.</p>
+<p>In this part of tutorial we will be creating REPL solution that will prompts users to type operations in each next line and issue execution of collected operations as single script.</p>
 <hr />
 <p>First clear entire <code>main.rs</code> file, and start with importing new set of dependencies:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -1104,8 +1104,8 @@ push 2
             return n;
         } else {
             return math::add(
-                main::fib(math::sub(n - 1)),
-                main::fib(math::sub(n - 2)),
+                main::fib(math::sub(n, 1)),
+                main::fib(math::sub(n, 2)),
             );
         }
     }
