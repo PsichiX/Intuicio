@@ -202,6 +202,7 @@ impl<T: Default + Clone + 'static> ValueTransformer for PtrValueTransformer<T> {
 mod tests {
     use super::*;
     use intuicio_core::prelude::*;
+    use intuicio_derive::intuicio_function;
 
     #[test]
     fn test_async() {
@@ -211,17 +212,18 @@ mod tests {
         is_async::<Ptr<Ptr<usize>>>();
     }
 
+    #[intuicio_function(transformer = "PtrValueTransformer")]
+    fn add(a: &usize, b: &mut usize) -> usize {
+        *a + *b
+    }
+
     #[test]
     fn test_raw_pointer_on_stack() {
         let mut registry = Registry::default().with_basic_types();
         registry.add_struct(define_native_struct! {
             registry => struct (Ptr<usize>) {}
         });
-        let add = registry.add_function(define_function! {
-            registry => mod intrinsics fn add(a: Ptr<usize>, b: Ptr<usize>) -> (result: usize) {
-                (*a + *b,)
-            }
-        });
+        let add = registry.add_function(add::define_function(&registry));
         let mut context = Context::new(1024, 1024, 1024);
         let a = 40usize;
         let b = 2usize;

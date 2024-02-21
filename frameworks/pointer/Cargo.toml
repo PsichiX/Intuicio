@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-pointer"
-version = "0.27.1"
+version = "0.27.2"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Raw pointer framework module for Intuicio scripting platform"
@@ -15,3 +15,4 @@ intuicio-core = { version = "0.27", path = "../../platform/core" }
 
 [dev-dependencies]
 intuicio-data = { version = "0.27", path = "../../platform/data" }
+intuicio-derive = { version = "0.27", path = "../../platform/derive" }
