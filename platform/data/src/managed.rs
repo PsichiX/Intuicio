@@ -649,9 +649,7 @@ impl DynamicManaged {
         finalizer: unsafe fn(*mut ()),
     ) -> Self {
         let memory = NonNull::new(alloc(layout)).unwrap();
-        memory
-            .as_ptr()
-            .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
+        memory.as_ptr().copy_from(bytes.as_ptr(), bytes.len());
         Self {
             type_hash,
             lifetime,
@@ -727,7 +725,7 @@ impl DynamicManaged {
             unsafe {
                 result
                     .as_mut_ptr()
-                    .copy_from_nonoverlapping(self.memory.as_ptr() as *const T, 1);
+                    .copy_from(self.memory.as_ptr() as *const T, 1);
                 Ok(result.assume_init())
             }
         } else {

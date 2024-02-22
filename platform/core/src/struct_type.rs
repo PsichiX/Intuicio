@@ -416,6 +416,19 @@ impl Struct {
     }
 
     /// # Safety
+    pub unsafe fn try_copy(&self, from: *const u8, to: *mut u8) -> bool {
+        if !self.is_send {
+            return false;
+        }
+        let size = self.layout.size();
+        if from < to.offset(size as _) && from.offset(size as _) > to {
+            return false;
+        }
+        to.copy_from_nonoverlapping(from, size);
+        true
+    }
+
+    /// # Safety
     pub unsafe fn initialize(&self, pointer: *mut ()) -> bool {
         if let Some(initializer) = self.initializer {
             (initializer)(pointer);
@@ -720,6 +733,7 @@ macro_rules! define_runtime_struct {
 #[cfg(test)]
 mod tests {
     use crate as intuicio_core;
+    use crate::object::Object;
     use crate::{meta::*, registry::*, IntuicioStruct};
     use intuicio_data;
     use intuicio_derive::*;
@@ -736,24 +750,39 @@ mod tests {
 
     #[test]
     fn test_struct_type() {
-        #[derive(Default)]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
         struct Foo {
             a: bool,
             b: usize,
         }
 
-        let registry = Registry::default().with_basic_types();
-        let struct_type = define_native_struct! {
+        let mut registry = Registry::default().with_basic_types();
+        let struct_type = registry.add_struct(define_native_struct! {
             registry => struct (Foo) {
                 a: bool,
                 b: usize
             }
-        };
+        });
+        assert!(struct_type.is_send());
+        assert!(struct_type.is_sync());
+        assert!(struct_type.is_copy());
         assert_eq!(struct_type.type_name(), std::any::type_name::<Foo>());
         assert_eq!(struct_type.fields()[0].name, "b");
         assert_eq!(struct_type.fields()[0].address_offset(), 0);
         assert_eq!(struct_type.fields()[1].name, "a");
         assert_eq!(struct_type.fields()[1].address_offset(), 8);
+
+        let source = Foo { a: true, b: 42 };
+        let mut target = Object::new(struct_type.clone());
+        assert_eq!(
+            unsafe { struct_type.try_copy(target.as_ptr(), target.as_mut_ptr()) },
+            false
+        );
+        assert_ne!(&source, target.read::<Foo>().unwrap());
+        assert!(unsafe {
+            struct_type.try_copy(&source as *const Foo as *const u8, target.as_mut_ptr())
+        });
+        assert_eq!(&source, target.read::<Foo>().unwrap());
 
         assert_eq!(
             Bar::define_struct(&registry).meta,

@@ -266,7 +266,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                     .memory
                     .as_mut_ptr()
                     .add(other.position - other_tag.layout.size());
-                std::ptr::copy(source, target, tag.layout.size());
+                target.copy_from(source, tag.layout.size());
                 self.stack
                     .memory
                     .as_mut_ptr()
@@ -566,7 +566,7 @@ impl DataStack {
                 .as_ptr()
                 .add(register.position - tag.layout.size());
             let target = self.memory.as_mut_ptr().add(self.position);
-            std::ptr::copy(source, target, tag.layout.size());
+            target.copy_from(source, tag.layout.size());
             self.position += tag.layout.size();
             self.memory
                 .as_mut_ptr()
@@ -795,7 +795,7 @@ impl DataStack {
                 .memory
                 .as_mut_ptr()
                 .add(register.position - tag.layout.size());
-            std::ptr::copy(source, target, tag.layout.size());
+            target.copy_from(source, tag.layout.size());
             register
                 .stack
                 .memory

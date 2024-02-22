@@ -98,9 +98,7 @@ impl Object {
     pub unsafe fn from_bytes(handle: StructHandle, bytes: &[u8]) -> Option<Self> {
         if handle.layout().size() == bytes.len() {
             let memory = NonNull::new(alloc(*handle.layout())).unwrap();
-            memory
-                .as_ptr()
-                .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
+            memory.as_ptr().copy_from(bytes.as_ptr(), bytes.len());
             Some(Self {
                 memory,
                 handle,
