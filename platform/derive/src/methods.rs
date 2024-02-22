@@ -233,12 +233,12 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 },
             })
             .collect::<Vec<_>>();
-        let (arg_types, arg_structs): (Vec<_>, Vec<_>) = item
+        let arg_types: Vec<_> = item
             .sig
             .inputs
             .iter()
             .filter_map(|arg| match arg {
-                FnArg::Receiver(_) => Some((*struct_type.clone(), *struct_type.clone())),
+                FnArg::Receiver(_) => Some(*struct_type.clone()),
                 FnArg::Typed(meta) => {
                     let ident = match &*meta.pat {
                         Pat::Ident(ident) => &ident.ident,
@@ -252,26 +252,26 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                             .as_ref()
                             .map(|transformer| match unpack_type(&meta.ty) {
                                 UnpackedType::Owned(ty) => {
-                                    (syn::parse2::<Type>(quote!{
+                                    syn::parse2::<Type>(quote!{
                                         <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Owned
-                                    }).unwrap(), ty)
+                                    }).unwrap()
                                 }
                                 UnpackedType::Ref(ty) => {
-                                    (syn::parse2::<Type>(quote!{
+                                    syn::parse2::<Type>(quote!{
                                         <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Ref
-                                    }).unwrap(), ty)
+                                    }).unwrap()
                                 }
                                 UnpackedType::RefMut(ty) => {
-                                    (syn::parse2::<Type>(quote!{
+                                    syn::parse2::<Type>(quote!{
                                         <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::RefMut
-                                    }).unwrap(), ty)
+                                    }).unwrap()
                                 }
                             })
-                            .unwrap_or_else(|| (*meta.ty.clone(), *meta.ty.clone())))
+                            .unwrap_or_else(|| *meta.ty.clone()))
                     }
                 }
             })
-            .unzip();
+            .collect();
         let (transform_arg_idents, arg_transforms): (Vec<_>, Vec<_>) =
             if let Some(transformer) = transformer.as_ref() {
                 item.sig
@@ -434,10 +434,10 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                         intuicio_core::function::FunctionParameter::new(
                             stringify!(#arg_idents),
                             registry
-                                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#arg_structs>())
+                                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#arg_types>())
                                 .unwrap_or_else(|| panic!(
                                     "Could not find struct: `{}` for argument: `{}` for function: `{}`",
-                                    std::any::type_name::<#arg_structs>(),
+                                    std::any::type_name::<#arg_types>(),
                                     stringify!(#arg_idents),
                                     stringify!(#ident),
                                 ))

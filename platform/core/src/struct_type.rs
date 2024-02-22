@@ -571,6 +571,67 @@ macro_rules! define_native_struct {
         struct $($name:ident)? ($type:ty) {
             $( $field_name:ident : $field_type:ty ),*
         }
+        [uninitialized]
+        $( [override_send = $override_send:literal] )?
+        $( [override_sync = $override_sync:literal] )?
+        $( [override_copy = $override_copy:literal] )?
+    ) => {
+        {
+            #[allow(unused_mut)]
+            let mut override_send = Option::<bool>::None;
+            $(
+                override_send = Some($override_send as bool);
+            )?
+            #[allow(unused_mut)]
+            let mut override_sync = Option::<bool>::None;
+            $(
+                override_sync = Some($override_sync as bool);
+            )?
+            #[allow(unused_mut)]
+            let mut override_copy = Option::<bool>::None;
+            $(
+                override_copy = Some($override_copy as bool);
+            )?
+            #[allow(unused_mut)]
+            let mut name = std::any::type_name::<$type>().to_owned();
+            $(
+                name = stringify!($name).to_owned();
+            )?
+            #[allow(unused_mut)]
+            let mut result = $crate::struct_type::NativeStructBuilder::new_named_uninitialized::<$type>(name);
+            $(
+                result = result.module_name(stringify!($module_name).to_owned());
+            )?
+            $(
+                result = result.field(
+                    $crate::struct_type::StructField::new(
+                        stringify!($field_name),
+                        $registry
+                            .find_struct($crate::struct_type::StructQuery::of::<$field_type>())
+                            .unwrap(),
+                    ),
+                    $crate::__internal::offset_of!($type, $field_name),
+                );
+            )*
+            if let Some(mode) = override_send {
+                result = unsafe { result.override_send(mode) };
+            }
+            if let Some(mode) = override_sync {
+                result = unsafe { result.override_sync(mode) };
+            }
+            if let Some(mode) = override_copy {
+                result = unsafe { result.override_copy(mode) };
+            }
+            result.build()
+        }
+    };
+    (
+        $registry:expr
+        =>
+        $(mod $module_name:ident)?
+        struct $($name:ident)? ($type:ty) {
+            $( $field_name:ident : $field_type:ty ),*
+        }
         $( [override_send = $override_send:literal] )?
         $( [override_sync = $override_sync:literal] )?
         $( [override_copy = $override_copy:literal] )?

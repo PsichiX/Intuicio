@@ -314,6 +314,13 @@ mod tests {
     #[test]
     fn test_derive() {
         let mut registry = Registry::default().with_basic_types();
+        registry.add_struct(define_native_struct! {
+            registry => struct (Managed<i32>) {}
+        });
+        registry.add_struct(define_native_struct! {
+            registry => struct (DynamicManaged) {}
+            [uninitialized]
+        });
         registry.add_struct(Foo::define_struct(&registry));
         registry.add_function(Foo::new__define_function(&registry));
         registry.add_struct(Bar::define_struct(&registry));

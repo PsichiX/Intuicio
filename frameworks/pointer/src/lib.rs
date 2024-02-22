@@ -226,11 +226,14 @@ mod tests {
         let add = registry.add_function(add::define_function(&registry));
         let mut context = Context::new(1024, 1024, 1024);
         let a = 40usize;
-        let b = 2usize;
-        context.stack().push(Ptr::from(&b));
-        context.stack().push(Ptr::from(&a));
-        add.invoke(&mut context, &registry);
-        assert_eq!(context.stack().pop::<usize>().unwrap(), 42);
+        let mut b = 2usize;
+        let (r,) = add.call::<(usize,), _>(
+            &mut context,
+            &registry,
+            (Ptr::from(&a), Ptr::from(&mut b)),
+            true,
+        );
+        assert_eq!(r, 42);
     }
 
     #[test]
