@@ -138,6 +138,7 @@ macro_rules! does_implement_trait {
                 _marker: PhantomData<$type>,
             }
 
+            #[allow(clippy::non_canonical_clone_impl)]
             impl<$type> Clone for ImplementsTrait<'_, $type> {
                 fn clone(&self) -> Self {
                     self.implements.set(false);
@@ -148,7 +149,7 @@ macro_rules! does_implement_trait {
                 }
             }
 
-            impl<$type: Sync> Copy for ImplementsTrait<'_, $type> {}
+            impl<$type: $trait> Copy for ImplementsTrait<'_, $type> {}
 
             let implements = Cell::new(true);
             let _ = [ImplementsTrait::<$type> {
