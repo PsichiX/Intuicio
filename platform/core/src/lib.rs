@@ -130,86 +130,44 @@ pub fn core_version() -> IntuicioVersion {
     crate_version!()
 }
 
-struct IsSend<'a, T> {
-    is_send: &'a Cell<bool>,
-    _marker: PhantomData<T>,
-}
+macro_rules! does_implement_trait {
+    ($trait:path => $identifier:ident < $type:ident >) => {
+        pub fn $identifier<$type>() -> bool {
+            struct ImplementsTrait<'a, $type> {
+                implements: &'a Cell<bool>,
+                _marker: PhantomData<$type>,
+            }
 
-impl<T> Clone for IsSend<'_, T> {
-    fn clone(&self) -> Self {
-        self.is_send.set(false);
-        IsSend {
-            is_send: self.is_send,
-            _marker: PhantomData,
+            impl<$type> Clone for ImplementsTrait<'_, $type> {
+                fn clone(&self) -> Self {
+                    self.implements.set(false);
+                    ImplementsTrait {
+                        implements: self.implements,
+                        _marker: PhantomData,
+                    }
+                }
+            }
+
+            impl<$type: Sync> Copy for ImplementsTrait<'_, $type> {}
+
+            let implements = Cell::new(true);
+            let _ = [ImplementsTrait::<$type> {
+                implements: &implements,
+                _marker: PhantomData,
+            }]
+            .clone();
+            implements.get()
         }
-    }
+    };
 }
 
-impl<T: Send> Copy for IsSend<'_, T> {}
-
-pub fn is_send<T>() -> bool {
-    let is_send = Cell::new(true);
-    let _ = [IsSend::<T> {
-        is_send: &is_send,
-        _marker: PhantomData,
-    }]
-    .clone();
-    is_send.get()
-}
-
-struct IsSync<'a, T> {
-    is_sync: &'a Cell<bool>,
-    _marker: PhantomData<T>,
-}
-
-impl<T> Clone for IsSync<'_, T> {
-    fn clone(&self) -> Self {
-        self.is_sync.set(false);
-        IsSync {
-            is_sync: self.is_sync,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<T: Sync> Copy for IsSync<'_, T> {}
-
-pub fn is_sync<T>() -> bool {
-    let is_sync = Cell::new(true);
-    let _ = [IsSync::<T> {
-        is_sync: &is_sync,
-        _marker: PhantomData,
-    }]
-    .clone();
-    is_sync.get()
-}
-
-struct IsCopy<'a, T> {
-    is_copy: &'a Cell<bool>,
-    _marker: PhantomData<T>,
-}
-
-impl<T> Clone for IsCopy<'_, T> {
-    fn clone(&self) -> Self {
-        self.is_copy.set(false);
-        IsCopy {
-            is_copy: self.is_copy,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<T: Sync> Copy for IsCopy<'_, T> {}
-
-pub fn is_copy<T>() -> bool {
-    let is_copy = Cell::new(true);
-    let _ = [IsCopy::<T> {
-        is_copy: &is_copy,
-        _marker: PhantomData,
-    }]
-    .clone();
-    is_copy.get()
-}
+does_implement_trait!(Send => is_send<T>);
+does_implement_trait!(Sync => is_sync<T>);
+does_implement_trait!(Copy => is_copy<T>);
+does_implement_trait!(Clone => is_clone<T>);
+does_implement_trait!(Sized => is_sized<T>);
+does_implement_trait!(Unpin => is_unpin<T>);
+does_implement_trait!(ToString => is_to_string<T>);
 
 #[cfg(test)]
 mod tests {

@@ -421,7 +421,7 @@ impl Struct {
             return false;
         }
         let size = self.layout.size();
-        if from < to.offset(size as _) && from.offset(size as _) > to {
+        if from < to.add(size) && from.add(size) > to {
             return false;
         }
         to.copy_from_nonoverlapping(from, size);
