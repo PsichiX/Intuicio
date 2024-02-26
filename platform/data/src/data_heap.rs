@@ -146,98 +146,96 @@ impl DataHeapMemoryPage {
     pub unsafe fn alloc_uninitialized<T: Finalize>(
         page: &DataHeapMemoryPageHandle,
     ) -> Option<DataHeapBox<T>> {
-        unsafe {
-            let page_weak = DataHeapMemoryPageHandle::downgrade(page);
-            let mut this = page
-                .write()
-                .expect("Could not get write access to heap memory page!");
-            let header_layout = Layout::new::<DataHeapObjectHeader>().pad_to_align();
-            let footer_layout = Layout::new::<DataHeapObjectFooter>().pad_to_align();
-            let layout = Layout::new::<T>().pad_to_align();
-            if header_layout.size() + layout.size() + footer_layout.size() > this.available_size() {
+        let page_weak = DataHeapMemoryPageHandle::downgrade(page);
+        let mut this = page
+            .write()
+            .expect("Could not get write access to heap memory page!");
+        let header_layout = Layout::new::<DataHeapObjectHeader>().pad_to_align();
+        let footer_layout = Layout::new::<DataHeapObjectFooter>().pad_to_align();
+        let layout = Layout::new::<T>().pad_to_align();
+        if header_layout.size() + layout.size() + footer_layout.size() > this.available_size() {
+            return None;
+        }
+        let mut accumulator = 0;
+        loop {
+            if accumulator >= this.capacity() {
                 return None;
-            }
-            let mut accumulator = 0;
-            loop {
-                if accumulator >= this.capacity() {
-                    return None;
-                }
-                let header_pointer = this
-                    .memory
-                    .as_mut_ptr()
-                    .add(this.position)
-                    .cast::<DataHeapObjectHeader>();
-                let offset = match header_pointer.read_unaligned() {
-                    DataHeapObjectHeader::Occupied {
-                        layout, tail_size, ..
-                    } => header_layout.size() + layout.size() + tail_size + footer_layout.size(),
-                    DataHeapObjectHeader::Free { size } => {
-                        if size >= layout.size() {
-                            break;
-                        }
-                        header_layout.size() + size + footer_layout.size()
-                    }
-                };
-                if this.position + offset >= this.capacity() {
-                    accumulator += this.capacity() - this.position;
-                    this.position = 0;
-                } else {
-                    this.position += offset;
-                    accumulator += offset;
-                }
             }
             let header_pointer = this
                 .memory
                 .as_mut_ptr()
                 .add(this.position)
                 .cast::<DataHeapObjectHeader>();
-            let size = if let DataHeapObjectHeader::Free { size } = header_pointer.read_unaligned()
-            {
-                size
-            } else {
-                return None;
+            let offset = match header_pointer.read_unaligned() {
+                DataHeapObjectHeader::Occupied {
+                    layout, tail_size, ..
+                } => header_layout.size() + layout.size() + tail_size + footer_layout.size(),
+                DataHeapObjectHeader::Free { size } => {
+                    if size >= layout.size() {
+                        break;
+                    }
+                    header_layout.size() + size + footer_layout.size()
+                }
             };
-            let id = DataHeapObjectID::new();
-            let data_pointer = this
-                .memory
-                .as_mut_ptr()
-                .add(this.position + header_layout.size());
-            let mut tail_size = size - layout.size() - footer_layout.size();
-            if tail_size > header_layout.size() + footer_layout.size() {
-                let new_size = tail_size - header_layout.size();
-                let extra_header_pointer = this.memory.as_mut_ptr().add(
-                    this.position + header_layout.size() + layout.size() + footer_layout.size(),
-                );
-                let extra_footer_pointer = extra_header_pointer.add(new_size);
-                extra_header_pointer
-                    .cast::<DataHeapObjectHeader>()
-                    .write(DataHeapObjectHeader::Free { size: new_size });
-                extra_footer_pointer
-                    .cast::<DataHeapObjectFooter>()
-                    .write(DataHeapObjectFooter { size: new_size });
-                tail_size = 0;
+            if this.position + offset >= this.capacity() {
+                accumulator += this.capacity() - this.position;
+                this.position = 0;
+            } else {
+                this.position += offset;
+                accumulator += offset;
             }
-            header_pointer.write(DataHeapObjectHeader::Occupied {
-                id,
-                layout,
-                finalizer: T::finalize_raw,
-                tail_size,
-            });
-            let size = layout.size() + tail_size;
-            let footer_pointer = this
+        }
+        let header_pointer = this
+            .memory
+            .as_mut_ptr()
+            .add(this.position)
+            .cast::<DataHeapObjectHeader>();
+        let size = if let DataHeapObjectHeader::Free { size } = header_pointer.read_unaligned() {
+            size
+        } else {
+            return None;
+        };
+        let id = DataHeapObjectID::new();
+        let data_pointer = this
+            .memory
+            .as_mut_ptr()
+            .add(this.position + header_layout.size());
+        let mut tail_size = size - layout.size() - footer_layout.size();
+        if tail_size > header_layout.size() + footer_layout.size() {
+            let new_size = tail_size - header_layout.size();
+            let extra_header_pointer = this
                 .memory
                 .as_mut_ptr()
-                .add(this.position + header_layout.size() + size)
-                .cast::<DataHeapObjectFooter>();
-            footer_pointer.write(DataHeapObjectFooter { size });
-            this.size += header_layout.size() + size + footer_layout.size();
-            let data_pointer = data_pointer.cast::<T>();
-            Some(DataHeapBox {
-                id,
-                data: NonNull::new_unchecked(data_pointer),
-                page: page_weak,
-            })
+                .add(this.position + header_layout.size() + layout.size() + footer_layout.size());
+            let extra_footer_pointer = extra_header_pointer.add(new_size);
+            extra_header_pointer
+                .cast::<DataHeapObjectHeader>()
+                .write(DataHeapObjectHeader::Free { size: new_size });
+            extra_footer_pointer
+                .cast::<DataHeapObjectFooter>()
+                .write(DataHeapObjectFooter { size: new_size });
+            tail_size = 0;
         }
+        header_pointer.write(DataHeapObjectHeader::Occupied {
+            id,
+            layout,
+            finalizer: T::finalize_raw,
+            tail_size,
+        });
+        let size = layout.size() + tail_size;
+        let footer_pointer = this
+            .memory
+            .as_mut_ptr()
+            .add(this.position + header_layout.size() + size)
+            .cast::<DataHeapObjectFooter>();
+        footer_pointer.write(DataHeapObjectFooter { size });
+        this.size += header_layout.size() + size + footer_layout.size();
+        let data_pointer = data_pointer.cast::<T>();
+        Some(DataHeapBox {
+            id,
+            data: NonNull::new_unchecked(data_pointer),
+            page: page_weak,
+        })
     }
 
     fn dealloc(page: &DataHeapMemoryPageHandle, data_pointer: *mut (), id: DataHeapObjectID) {

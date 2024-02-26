@@ -19,6 +19,7 @@ clippy:
   cargo clippy --all --all-features
 
 checks:
+  just format
   just build
   just clippy
   just test
