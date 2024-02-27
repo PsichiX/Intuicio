@@ -216,7 +216,7 @@ mod tests {
         assert_eq!(arena.capacity(), 5120);
         assert_eq!(arena.size(), 2252);
         assert_eq!(arena.available_size(), 2868);
-        assert_eq!(*droppable_inner.read().unwrap(), false);
+        assert!(!*droppable_inner.read().unwrap());
         let nested = arena.alloc(Nested(object.clone()));
         assert_eq!(arena.pages_count(), 2);
         assert_eq!(arena.capacity(), 5120);
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(*nested.read().unwrap().0.read().unwrap(), 42);
         assert_eq!(*object.read().unwrap(), 42);
         arena.clear();
-        assert_eq!(*droppable_inner.read().unwrap(), true);
+        assert!(*droppable_inner.read().unwrap());
         assert_eq!(arena.pages_count(), 0);
         assert_eq!(arena.capacity(), 0);
         assert_eq!(arena.size(), 0);

@@ -598,13 +598,13 @@ mod tests {
         });
 
         let object = Reference::from(handle.join().unwrap());
-        assert_eq!(object.is_null(), false);
+        assert!(!object.is_null());
         assert!(object.type_of().unwrap().is::<Foo>());
         let value = object.read::<Foo>().unwrap();
-        assert_eq!(value.v.is_null(), false);
+        assert!(!value.v.is_null());
         assert!(value.v.type_of().unwrap().is::<Integer>());
         assert_eq!(*value.v.read::<Integer>().unwrap(), 42);
-        assert_eq!(value.me.is_null(), false);
+        assert!(!value.me.is_null());
         assert!(value.me.type_of().unwrap().is::<Foo>());
         assert!(value.me.does_share_reference(&object, true));
     }

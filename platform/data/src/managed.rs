@@ -1503,7 +1503,7 @@ mod tests {
             *foo.write().unwrap().downcast_mut::<usize>().unwrap() = 100;
         }
         {
-            let foo = ManagedLazy::<dyn Any>::new(&mut data, lifetime.lazy());
+            let foo = ManagedLazy::<dyn Any>::new(&data, lifetime.lazy());
             assert_eq!(
                 *foo.read().unwrap().downcast_ref::<usize>().unwrap(),
                 100usize
@@ -1518,10 +1518,10 @@ mod tests {
         }
         {
             let mut foo = ManagedRefMut::<[i32]>::new(&mut data, lifetime.borrow_mut().unwrap());
-            foo.write().unwrap().sort_by(|a, b| a.cmp(&b).reverse());
+            foo.write().unwrap().sort_by(|a, b| a.cmp(b).reverse());
         }
         {
-            let foo = ManagedLazy::<[i32]>::new(&mut data, lifetime.lazy());
+            let foo = ManagedLazy::<[i32]>::new(&data, lifetime.lazy());
             assert_eq!(*foo.read().unwrap(), [3, 2, 1, 0]);
         }
     }

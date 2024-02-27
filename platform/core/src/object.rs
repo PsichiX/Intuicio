@@ -432,7 +432,7 @@ mod tests {
         let dropped = Rc::new(());
         let dropped_weak = Rc::downgrade(&dropped);
         object.write_field::<Droppable>("e").unwrap().0 = Some(dropped_weak);
-        assert_eq!(*object.read_field::<bool>("a").unwrap(), true);
+        assert!(*object.read_field::<bool>("a").unwrap());
         assert_eq!(*object.read_field::<f32>("b").unwrap(), 4.2);
         assert_eq!(*object.read_field::<usize>("c").unwrap(), 42);
         assert_eq!(Rc::weak_count(&dropped), 1);
@@ -449,7 +449,7 @@ mod tests {
         assert!(lifetime.state().can_write(0));
         let handle = NativeStructBuilder::new_uninitialized::<Wrapper>().build_handle();
         let object = Object::with_value(handle, lifetime.borrow_mut().unwrap()).unwrap();
-        assert_eq!(lifetime.state().can_write(0), false);
+        assert!(!lifetime.state().can_write(0));
         drop(object);
         assert!(lifetime.state().can_write(0));
     }

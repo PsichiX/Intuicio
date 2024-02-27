@@ -1017,6 +1017,7 @@ mod tests {
         }
 
         fn set_property(&mut self, property_name: &str, property_value: PropertyValue) {
+            #[allow(clippy::single_match)]
             match self {
                 Nodes::Expression(value) => match property_name {
                     "Value" => {

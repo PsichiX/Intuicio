@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(meta.as_identifier().unwrap(), "foo");
         let meta = crate::meta!(true);
         assert!(matches!(meta, Meta::Value(MetaValue::Bool(_))));
-        assert_eq!(meta.as_value().unwrap().as_bool().unwrap(), true);
+        assert!(meta.as_value().unwrap().as_bool().unwrap());
         let meta = crate::meta!(42);
         assert!(matches!(meta, Meta::Value(MetaValue::Integer(_))));
         assert_eq!(meta.as_value().unwrap().as_integer().unwrap(), 42);
@@ -287,14 +287,11 @@ mod tests {
         let meta = crate::meta!([]);
         assert!(matches!(meta, Meta::Array(_)));
         let meta = crate::meta!([true, 42, 4.2, "foo"]);
-        assert_eq!(
-            meta.as_array().unwrap()[0]
-                .as_value()
-                .unwrap()
-                .as_bool()
-                .unwrap(),
-            true
-        );
+        assert!(meta.as_array().unwrap()[0]
+            .as_value()
+            .unwrap()
+            .as_bool()
+            .unwrap());
         assert_eq!(
             meta.as_array().unwrap()[1]
                 .as_value()
@@ -322,14 +319,11 @@ mod tests {
         let meta = crate::meta!({});
         assert!(matches!(meta, Meta::Map(_)));
         let meta = crate::meta!({bool: true, integer: 42, float: 4.2, string: "foo"});
-        assert_eq!(
-            meta.as_map().unwrap()["bool"]
-                .as_value()
-                .unwrap()
-                .as_bool()
-                .unwrap(),
-            true
-        );
+        assert!(meta.as_map().unwrap()["bool"]
+            .as_value()
+            .unwrap()
+            .as_bool()
+            .unwrap());
         assert_eq!(
             meta.as_map().unwrap()["integer"]
                 .as_value()

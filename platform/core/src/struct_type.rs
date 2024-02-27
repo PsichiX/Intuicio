@@ -774,10 +774,7 @@ mod tests {
 
         let source = Foo { a: true, b: 42 };
         let mut target = Object::new(struct_type.clone());
-        assert_eq!(
-            unsafe { struct_type.try_copy(target.as_ptr(), target.as_mut_ptr()) },
-            false
-        );
+        assert!(unsafe { !struct_type.try_copy(target.as_ptr(), target.as_mut_ptr()) });
         assert_ne!(&source, target.read::<Foo>().unwrap());
         assert!(unsafe {
             struct_type.try_copy(&source as *const Foo as *const u8, target.as_mut_ptr())

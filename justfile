@@ -17,6 +17,7 @@ bench:
 
 clippy:
   cargo clippy --all --all-features
+  cargo clippy --tests --all --all-features
 
 checks:
   just format

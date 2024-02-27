@@ -176,14 +176,14 @@ mod tests {
 
     #[test]
     fn test_visibility() {
-        assert_eq!(Visibility::Private.is_visible(Visibility::Private), true);
-        assert_eq!(Visibility::Private.is_visible(Visibility::Module), false);
-        assert_eq!(Visibility::Private.is_visible(Visibility::Public), false);
-        assert_eq!(Visibility::Module.is_visible(Visibility::Private), true);
-        assert_eq!(Visibility::Module.is_visible(Visibility::Module), true);
-        assert_eq!(Visibility::Module.is_visible(Visibility::Public), false);
-        assert_eq!(Visibility::Public.is_visible(Visibility::Private), true);
-        assert_eq!(Visibility::Public.is_visible(Visibility::Module), true);
-        assert_eq!(Visibility::Public.is_visible(Visibility::Public), true);
+        assert!(Visibility::Private.is_visible(Visibility::Private));
+        assert!(!Visibility::Private.is_visible(Visibility::Module));
+        assert!(!Visibility::Private.is_visible(Visibility::Public));
+        assert!(Visibility::Module.is_visible(Visibility::Private));
+        assert!(Visibility::Module.is_visible(Visibility::Module));
+        assert!(!Visibility::Module.is_visible(Visibility::Public));
+        assert!(Visibility::Public.is_visible(Visibility::Private));
+        assert!(Visibility::Public.is_visible(Visibility::Module));
+        assert!(Visibility::Public.is_visible(Visibility::Public));
     }
 }

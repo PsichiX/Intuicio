@@ -1203,7 +1203,6 @@ mod tests {
                 total_size: 96560,
                 occupied_size: 89648,
                 free_size: 6912,
-                ..Default::default()
             }
         );
         drop(a);
@@ -1216,7 +1215,6 @@ mod tests {
                 total_size: 96560,
                 occupied_size: 89392,
                 free_size: 7168,
-                ..Default::default()
             }
         );
         drop(b);
@@ -1229,7 +1227,6 @@ mod tests {
                 total_size: 96560,
                 occupied_size: 88368,
                 free_size: 8192,
-                ..Default::default()
             }
         );
         drop(c);
@@ -1242,7 +1239,6 @@ mod tests {
                 total_size: 80176,
                 occupied_size: 80176,
                 free_size: 0,
-                ..Default::default()
             }
         );
         drop(d);

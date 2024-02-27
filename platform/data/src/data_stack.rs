@@ -1059,7 +1059,7 @@ mod tests {
         assert_eq!(stack.position(), 41);
         stack.push(4.2_f32);
         assert_eq!(stack.position(), 53);
-        assert_eq!(*dropped.borrow(), false);
+        assert!(!*dropped.borrow());
         assert!(stack.pop::<()>().is_none());
         stack.push(());
         assert_eq!(stack.position(), 61);
@@ -1070,7 +1070,7 @@ mod tests {
         assert_eq!(stack2.position(), 25);
         assert_eq!(stack2.pop::<usize>().unwrap(), 42_usize);
         assert_eq!(stack2.position(), 9);
-        assert_eq!(stack2.pop::<bool>().unwrap(), true);
+        assert!(stack2.pop::<bool>().unwrap());
         assert_eq!(stack2.position(), 0);
         stack2.push(true);
         stack2.push(42_usize);
@@ -1078,11 +1078,11 @@ mod tests {
         assert_eq!(stack.position(), 61);
         assert_eq!(stack.pop::<usize>().unwrap(), 42_usize);
         assert_eq!(stack.position(), 45);
-        assert_eq!(stack.pop::<bool>().unwrap(), true);
+        assert!(stack.pop::<bool>().unwrap());
         assert_eq!(stack.position(), 36);
         assert_eq!(stack.pop::<f32>().unwrap(), 4.2_f32);
         assert_eq!(stack.position(), 24);
-        assert_eq!(stack.pop::<()>().unwrap(), ());
+        stack.pop::<()>().unwrap();
         assert_eq!(stack.position(), 16);
         stack.push(42_usize);
         unsafe {
@@ -1095,7 +1095,7 @@ mod tests {
             assert_eq!(stack.position(), 16);
         }
         drop(stack);
-        assert_eq!(*dropped.borrow(), true);
+        assert!(*dropped.borrow());
 
         let mut stack = DataStack::new(1024, DataStackMode::Registers);
         assert_eq!(stack.size(), 1024);
@@ -1106,15 +1106,9 @@ mod tests {
         assert_eq!(stack.position(), 0);
         let a = stack.push_register_value(true).unwrap();
         assert_eq!(stack.position(), 41);
-        assert_eq!(
-            *stack.access_register(a).unwrap().read::<bool>().unwrap(),
-            true
-        );
-        assert_eq!(
-            stack.access_register(a).unwrap().take::<bool>().unwrap(),
-            true
-        );
-        assert_eq!(stack.access_register(a).unwrap().has_value(), false);
+        assert!(*stack.access_register(a).unwrap().read::<bool>().unwrap());
+        assert!(stack.access_register(a).unwrap().take::<bool>().unwrap());
+        assert!(!stack.access_register(a).unwrap().has_value());
         let b = stack.push_register_value(0usize).unwrap();
         assert_eq!(stack.position(), 89);
         stack.access_register(b).unwrap().set(42usize);

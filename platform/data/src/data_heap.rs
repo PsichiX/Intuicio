@@ -768,12 +768,8 @@ mod tests {
             } else {
                 String::new()
             };
-            let parts = command
-                .as_str()
-                .trim()
-                .split_whitespace()
-                .collect::<Vec<_>>();
-            if let Some(id) = parts.get(0) {
+            let parts = command.as_str().split_whitespace().collect::<Vec<_>>();
+            if let Some(id) = parts.first() {
                 match *id {
                     "exit" => {
                         std::process::exit(0);
@@ -890,7 +886,7 @@ mod tests {
         analize_stats(&heap);
         assert_eq!(heap.size(), 0);
         assert_eq!(heap.available_size(), 1024);
-        assert_eq!(*dropped.read().unwrap(), true);
+        assert!(*dropped.read().unwrap());
         let keep = heap.alloc(42u8).unwrap();
         analize_stats(&heap);
         assert_eq!(heap.size(), 57);
@@ -920,7 +916,7 @@ mod tests {
         assert_eq!(heap.size(), 57);
         assert_eq!(heap.available_size(), 967);
         drop(heap);
-        assert_eq!(keep.exists(), false);
+        assert!(!keep.exists());
 
         let mut heap = DataHeap::default();
         let mut value = heap.alloc(42).unwrap().into_managed();

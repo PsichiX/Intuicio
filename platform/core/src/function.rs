@@ -445,67 +445,52 @@ mod tests {
             .with_output(FunctionParameter::new("result", i32_handle));
         let function = Function::new(signature.to_owned(), FunctionBody::pointer(add));
 
-        assert_eq!(
-            FunctionQuery {
-                ..Default::default()
-            }
-            .is_valid(&signature),
-            true
-        );
-        assert_eq!(
-            FunctionQuery {
-                name: Some("add".into()),
-                ..Default::default()
-            }
-            .is_valid(&signature),
-            true
-        );
-        assert_eq!(
-            FunctionQuery {
-                name: Some("add".into()),
-                inputs: [
-                    FunctionQueryParameter {
-                        name: Some("a".into()),
-                        ..Default::default()
-                    },
-                    FunctionQueryParameter {
-                        name: Some("b".into()),
-                        ..Default::default()
-                    }
-                ]
-                .as_slice()
-                .into(),
-                outputs: [FunctionQueryParameter {
-                    name: Some("result".into()),
+        assert!(FunctionQuery::default().is_valid(&signature));
+        assert!(FunctionQuery {
+            name: Some("add".into()),
+            ..Default::default()
+        }
+        .is_valid(&signature));
+        assert!(FunctionQuery {
+            name: Some("add".into()),
+            inputs: [
+                FunctionQueryParameter {
+                    name: Some("a".into()),
                     ..Default::default()
-                }]
-                .as_slice()
-                .into(),
+                },
+                FunctionQueryParameter {
+                    name: Some("b".into()),
+                    ..Default::default()
+                }
+            ]
+            .as_slice()
+            .into(),
+            outputs: [FunctionQueryParameter {
+                name: Some("result".into()),
                 ..Default::default()
-            }
-            .is_valid(&signature),
-            true
-        );
-        assert_eq!(
-            FunctionQuery {
-                name: Some("add".into()),
-                inputs: [
-                    FunctionQueryParameter {
-                        name: Some("b".into()),
-                        ..Default::default()
-                    },
-                    FunctionQueryParameter {
-                        name: Some("a".into()),
-                        ..Default::default()
-                    }
-                ]
-                .as_slice()
-                .into(),
-                ..Default::default()
-            }
-            .is_valid(&signature),
-            false
-        );
+            }]
+            .as_slice()
+            .into(),
+            ..Default::default()
+        }
+        .is_valid(&signature));
+        assert!(!FunctionQuery {
+            name: Some("add".into()),
+            inputs: [
+                FunctionQueryParameter {
+                    name: Some("b".into()),
+                    ..Default::default()
+                },
+                FunctionQueryParameter {
+                    name: Some("a".into()),
+                    ..Default::default()
+                }
+            ]
+            .as_slice()
+            .into(),
+            ..Default::default()
+        }
+        .is_valid(&signature));
 
         let mut context = Context::new(1024, 1024, 1024);
         let registry = Registry::default();
