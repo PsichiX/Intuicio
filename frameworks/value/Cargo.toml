@@ -1,17 +1,18 @@
 [package]
-name = "intuicio-backend-rust"
+name = "intuicio-framework-value"
 version = "0.29.1"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
-description = "Rust backend module for Intuicio scripting platform"
+description = "Type erased value framework module for Intuicio scripting platform"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
-documentation = "https://docs.rs/intuicio-backend-rust"
+documentation = "https://docs.rs/intuicio-framework-value"
 readme = "../../README.md"
-exclude = ["./resources/"]
 
 [dependencies]
 intuicio-data = { version = "0.29", path = "../../platform/data" }
 intuicio-core = { version = "0.29", path = "../../platform/core" }
-serde = { version = "1", features = ["derive", "rc"] }
+
+[dev-dependencies]
+intuicio-derive = { version = "0.29", path = "../../platform/derive" }

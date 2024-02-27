@@ -24,7 +24,19 @@ pub fn bench() {
     let managed_alloc_result = {
         println!();
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
-            "managed heap alloc",
+            "managed alloc",
+            || {},
+            |_| Managed::new(black_box(42u128)),
+            |data| drop(data),
+        )
+    };
+
+    // managed box
+    let managed_box_alloc_result = {
+        println!();
+        let _ = ManagedBox::new(true);
+        Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
+            "managed box alloc",
             || {},
             |_| Managed::new(black_box(42u128)),
             |data| drop(data),
@@ -78,14 +90,26 @@ pub fn bench() {
     let managed_dealloc_result = {
         println!();
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
-            "managed heap dealloc",
+            "managed dealloc",
             || Managed::new(black_box(42u128)),
             |data| drop(data),
             |_| {},
         )
     };
 
-    // data
+    // managed box
+    let managed_box_dealloc_result = {
+        println!();
+        let _ = ManagedBox::new(true);
+        Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
+            "managed box dealloc",
+            || Managed::new(black_box(42u128)),
+            |data| drop(data),
+            |_| {},
+        )
+    };
+
+    // data heap
     let data_heap_dealloc_result = {
         println!();
         let mut heap = DataHeap::new(1024);
@@ -121,8 +145,16 @@ pub fn bench() {
     println!("--- ALLOCATOR | RESULTS ---");
 
     println!();
-    println!("Managed heap vs Native heap alloc:");
+    println!("Managed vs Native heap alloc:");
     managed_alloc_result.print_comparison(&native_alloc_result, COMPARISON_FORMAT);
+
+    println!();
+    println!("ManagedBox vs Native heap alloc:");
+    managed_box_alloc_result.print_comparison(&native_alloc_result, COMPARISON_FORMAT);
+
+    println!();
+    println!("ManagedBox vs Managed alloc:");
+    managed_box_alloc_result.print_comparison(&managed_alloc_result, COMPARISON_FORMAT);
 
     println!();
     println!("Data heap vs Native heap alloc:");
@@ -133,8 +165,16 @@ pub fn bench() {
     data_stack_alloc_result.print_comparison(&native_alloc_result, COMPARISON_FORMAT);
 
     println!();
-    println!("Managed heap vs Native heap dealloc:");
+    println!("Managed vs Native heap dealloc:");
     managed_dealloc_result.print_comparison(&native_dealloc_result, COMPARISON_FORMAT);
+
+    println!();
+    println!("ManagedBox vs Native heap dealloc:");
+    managed_box_dealloc_result.print_comparison(&native_dealloc_result, COMPARISON_FORMAT);
+
+    println!();
+    println!("ManagedBox vs Managed dealloc:");
+    managed_box_dealloc_result.print_comparison(&managed_dealloc_result, COMPARISON_FORMAT);
 
     println!();
     println!("Data heap vs Native heap dealloc:");

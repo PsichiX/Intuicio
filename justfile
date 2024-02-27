@@ -51,6 +51,7 @@ update:
   cargo update --manifest-path ./backends/rust/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/dynamic/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/pointer/Cargo.toml --aggressive
+  cargo update --manifest-path ./frameworks/value/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/serde/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/assembler/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/simpleton/Cargo.toml --aggressive
@@ -90,6 +91,8 @@ publish:
   cargo publish --no-verify --manifest-path ./frameworks/dynamic/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./frameworks/pointer/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./frameworks/value/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./frontends/serde/Cargo.toml
   sleep 1

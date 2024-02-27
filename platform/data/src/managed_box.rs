@@ -553,6 +553,39 @@ impl ManagedStorage {
         None
     }
 
+    fn object_layout(
+        &self,
+        pointer: NonNull<u8>,
+        object_id: usize,
+        page_id: usize,
+    ) -> Option<Layout> {
+        if let Some(page) = self.pages.get(&page_id) {
+            if page.owns_pointer(pointer) {
+                let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
+                let header = unsafe {
+                    pointer
+                        .as_ptr()
+                        .sub(header_size)
+                        .cast::<ManagedObjectHeader>()
+                        .as_mut()
+                        .unwrap()
+                };
+                if let ManagedObjectHeader::Occupied {
+                    id,
+                    layout,
+                    instances_count,
+                    ..
+                } = header
+                {
+                    if object_id == *id && *instances_count > 0 {
+                        return Some(*layout);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     fn object_instances_count(
         &self,
         pointer: NonNull<u8>,
@@ -591,6 +624,12 @@ pub struct ManagedBox<T> {
     id: usize,
     page: usize,
     drop: bool,
+}
+
+impl<T: Default> Default for ManagedBox<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
 }
 
 impl<T> Drop for ManagedBox<T> {
@@ -710,6 +749,34 @@ impl<T> ManagedBox<T> {
         });
         unsafe { lifetime.as_mut().write(pointer.as_mut()) }
     }
+
+    /// # Safety
+    pub unsafe fn as_ptr(&self) -> Option<*const T> {
+        STORAGE.with_borrow(|storage| {
+            if storage
+                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
+                .is_some()
+            {
+                Some(self.memory.as_ptr().cast_const())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr_mut(&mut self) -> Option<*mut T> {
+        STORAGE.with_borrow(|storage| {
+            if storage
+                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
+                .is_some()
+            {
+                Some(self.memory.as_ptr())
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl<T> Clone for ManagedBox<T> {
@@ -746,13 +813,18 @@ impl Drop for DynamicManagedBox {
 impl DynamicManagedBox {
     pub fn new<T: Finalize>(value: T) -> Self {
         unsafe {
-            let result = Self::new_raw(TypeHash::of::<T>(), Layout::new::<T>(), T::finalize_raw);
+            let result =
+                Self::new_uninitialized(TypeHash::of::<T>(), Layout::new::<T>(), T::finalize_raw);
             result.memory.as_ptr().cast::<T>().write(value);
             result
         }
     }
 
-    pub fn new_raw(type_hash: TypeHash, layout: Layout, finalizer: unsafe fn(*mut ())) -> Self {
+    pub fn new_uninitialized(
+        type_hash: TypeHash,
+        layout: Layout,
+        finalizer: unsafe fn(*mut ()),
+    ) -> Self {
         STORAGE.with_borrow_mut(|storage| {
             storage.alloc_uninitialized(type_hash, layout.pad_to_align(), finalizer)
         })
@@ -850,6 +922,57 @@ impl DynamicManagedBox {
                 .unwrap()
         });
         unsafe { lifetime.as_mut().write(pointer.as_mut()) }
+    }
+
+    /// # Safety
+    pub unsafe fn memory(&self) -> Option<&[u8]> {
+        STORAGE.with_borrow(|storage| {
+            storage
+                .object_layout(self.memory, self.id, self.page)
+                .map(|layout| std::slice::from_raw_parts(self.memory.as_ptr(), layout.size()))
+        })
+    }
+
+    /// # Safety
+    pub unsafe fn memory_mut(&mut self) -> Option<&mut [u8]> {
+        STORAGE.with_borrow(|storage| {
+            if let Some(layout) = storage.object_layout(self.memory, self.id, self.page) {
+                Some(std::slice::from_raw_parts_mut(
+                    self.memory.as_ptr(),
+                    layout.size(),
+                ))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr<T>(&self) -> Option<*const T> {
+        STORAGE.with_borrow(|storage| {
+            if storage
+                .access_object_lifetime::<T>(self.memory, self.id, self.page)
+                .is_some()
+            {
+                Some(self.memory.as_ptr().cast_const().cast())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr_mut<T>(&mut self) -> Option<*mut T> {
+        STORAGE.with_borrow(|storage| {
+            if storage
+                .access_object_lifetime::<T>(self.memory, self.id, self.page)
+                .is_some()
+            {
+                Some(self.memory.as_ptr().cast())
+            } else {
+                None
+            }
+        })
     }
 }
 
