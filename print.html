@@ -266,11 +266,9 @@ AsmPackage::new("./resources/main.iasm", &amp;mut content_provider)
 </span><span class="boring">fn main() {
 </span>let context = Context::new(
     // stack bytes capacity.
-    1024,
+    10240,
     // registers bytes capacity.
-    1024,
-    // heap page capacity.
-    1024,
+    10240,
 );
 let mut host = Host::new(context, RegistryHandle::new(registry));
 let (result,) = host
@@ -858,7 +856,7 @@ registry.add_function(Function::new(
 <p>Final thing to do is to create host and test frontend:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let mut host = Host::new(Context::new(1024, 1024, 1024), registry.into());
+</span>let mut host = Host::new(Context::new(10240, 10240), registry.into());
 let (result,) = host
     .call_function::&lt;(i32,), _&gt;("main", "main", None)
     .unwrap()
@@ -995,7 +993,7 @@ impl Default for Repl {
     fn default() -&gt; Self {
         let mut registry = Registry::default().with_basic_types();
         crate::library::install(&amp;mut registry);
-        let context = Context::new(1024, 1024, 1024);
+        let context = Context::new(10240, 10240);
         Self {
             script: Default::default(),
             host: Host::new(context, registry.into()),
