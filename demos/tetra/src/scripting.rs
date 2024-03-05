@@ -22,7 +22,6 @@ impl Scripting {
         assets: &str,
         stack_capacity: usize,
         registers_capacity: usize,
-        heap_page_capacity: usize,
         entry: &str,
         tetra_context: &mut TetraContext,
     ) -> Self {
@@ -43,7 +42,7 @@ impl Scripting {
             package
                 .compile()
                 .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
-            let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);
+            let context = Context::new(stack_capacity, registers_capacity);
             Host::new(context, registry.into())
         });
         let mut host = host_producer.produce();

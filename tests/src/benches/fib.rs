@@ -101,7 +101,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
                 },
                 FunctionBody::pointer(fib),
             ));
-            let mut context = Context::new(1024, 1024, 1024);
+            let mut context = Context::new(10240, 10240);
             Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
                 "host fib",
                 || {},
@@ -130,7 +130,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
                 },
                 FunctionBody::pointer(fib),
             ));
-            let mut context = Context::new(1024, 1024, 1024);
+            let mut context = Context::new(10240, 10240);
             Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
                 "host indexed fib",
                 || {},
@@ -202,7 +202,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
                 .unwrap()
                 .0,
             ));
-            let mut context = Context::new(1024, 1024, 1024);
+            let mut context = Context::new(10240, 10240);
             Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
                 "vm fib",
                 || {},
@@ -239,7 +239,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
                 .unwrap()
                 .0,
             ));
-            let mut context = Context::new(1024, 1024, 1024);
+            let mut context = Context::new(10240, 10240);
             Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
                 "vm indexed fib",
                 || {},
@@ -288,7 +288,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
                 ..Default::default()
             })
             .unwrap();
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "script fib",
             || {},
@@ -335,7 +335,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
                 ..Default::default()
             })
             .unwrap();
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "script indexed fib",
             || {},
@@ -382,7 +382,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
             "rune fib",
             || {},
             |_| {
-                vm.execute(&["rune_fib"], (black_box(FIB_N),))
+                vm.execute(["rune_fib"], (black_box(FIB_N),))
                     .unwrap()
                     .complete()
                     .unwrap();

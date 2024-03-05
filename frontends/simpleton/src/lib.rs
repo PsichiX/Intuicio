@@ -48,7 +48,7 @@ mod tests {
                     //         .into_handle(),
                     // ),
                 );
-            let context = Context::new(1024, 1024, 1024);
+            let context = Context::new(10240, 10240);
             Host::new(context, registry.into())
         });
         let mut vm = host_producer.produce();

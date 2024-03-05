@@ -64,7 +64,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
                 (a / b,)
             }
         });
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "host div",
             || {},
@@ -103,7 +103,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
             .unwrap()
             .0,
         ));
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "vm div",
             || {},
@@ -140,7 +140,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
                 ..Default::default()
             })
             .unwrap();
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "script div",
             || {},
@@ -188,7 +188,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
             "rune div",
             || {},
             |_| {
-                vm.execute(&["rune_div"], (black_box(DIV_A), black_box(DIV_B)))
+                vm.execute(["rune_div"], (black_box(DIV_A), black_box(DIV_B)))
                     .unwrap()
                     .complete()
                     .unwrap();

@@ -1,38 +1,25 @@
-use intuicio_data::{
-    data_heap::DataHeap,
-    data_stack::{DataStack, DataStackMode, DataStackRegisterAccess},
-};
+use intuicio_data::data_stack::{DataStack, DataStackMode, DataStackRegisterAccess};
 use std::{any::Any, collections::HashMap};
 
 pub struct Context {
     stack: DataStack,
     registers: DataStack,
     registers_barriers: Vec<usize>,
-    heap: DataHeap,
     custom: HashMap<String, Box<dyn Any + Send + Sync>>,
 }
 
 impl Context {
-    pub fn new(
-        stack_capacity: usize,
-        registers_capacity: usize,
-        heap_page_capacity: usize,
-    ) -> Self {
+    pub fn new(stack_capacity: usize, registers_capacity: usize) -> Self {
         Self {
             stack: DataStack::new(stack_capacity, DataStackMode::Values),
             registers: DataStack::new(registers_capacity, DataStackMode::Registers),
             registers_barriers: vec![],
-            heap: DataHeap::new(heap_page_capacity),
             custom: Default::default(),
         }
     }
 
     pub fn fork(&self) -> Self {
-        Self::new(
-            self.stack.size(),
-            self.registers.size(),
-            self.heap.page_capacity(),
-        )
+        Self::new(self.stack.size(), self.registers.size())
     }
 
     pub fn stack_capacity(&self) -> usize {
@@ -43,20 +30,12 @@ impl Context {
         self.registers.size()
     }
 
-    pub fn heap_page_capacity(&self) -> usize {
-        self.heap.page_capacity()
-    }
-
     pub fn stack(&mut self) -> &mut DataStack {
         &mut self.stack
     }
 
     pub fn registers(&mut self) -> &mut DataStack {
         &mut self.registers
-    }
-
-    pub fn heap(&mut self) -> &mut DataHeap {
-        &mut self.heap
     }
 
     pub fn stack_and_registers(&mut self) -> (&mut DataStack, &mut DataStack) {

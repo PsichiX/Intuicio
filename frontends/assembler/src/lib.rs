@@ -68,10 +68,7 @@ mod tests {
                 ..Default::default()
             })
             .is_some());
-        let mut host = Host::new(
-            Context::new(1024, 1024, 1024),
-            RegistryHandle::new(registry),
-        );
+        let mut host = Host::new(Context::new(10240, 10240), RegistryHandle::new(registry));
         let (result,) = host
             .call_function::<(usize,), _>("main", "test", None)
             .unwrap()

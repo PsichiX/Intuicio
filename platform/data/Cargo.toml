@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-data"
-version = "0.29.1"
+version = "0.30.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Data module for Intuicio scripting platform"
@@ -12,3 +12,5 @@ readme = "../../README.md"
 
 [dependencies]
 typid = "1"
+rustc-hash = "1"
+smallvec = "1.13"

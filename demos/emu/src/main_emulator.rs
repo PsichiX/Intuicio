@@ -295,7 +295,7 @@ fn main() -> tetra::Result {
                 .into_package()
                 .compile()
                 .install::<VmScope<AsmExpression>>(&mut registry, None);
-            let context = Context::new(8192, 8192, 0);
+            let context = Context::new(8192, 8192);
             let mut host = Host::new(context, registry.into());
             if let Some(call) =
                 host.call_function::<(), ()>("bootload", &cartridge.module_name, None)

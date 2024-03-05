@@ -328,7 +328,7 @@ mod tests {
             .0,
         );
         registry.add_struct_handle(i32_handle);
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         let (result,) = registry
             .find_function(FunctionQuery {
                 name: Some("add".into()),

@@ -50,7 +50,6 @@ fn main() -> tetra::Result {
             &config.assets,
             config.scripting.stack_capacity,
             config.scripting.registers_capacity,
-            config.scripting.heap_page_capacity,
             &config.scripting.entry,
             ctx,
         );

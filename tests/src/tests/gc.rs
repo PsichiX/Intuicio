@@ -28,7 +28,7 @@ impl Adder {
 
 #[test]
 fn test_gc() {
-    let mut context = Context::new(1024, 1024, 1024);
+    let mut context = Context::new(10240, 10240);
     let mut registry = Registry::default().with_basic_types();
     registry.add_struct(NativeStructBuilder::new::<Gc<i32>>().build());
     let add = registry.add_function(add::define_function(&registry));

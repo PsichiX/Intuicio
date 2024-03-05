@@ -62,7 +62,7 @@ fn main() {
         package
             .compile()
             .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
-        let context = Context::new(1024 * 128, 1024 * 128, 0);
+        let context = Context::new(1024 * 128, 1024 * 128);
         Host::new(context, registry.into())
     });
     let mut host = host_producer.produce();

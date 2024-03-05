@@ -6,9 +6,9 @@ use crate::{
     Visibility,
 };
 use intuicio_data::data_stack::DataStackPack;
+use rustc_hash::FxHasher;
 use std::{
     borrow::Cow,
-    collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     sync::Arc,
 };
@@ -273,6 +273,16 @@ impl<'a> FunctionQueryParameter<'a> {
                 .map(|query| query.is_valid(&parameter.struct_handle))
                 .unwrap_or(true)
     }
+
+    pub fn to_static(&self) -> FunctionQueryParameter<'static> {
+        FunctionQueryParameter {
+            name: self
+                .name
+                .as_ref()
+                .map(|name| name.as_ref().to_owned().into()),
+            struct_query: self.struct_query.as_ref().map(|query| query.to_static()),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Hash)]
@@ -336,9 +346,37 @@ impl<'a> FunctionQuery<'a> {
     }
 
     pub fn as_hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
         hasher.finish()
+    }
+
+    pub fn to_static(&self) -> FunctionQuery<'static> {
+        FunctionQuery {
+            name: self
+                .name
+                .as_ref()
+                .map(|name| name.as_ref().to_owned().into()),
+            module_name: self
+                .module_name
+                .as_ref()
+                .map(|name| name.as_ref().to_owned().into()),
+            struct_query: self.struct_query.as_ref().map(|query| query.to_static()),
+            visibility: self.visibility,
+            inputs: self
+                .inputs
+                .as_ref()
+                .iter()
+                .map(|query| query.to_static())
+                .collect(),
+            outputs: self
+                .outputs
+                .as_ref()
+                .iter()
+                .map(|query| query.to_static())
+                .collect(),
+            meta: self.meta,
+        }
     }
 }
 
@@ -492,7 +530,7 @@ mod tests {
         }
         .is_valid(&signature));
 
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         let registry = Registry::default();
 
         context.stack().push(2);

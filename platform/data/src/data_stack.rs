@@ -1,4 +1,5 @@
-use crate::{type_hash::TypeHash, Finalize};
+use crate::{pointer_alignment_padding, type_hash::TypeHash, Finalize};
+use smallvec::SmallVec;
 use std::{
     alloc::Layout,
     collections::{hash_map::Entry, HashMap},
@@ -16,6 +17,7 @@ struct DataStackRegisterTag {
     type_hash: TypeHash,
     layout: Layout,
     finalizer: Option<unsafe fn(*mut ())>,
+    padding: u8,
 }
 
 pub struct DataStackToken(usize);
@@ -40,7 +42,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read()
+                .read_unaligned()
                 .type_hash
         }
     }
@@ -52,7 +54,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read()
+                .read_unaligned()
                 .layout
         }
     }
@@ -65,7 +67,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
+                .read_unaligned();
             (tag.type_hash, tag.layout)
         }
     }
@@ -77,7 +79,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read()
+                .read_unaligned()
                 .finalizer
                 .is_some()
         }
@@ -91,7 +93,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
+                .read_unaligned();
             if tag.type_hash == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 self.stack
                     .memory
@@ -113,7 +115,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
+                .read_unaligned();
             if tag.type_hash == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 self.stack
                     .memory
@@ -135,7 +137,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
+                .read_unaligned();
             if tag.type_hash == TypeHash::of::<T>() && tag.finalizer.is_some() {
                 tag.finalizer = None;
                 self.stack
@@ -143,14 +145,14 @@ impl<'a> DataStackRegisterAccess<'a> {
                     .as_mut_ptr()
                     .add(self.position)
                     .cast::<DataStackRegisterTag>()
-                    .write(tag);
+                    .write_unaligned(tag);
                 Some(
                     self.stack
                         .memory
                         .as_ptr()
                         .add(self.position - tag.layout.size())
                         .cast::<T>()
-                        .read(),
+                        .read_unaligned(),
                 )
             } else {
                 None
@@ -166,7 +168,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
+                .read_unaligned();
             if let Some(finalizer) = tag.finalizer {
                 (finalizer)(
                     self.stack
@@ -181,7 +183,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                     .as_mut_ptr()
                     .add(self.position)
                     .cast::<DataStackRegisterTag>()
-                    .write(tag);
+                    .write_unaligned(tag);
                 true
             } else {
                 false
@@ -197,7 +199,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
+                .read_unaligned();
             if tag.type_hash == TypeHash::of::<T>() {
                 if let Some(finalizer) = tag.finalizer {
                     (finalizer)(
@@ -215,13 +217,13 @@ impl<'a> DataStackRegisterAccess<'a> {
                     .as_mut_ptr()
                     .add(self.position - tag.layout.size())
                     .cast::<T>()
-                    .write(value);
+                    .write_unaligned(value);
                 self.stack
                     .memory
                     .as_mut_ptr()
                     .add(self.position)
                     .cast::<DataStackRegisterTag>()
-                    .write(tag);
+                    .write_unaligned(tag);
             }
         }
     }
@@ -237,14 +239,14 @@ impl<'a> DataStackRegisterAccess<'a> {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
+                .read_unaligned();
             let other_tag = other
                 .stack
                 .memory
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
+                .read_unaligned();
             if tag.type_hash == other_tag.type_hash && tag.layout == other_tag.layout {
                 if let Some(finalizer) = other_tag.finalizer {
                     (finalizer)(
@@ -272,7 +274,7 @@ impl<'a> DataStackRegisterAccess<'a> {
                     .as_mut_ptr()
                     .add(self.position)
                     .cast::<DataStackRegisterTag>()
-                    .write(tag);
+                    .write_unaligned(tag);
             }
         }
     }
@@ -283,16 +285,16 @@ pub enum DataStackMode {
     Values,
     Registers,
     #[default]
-    All,
+    Mixed,
 }
 
 impl DataStackMode {
     pub fn allows_values(self) -> bool {
-        matches!(self, Self::Values | Self::All)
+        matches!(self, Self::Values | Self::Mixed)
     }
 
     pub fn allows_registers(self) -> bool {
-        matches!(self, Self::Registers | Self::All)
+        matches!(self, Self::Registers | Self::Mixed)
     }
 }
 
@@ -351,7 +353,13 @@ impl DataStack {
                 return;
             }
             position -= type_layout.size();
-            let type_hash = unsafe { self.memory.as_ptr().add(position).cast::<TypeHash>().read() };
+            let type_hash = unsafe {
+                self.memory
+                    .as_ptr()
+                    .add(position)
+                    .cast::<TypeHash>()
+                    .read_unaligned()
+            };
             if type_hash == TypeHash::of::<DataStackRegisterTag>() {
                 if position < tag_layout.size() {
                     return;
@@ -362,7 +370,7 @@ impl DataStack {
                         .as_ptr()
                         .add(position)
                         .cast::<DataStackRegisterTag>()
-                        .read()
+                        .read_unaligned()
                 };
                 if position < tag.layout.size() {
                     return;
@@ -376,6 +384,7 @@ impl DataStack {
                     range,
                     tag.finalizer.is_some(),
                 );
+                position -= tag.padding as usize;
             } else if let Some(finalizer) = self.finalizers.get(&type_hash) {
                 if position < finalizer.layout.size() {
                     return;
@@ -414,13 +423,13 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(self.position)
                 .cast::<T>()
-                .write(value);
+                .write_unaligned(value);
             self.position += value_layout.size();
             self.memory
                 .as_mut_ptr()
                 .add(self.position)
                 .cast::<TypeHash>()
-                .write(type_hash);
+                .write_unaligned(type_hash);
             self.position += type_layout.size();
         }
         true
@@ -456,7 +465,7 @@ impl DataStack {
             .as_mut_ptr()
             .add(self.position)
             .cast::<TypeHash>()
-            .write(type_hash);
+            .write_unaligned(type_hash);
         self.position += type_layout.size();
         true
     }
@@ -483,29 +492,31 @@ impl DataStack {
         }
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
-        if self.position + value_layout.size() + tag_layout.size() + type_layout.size()
+        let padding = self.alignment_padding(value_layout.align());
+        if self.position + padding + value_layout.size() + tag_layout.size() + type_layout.size()
             > self.size()
         {
             return None;
         }
         unsafe {
-            self.position += value_layout.size();
+            self.position += padding + value_layout.size();
             let position = self.position;
             self.memory
                 .as_mut_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .write(DataStackRegisterTag {
+                .write_unaligned(DataStackRegisterTag {
                     type_hash,
                     layout: value_layout,
                     finalizer: None,
+                    padding: padding as u8,
                 });
             self.position += tag_layout.size();
             self.memory
                 .as_mut_ptr()
                 .add(self.position)
                 .cast::<TypeHash>()
-                .write(TypeHash::of::<DataStackRegisterTag>());
+                .write_unaligned(TypeHash::of::<DataStackRegisterTag>());
             self.position += type_layout.size();
             self.registers.push(position);
             Some(self.registers.len() - 1)
@@ -545,7 +556,7 @@ impl DataStack {
                 .as_ptr()
                 .add(register.position)
                 .cast::<DataStackRegisterTag>()
-                .read()
+                .read_unaligned()
         };
         if self.position + tag.layout.size() + type_layout.size() > self.size() {
             return false;
@@ -572,7 +583,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(self.position)
                 .cast::<TypeHash>()
-                .write(tag.type_hash);
+                .write_unaligned(tag.type_hash);
             self.position += type_layout.size();
             register
                 .stack
@@ -580,7 +591,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(register.position)
                 .cast::<DataStackRegisterTag>()
-                .write(tag);
+                .write_unaligned(tag);
         }
         true
     }
@@ -599,7 +610,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
                 .cast::<TypeHash>()
-                .read()
+                .read_unaligned()
         };
         if type_hash != TypeHash::of::<T>() || type_hash == TypeHash::of::<DataStackRegisterTag>() {
             return None;
@@ -610,7 +621,7 @@ impl DataStack {
                 .as_ptr()
                 .add(self.position - value_layout.size())
                 .cast::<T>()
-                .read()
+                .read_unaligned()
         };
         self.position -= value_layout.size();
         Some(result)
@@ -631,7 +642,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
                 .cast::<TypeHash>()
-                .read()
+                .read_unaligned()
         };
         if type_hash == TypeHash::of::<DataStackRegisterTag>() {
             return None;
@@ -657,7 +668,7 @@ impl DataStack {
                 .as_ptr()
                 .add(self.position)
                 .cast::<TypeHash>()
-                .read()
+                .read_unaligned()
         };
         if type_hash == TypeHash::of::<DataStackRegisterTag>() {
             return false;
@@ -683,7 +694,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
                 .cast::<TypeHash>()
-                .read();
+                .read_unaligned();
             if type_hash != TypeHash::of::<DataStackRegisterTag>() {
                 return false;
             }
@@ -694,8 +705,8 @@ impl DataStack {
                 .as_ptr()
                 .add(self.position)
                 .cast::<DataStackRegisterTag>()
-                .read();
-            self.position -= tag.layout.size();
+                .read_unaligned();
+            self.position -= tag.layout.size() - tag.padding as usize;
             if let Some(finalizer) = tag.finalizer {
                 (finalizer)(self.memory.as_mut_ptr().add(self.position).cast::<()>());
             }
@@ -718,7 +729,7 @@ impl DataStack {
                     .as_mut_ptr()
                     .add(position)
                     .cast::<TypeHash>()
-                    .read()
+                    .read_unaligned()
             };
             if let Some(finalizer) = self.finalizers.get(&type_hash) {
                 position -= finalizer.layout.size();
@@ -753,7 +764,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(self.position - type_layout.size())
                 .cast::<TypeHash>()
-                .read()
+                .read_unaligned()
         };
         let mut tag = unsafe {
             register
@@ -762,7 +773,7 @@ impl DataStack {
                 .as_ptr()
                 .add(register.position)
                 .cast::<DataStackRegisterTag>()
-                .read()
+                .read_unaligned()
         };
         if type_hash != tag.type_hash || type_hash == TypeHash::of::<DataStackRegisterTag>() {
             return false;
@@ -802,7 +813,7 @@ impl DataStack {
                 .as_mut_ptr()
                 .add(register.position)
                 .cast::<DataStackRegisterTag>()
-                .write(tag);
+                .write_unaligned(tag);
         }
         self.position -= type_layout.size();
         self.position -= tag.layout.size();
@@ -824,7 +835,7 @@ impl DataStack {
                     .as_ptr()
                     .add(self.position)
                     .cast::<TypeHash>()
-                    .read()
+                    .read_unaligned()
             };
             if type_hash == tag_type_hash {
                 unsafe {
@@ -833,12 +844,13 @@ impl DataStack {
                         .as_ptr()
                         .add(self.position - tag_layout.size())
                         .cast::<DataStackRegisterTag>()
-                        .read();
+                        .read_unaligned();
                     self.position -= tag_layout.size();
                     self.position -= tag.layout.size();
                     if let Some(finalizer) = tag.finalizer {
                         (finalizer)(self.memory.as_mut_ptr().add(self.position).cast::<()>());
                     }
+                    self.position -= tag.padding as usize;
                     self.registers.pop();
                 }
             } else if let Some(finalizer) = self.finalizers.get(&type_hash) {
@@ -852,12 +864,7 @@ impl DataStack {
 
     pub fn reverse(&mut self, token: DataStackToken) {
         let size = self.position.saturating_sub(token.0);
-        if size <= 1 {
-            return;
-        }
-        let mut memory = vec![0; size];
-        memory.copy_from_slice(&self.memory[token.0..self.position]);
-        let mut meta_data = vec![];
+        let mut meta_data = SmallVec::<[_; 8]>::with_capacity(8);
         let mut meta_registers = 0;
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
@@ -870,7 +877,7 @@ impl DataStack {
                     .as_mut_ptr()
                     .add(position)
                     .cast::<TypeHash>()
-                    .read()
+                    .read_unaligned()
             };
             if type_hash == tag_type_hash {
                 unsafe {
@@ -879,7 +886,7 @@ impl DataStack {
                         .as_ptr()
                         .add(self.position - tag_layout.size())
                         .cast::<DataStackRegisterTag>()
-                        .read();
+                        .read_unaligned();
                     position -= tag_layout.size();
                     position -= tag.layout.size();
                     meta_data.push((
@@ -896,6 +903,12 @@ impl DataStack {
                 ));
             }
         }
+        if meta_data.len() <= 1 {
+            return;
+        }
+        let mut memory = SmallVec::<[_; 256]>::new();
+        memory.resize(size, 0);
+        memory.copy_from_slice(&self.memory[token.0..self.position]);
         for (source_position, size) in meta_data {
             self.memory[position..(position + size)]
                 .copy_from_slice(&memory[source_position..(source_position + size)]);
@@ -915,7 +928,7 @@ impl DataStack {
                 .as_ptr()
                 .add(self.position - type_layout.size())
                 .cast::<TypeHash>()
-                .read()
+                .read_unaligned()
         })
     }
 
@@ -958,6 +971,12 @@ impl DataStack {
     /// # Safety
     pub unsafe fn prevent_drop(&mut self) {
         self.drop = false;
+    }
+
+    /// # Safety
+    #[inline]
+    unsafe fn alignment_padding(&self, alignment: usize) -> usize {
+        pointer_alignment_padding(self.memory.as_ptr().add(self.position), alignment)
     }
 }
 
@@ -1047,8 +1066,8 @@ mod tests {
         }
 
         let dropped = Rc::new(RefCell::new(false));
-        let mut stack = DataStack::new(1024, DataStackMode::Values);
-        assert_eq!(stack.size(), 1024);
+        let mut stack = DataStack::new(10240, DataStackMode::Values);
+        assert_eq!(stack.size(), 16384);
         assert_eq!(stack.position(), 0);
         stack.push(Droppable(dropped.clone()));
         assert_eq!(stack.position(), 16);
@@ -1097,20 +1116,15 @@ mod tests {
         drop(stack);
         assert!(*dropped.borrow());
 
-        let mut stack = DataStack::new(1024, DataStackMode::Registers);
-        assert_eq!(stack.size(), 1024);
-        assert_eq!(stack.position(), 0);
+        let mut stack = DataStack::new(10240, DataStackMode::Registers);
+        assert_eq!(stack.size(), 16384);
         stack.push_register::<bool>().unwrap();
-        assert_eq!(stack.position(), 41);
         stack.drop_register();
-        assert_eq!(stack.position(), 0);
         let a = stack.push_register_value(true).unwrap();
-        assert_eq!(stack.position(), 41);
         assert!(*stack.access_register(a).unwrap().read::<bool>().unwrap());
         assert!(stack.access_register(a).unwrap().take::<bool>().unwrap());
         assert!(!stack.access_register(a).unwrap().has_value());
         let b = stack.push_register_value(0usize).unwrap();
-        assert_eq!(stack.position(), 89);
         stack.access_register(b).unwrap().set(42usize);
         assert_eq!(
             *stack.access_register(b).unwrap().read::<usize>().unwrap(),

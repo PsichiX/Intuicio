@@ -16,10 +16,10 @@ pub fn bench() {
             "native access",
             || Box::new(black_box(42u128)),
             |mut data| {
-                *data = *data + 42;
+                *data += 42;
                 data
             },
-            |data| drop(data),
+            |_| {},
         )
     };
 
@@ -34,7 +34,7 @@ pub fn bench() {
                 *data.write().unwrap() = value + 42;
                 data
             },
-            |data| drop(data),
+            |_| {},
         )
     };
 
@@ -50,7 +50,7 @@ pub fn bench() {
                 *data.write().unwrap() = value + 42;
                 data
             },
-            |data| drop(data),
+            |_| {},
         )
     };
 

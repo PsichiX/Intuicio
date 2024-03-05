@@ -147,7 +147,7 @@ impl<T: 'static> ValueTransformer for DynamicManagedValueTransformer<T> {
     type RefMut = DynamicManagedRefMut;
 
     fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
-        DynamicManaged::new(value)
+        DynamicManaged::new(value).ok().unwrap()
     }
 
     fn from_ref(
@@ -292,7 +292,7 @@ mod tests {
         }
     }
 
-    #[derive(IntuicioStruct, Default, Clone)]
+    #[derive(IntuicioStruct, Debug, Default, Clone)]
     #[intuicio(name = "Bar")]
     struct Bar {
         foo: i32,
@@ -325,7 +325,7 @@ mod tests {
         registry.add_function(Foo::new__define_function(&registry));
         registry.add_struct(Bar::define_struct(&registry));
         registry.add_function(Bar::new__define_function(&registry));
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
 
         let a = Managed::new(40);
         let mut b = Managed::new(2);
@@ -343,8 +343,8 @@ mod tests {
             42
         );
 
-        let a = DynamicManaged::new(40);
-        let mut b = DynamicManaged::new(2);
+        let a = DynamicManaged::new(40).unwrap();
+        let mut b = DynamicManaged::new(2).unwrap();
         context.stack().push(b.borrow_mut().unwrap());
         context.stack().push(a.borrow().unwrap());
         sub::intuicio_function(&mut context, &registry);
@@ -372,7 +372,7 @@ mod tests {
             42
         );
 
-        let bar = DynamicManaged::new(Bar::new(42));
+        let bar = DynamicManaged::new(Bar::new(42)).unwrap();
         context.stack().push(bar.borrow().unwrap());
         Bar::get__intuicio_function(&mut context, &registry);
         assert_eq!(

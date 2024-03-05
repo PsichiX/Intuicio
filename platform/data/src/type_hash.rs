@@ -1,7 +1,5 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
+use rustc_hash::FxHasher;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TypeHash {
@@ -15,7 +13,7 @@ impl TypeHash {
 
     /// # Safety
     pub unsafe fn raw(name: &str) -> Self {
-        let mut hasher = DefaultHasher::default();
+        let mut hasher = FxHasher::default();
         name.hash(&mut hasher);
         Self {
             hash: hasher.finish(),

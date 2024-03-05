@@ -7,7 +7,7 @@ use intuicio_core::prelude::*;
 use intuicio_frontend_vault::*;
 use std::time::Duration;
 
-const SQRT_N: f32 = 424242.424242;
+const SQRT_N: f32 = 4242.4242;
 
 pub fn bench() {
     println!();
@@ -62,7 +62,7 @@ pub fn bench() {
                 (n.sqrt(),)
             }
         });
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "host sqrt",
             || {},
@@ -100,7 +100,7 @@ pub fn bench() {
             .unwrap()
             .0,
         ));
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "vm sqrt",
             || {},
@@ -132,7 +132,7 @@ pub fn bench() {
                 ..Default::default()
             })
             .unwrap();
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
             "script sqrt",
             || {},

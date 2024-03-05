@@ -12,6 +12,10 @@ test:
   cd ./runners/simpleton && just run
   cd ./runners/alchemyst && just run
 
+miri:
+  cargo +nightly miri test --manifest-path ./platform/data/Cargo.toml
+  cargo +nightly miri test --manifest-path ./platform/core/Cargo.toml
+
 bench:
   cargo test --manifest-path ./tests/Cargo.toml --features=bench --release -- --nocapture
 
@@ -24,6 +28,7 @@ checks:
   just build
   just clippy
   just test
+  just miri
 
 demo-emu:
   cd ./demos/emu/resources && just package-run

@@ -745,7 +745,7 @@ mod tests {
                 //         .into_handle(),
                 // ),
             );
-        let mut vm = Host::new(Context::new(1024, 1024, 1024), registry.into());
+        let mut vm = Host::new(Context::new(10240, 10240), registry.into());
         let (result,) = vm
             .call_function::<(usize,), _>("main", "test", None)
             .unwrap()

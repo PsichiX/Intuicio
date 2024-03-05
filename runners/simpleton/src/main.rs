@@ -43,10 +43,6 @@ struct Cli {
     #[arg(long, value_name = "BYTES")]
     registers_capacity: Option<usize>,
 
-    /// VM heap page capacity in bytes.
-    #[arg(long, value_name = "BYTES")]
-    heap_page_capacity: Option<usize>,
-
     /// Prints CLI parameters.
     #[arg(short, long)]
     show_cli: bool,
@@ -121,9 +117,8 @@ fn main() {
     }
     let indexing_capacity = cli.indexing_capacity.unwrap_or(256);
     let use_indexing_threshold = cli.use_indexing_threshold.unwrap_or(256);
-    let stack_capacity = cli.stack_capacity.unwrap_or(1024);
-    let registers_capacity = cli.registers_capacity.unwrap_or(1024);
-    let heap_page_capacity = cli.heap_page_capacity.unwrap_or(1024);
+    let stack_capacity = cli.stack_capacity.unwrap_or(10240);
+    let registers_capacity = cli.registers_capacity.unwrap_or(10240);
     let host_producer = HostProducer::new(move || {
         let packages_dir = dirs::data_dir()
             .unwrap()
@@ -144,7 +139,7 @@ fn main() {
         package
             .compile()
             .install::<VmScope<SimpletonScriptExpression>>(&mut registry, None);
-        let context = Context::new(stack_capacity, registers_capacity, heap_page_capacity);
+        let context = Context::new(stack_capacity, registers_capacity);
         Host::new(context, registry.into())
     });
     let mut host = host_producer.produce();

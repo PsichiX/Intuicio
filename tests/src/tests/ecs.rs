@@ -23,7 +23,7 @@ fn deal_damage(health: &mut Health, damage: &Damage) {
 
 #[test]
 fn test_ecs() {
-    let mut context = Context::new(1024, 1024, 1024);
+    let mut context = Context::new(10240, 10240);
     let mut registry = Registry::default().with_basic_types();
 
     registry.add_struct(NativeStructBuilder::new_uninitialized::<ManagedRefMut<Health>>().build());

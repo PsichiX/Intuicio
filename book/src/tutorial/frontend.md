@@ -227,7 +227,7 @@ As you can see, our scripts do not define functions, rather operations that belo
 
 Final thing to do is to create host and test frontend:
 ```rust
-let mut host = Host::new(Context::new(1024, 1024, 1024), registry.into());
+let mut host = Host::new(Context::new(10240, 10240), registry.into());
 let (result,) = host
     .call_function::<(i32,), _>("main", "main", None)
     .unwrap()

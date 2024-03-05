@@ -18,8 +18,6 @@ pub struct ScriptingConfig {
     pub stack_capacity: usize,
     #[serde(default = "ScriptingConfig::default_registers_capacity")]
     pub registers_capacity: usize,
-    #[serde(default = "ScriptingConfig::default_heap_page_capacity")]
-    pub heap_page_capacity: usize,
 }
 
 impl Default for ScriptingConfig {
@@ -28,7 +26,6 @@ impl Default for ScriptingConfig {
             entry: Self::default_entry(),
             stack_capacity: Self::default_stack_capacity(),
             registers_capacity: Self::default_registers_capacity(),
-            heap_page_capacity: Self::default_heap_page_capacity(),
         }
     }
 }
@@ -39,15 +36,11 @@ impl ScriptingConfig {
     }
 
     fn default_stack_capacity() -> usize {
-        1024
+        10240
     }
 
     fn default_registers_capacity() -> usize {
-        1024
-    }
-
-    fn default_heap_page_capacity() -> usize {
-        1024
+        10240
     }
 }
 

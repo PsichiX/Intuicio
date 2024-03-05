@@ -27,7 +27,7 @@ impl Adder {
 
 #[test]
 fn test_derive() {
-    let mut context = Context::new(1024, 1024, 1024);
+    let mut context = Context::new(10240, 10240);
     let mut registry = Registry::default().with_basic_types();
     let add = registry.add_function(add::define_function(&registry));
     registry.add_struct(Adder::define_struct(&registry));

@@ -1,16 +1,20 @@
+use std::alloc::dealloc;
+
 use crate::{object::Object, prelude::StructQuery, registry::Registry};
 use intuicio_data::data_stack::DataStack;
 
-pub fn object_push_to_stack(mut object: Object, data_stack: &mut DataStack) -> bool {
+pub fn object_push_to_stack(object: Object, data_stack: &mut DataStack) -> bool {
     unsafe {
-        object.prevent_drop();
-        let handle = object.struct_handle();
-        data_stack.push_raw(
+        let (handle, memory) = object.into_inner();
+        let bytes = std::slice::from_raw_parts(memory, handle.layout().size());
+        let result = data_stack.push_raw(
             *handle.layout(),
             handle.type_hash(),
             handle.finalizer(),
-            object.memory(),
-        )
+            bytes,
+        );
+        dealloc(memory, *handle.layout());
+        result
     }
 }
 

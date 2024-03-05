@@ -447,11 +447,6 @@ pub fn registers_size(context: &mut Context, registry: &Registry) -> Reference {
     Reference::new_integer(context.registers().position() as Integer, registry)
 }
 
-#[intuicio_function(module_name = "reflect", use_context, use_registry)]
-pub fn heap_size(context: &mut Context, registry: &Registry) -> Reference {
-    Reference::new_integer(context.heap().size() as Integer, registry)
-}
-
 pub fn install(registry: &mut Registry) {
     registry.add_struct(define_native_struct! {
         registry => mod reflect struct Reference (Reference) {}
@@ -491,5 +486,4 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(to_text::define_function(registry));
     registry.add_function(stack_size::define_function(registry));
     registry.add_function(registers_size::define_function(registry));
-    registry.add_function(heap_size::define_function(registry));
 }

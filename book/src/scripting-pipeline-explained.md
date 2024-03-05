@@ -70,11 +70,9 @@ Last step is to construct `Context` and put it with `Registry` into `Host` that 
 ```rust
 let context = Context::new(
     // stack bytes capacity.
-    1024,
+    10240,
     // registers bytes capacity.
-    1024,
-    // heap page capacity.
-    1024,
+    10240,
 );
 let mut host = Host::new(context, RegistryHandle::new(registry));
 let (result,) = host

@@ -3,7 +3,6 @@ use intuicio_data::{type_hash::TypeHash, Initialize};
 use std::{
     alloc::{alloc, dealloc},
     collections::HashMap,
-    ptr::NonNull,
 };
 
 pub struct RuntimeObject;
@@ -16,7 +15,7 @@ impl Initialize for RuntimeObject {
 
 pub struct Object {
     handle: StructHandle,
-    memory: NonNull<u8>,
+    memory: *mut u8,
     drop: bool,
 }
 
@@ -25,18 +24,15 @@ impl Drop for Object {
         if self.drop {
             unsafe {
                 if self.handle.is_native() {
-                    self.handle.finalize(self.memory.as_ptr().cast::<()>());
+                    self.handle.finalize(self.memory.cast::<()>());
                 } else {
                     for field in self.handle.fields() {
-                        field.struct_handle().finalize(
-                            self.memory
-                                .as_ptr()
-                                .add(field.address_offset())
-                                .cast::<()>(),
-                        );
+                        field
+                            .struct_handle()
+                            .finalize(self.memory.add(field.address_offset()).cast::<()>());
                     }
                 }
-                dealloc(self.memory.as_ptr(), *self.handle.layout());
+                dealloc(self.memory, *self.handle.layout());
             }
         }
     }
@@ -51,7 +47,7 @@ impl Object {
                 handle.name
             );
         }
-        let memory = unsafe { NonNull::new(alloc(*handle.layout())).unwrap() };
+        let memory = unsafe { alloc(*handle.layout()) };
         let mut result = Self {
             memory,
             handle,
@@ -63,30 +59,39 @@ impl Object {
 
     pub fn try_new(handle: StructHandle) -> Option<Self> {
         if handle.can_initialize() {
-            let memory = unsafe { NonNull::new(alloc(*handle.layout())).unwrap() };
-            let mut result = Self {
-                memory,
-                handle,
-                drop: true,
-            };
-            unsafe { result.initialize() };
-            Some(result)
+            let memory = unsafe { alloc(*handle.layout()) };
+            if memory.is_null() {
+                None
+            } else {
+                let mut result = Self {
+                    memory,
+                    handle,
+                    drop: true,
+                };
+                unsafe { result.initialize() };
+                Some(result)
+            }
         } else {
             None
         }
     }
 
     /// # Safety
-    pub unsafe fn new_uninitialized(handle: StructHandle) -> Self {
-        Self {
-            memory: NonNull::new(alloc(*handle.layout())).unwrap(),
-            handle,
-            drop: true,
+    pub unsafe fn new_uninitialized(handle: StructHandle) -> Option<Self> {
+        let memory = alloc(*handle.layout());
+        if memory.is_null() {
+            None
+        } else {
+            Some(Self {
+                memory,
+                handle,
+                drop: true,
+            })
         }
     }
 
     /// # Safety
-    pub unsafe fn new_raw(handle: StructHandle, memory: NonNull<u8>) -> Self {
+    pub unsafe fn new_raw(handle: StructHandle, memory: *mut u8) -> Self {
         Self {
             memory,
             handle,
@@ -97,13 +102,17 @@ impl Object {
     /// # Safety
     pub unsafe fn from_bytes(handle: StructHandle, bytes: &[u8]) -> Option<Self> {
         if handle.layout().size() == bytes.len() {
-            let memory = NonNull::new(alloc(*handle.layout())).unwrap();
-            memory.as_ptr().copy_from(bytes.as_ptr(), bytes.len());
-            Some(Self {
-                memory,
-                handle,
-                drop: true,
-            })
+            let memory = alloc(*handle.layout());
+            if memory.is_null() {
+                None
+            } else {
+                memory.copy_from(bytes.as_ptr(), bytes.len());
+                Some(Self {
+                    memory,
+                    handle,
+                    drop: true,
+                })
+            }
         } else {
             None
         }
@@ -112,7 +121,7 @@ impl Object {
     pub fn with_value<T: 'static>(handle: StructHandle, value: T) -> Option<Self> {
         if handle.type_hash() == TypeHash::of::<T>() {
             unsafe {
-                let mut result = Self::new_uninitialized(handle);
+                let mut result = Self::new_uninitialized(handle)?;
                 result.as_mut_ptr().cast::<T>().write(value);
                 Some(result)
             }
@@ -124,15 +133,12 @@ impl Object {
     /// # Safety
     pub unsafe fn initialize(&mut self) {
         if self.handle.is_native() {
-            self.handle.initialize(self.memory.as_ptr().cast::<()>());
+            self.handle.initialize(self.memory.cast::<()>());
         } else {
             for field in self.handle.fields() {
-                field.struct_handle().initialize(
-                    self.memory
-                        .as_ptr()
-                        .add(field.address_offset())
-                        .cast::<()>(),
-                );
+                field
+                    .struct_handle()
+                    .initialize(self.memory.add(field.address_offset()).cast::<()>());
             }
         }
     }
@@ -140,14 +146,14 @@ impl Object {
     pub fn consume<T: 'static>(mut self) -> Result<T, Self> {
         if self.handle.type_hash() == TypeHash::of::<T>() {
             self.drop = false;
-            unsafe { Ok(*Box::from_raw(self.memory.as_ptr().cast::<T>())) }
+            unsafe { Ok(self.memory.cast::<T>().read()) }
         } else {
             Err(self)
         }
     }
 
     /// # Safety
-    pub unsafe fn into_inner(mut self) -> (StructHandle, NonNull<u8>) {
+    pub unsafe fn into_inner(mut self) -> (StructHandle, *mut u8) {
         self.drop = false;
         (self.handle.clone(), self.memory)
     }
@@ -158,19 +164,19 @@ impl Object {
 
     /// # Safety
     pub unsafe fn memory(&self) -> &[u8] {
-        std::slice::from_raw_parts(self.memory.as_ptr(), self.struct_handle().layout().size())
+        std::slice::from_raw_parts(self.memory, self.struct_handle().layout().size())
     }
 
     /// # Safety
     pub unsafe fn memory_mut(&mut self) -> &mut [u8] {
-        std::slice::from_raw_parts_mut(self.memory.as_ptr(), self.struct_handle().layout().size())
+        std::slice::from_raw_parts_mut(self.memory, self.struct_handle().layout().size())
     }
 
     /// # Safety
     pub unsafe fn field_memory<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&[u8]> {
         self.handle.find_field(query).map(|field| {
             std::slice::from_raw_parts(
-                self.memory.as_ptr().add(field.address_offset()),
+                self.memory.add(field.address_offset()),
                 field.struct_handle().layout().size(),
             )
         })
@@ -183,7 +189,7 @@ impl Object {
     ) -> Option<&mut [u8]> {
         self.handle.find_field(query).map(|field| {
             std::slice::from_raw_parts_mut(
-                self.memory.as_ptr().add(field.address_offset()),
+                self.memory.add(field.address_offset()),
                 field.struct_handle().layout().size(),
             )
         })
@@ -191,7 +197,7 @@ impl Object {
 
     pub fn read<T: 'static>(&self) -> Option<&T> {
         if self.handle.type_hash() == TypeHash::of::<T>() {
-            unsafe { self.memory.as_ptr().cast::<T>().as_ref() }
+            unsafe { self.memory.cast::<T>().as_ref() }
         } else {
             None
         }
@@ -199,7 +205,7 @@ impl Object {
 
     pub fn write<T: 'static>(&mut self) -> Option<&mut T> {
         if self.handle.type_hash() == TypeHash::of::<T>() {
-            unsafe { self.memory.as_ptr().cast::<T>().as_mut() }
+            unsafe { self.memory.cast::<T>().as_mut() }
         } else {
             None
         }
@@ -214,13 +220,7 @@ impl Object {
             }),
             ..Default::default()
         })?;
-        unsafe {
-            self.memory
-                .as_ptr()
-                .add(field.address_offset())
-                .cast::<T>()
-                .as_ref()
-        }
+        unsafe { self.memory.add(field.address_offset()).cast::<T>().as_ref() }
     }
 
     pub fn write_field<'a, T: 'static>(&'a mut self, field: &str) -> Option<&'a mut T> {
@@ -232,23 +232,17 @@ impl Object {
             }),
             ..Default::default()
         })?;
-        unsafe {
-            self.memory
-                .as_ptr()
-                .add(field.address_offset())
-                .cast::<T>()
-                .as_mut()
-        }
+        unsafe { self.memory.add(field.address_offset()).cast::<T>().as_mut() }
     }
 
     /// # Safety
     pub unsafe fn as_ptr(&self) -> *const u8 {
-        self.memory.as_ptr()
+        self.memory
     }
 
     /// # Safety
     pub unsafe fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.memory.as_ptr()
+        self.memory
     }
 
     /// # Safety
@@ -456,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_inner() {
-        let mut stack = DataStack::new(1024, DataStackMode::Values);
+        let mut stack = DataStack::new(10240, DataStackMode::Values);
         assert_eq!(stack.position(), 0);
         let registry = Registry::default().with_basic_types();
         let handle = registry

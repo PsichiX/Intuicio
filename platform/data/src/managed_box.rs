@@ -1,5 +1,6 @@
 use crate::{
     managed::{ManagedLazy, ManagedRef, ManagedRefMut},
+    pointer_alignment_padding,
     prelude::{Lifetime, ValueReadAccess, ValueWriteAccess},
     type_hash::TypeHash,
     Finalize,
@@ -8,7 +9,7 @@ use std::{
     alloc::{alloc, dealloc, Layout},
     cell::RefCell,
     collections::HashMap,
-    ptr::NonNull,
+    ops::Range,
 };
 
 const MEMORY_CHUNK_SIZE: usize = 128;
@@ -30,27 +31,51 @@ enum ManagedObjectHeader {
         layout: Layout,
         finalizer: unsafe fn(*mut ()),
         instances_count: usize,
+        padding: u8,
     },
     Free,
+}
+
+impl std::fmt::Debug for ManagedObjectHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Occupied {
+                id,
+                type_hash,
+                layout,
+                finalizer,
+                instances_count,
+                ..
+            } => f
+                .debug_struct("Occupied")
+                .field("id", id)
+                .field("type_hash", type_hash)
+                .field("layout", layout)
+                .field("finalizer", finalizer)
+                .field("instances_count", instances_count)
+                .finish_non_exhaustive(),
+            Self::Free => write!(f, "Free"),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 struct OccupancyMap {
     // each bit represents single memory chunk occupancy.
-    map: u128,
+    mask: u128,
 }
 
 impl OccupancyMap {
     fn occuppy(&mut self, range: OccupancyRange) {
-        self.map |= range.mask;
+        self.mask |= range.mask;
     }
 
     fn free(&mut self, range: OccupancyRange) {
-        self.map &= !range.mask;
+        self.mask &= !range.mask;
     }
 
     fn is_free(&self, range: OccupancyRange) -> bool {
-        self.map & range.mask == 0
+        self.mask & range.mask == 0
     }
 
     fn find_free_space(
@@ -100,6 +125,10 @@ impl Default for OccupancyRange {
 }
 
 impl OccupancyRange {
+    fn range(&self) -> Range<usize> {
+        self.bits_start_inclusive..self.bits_end_exclusive
+    }
+
     fn byte_offset(&self) -> usize {
         self.bits_start_inclusive * MEMORY_CHUNK_SIZE
     }
@@ -158,8 +187,8 @@ impl OccupancyRange {
         ))
     }
 
-    fn from_pointer_size(memory: NonNull<u8>, pointer: NonNull<u8>, size: usize) -> Self {
-        let offset = pointer.as_ptr() as usize - memory.as_ptr() as usize;
+    fn from_pointer_size(memory: *const u8, pointer: *const u8, size: usize) -> Self {
+        let offset = pointer as usize - memory as usize;
         let from = offset / MEMORY_CHUNK_SIZE;
         let to = from + size.next_power_of_two() / MEMORY_CHUNK_SIZE;
         Self {
@@ -173,25 +202,29 @@ impl OccupancyRange {
 
 enum ManagedMemoryPage {
     Chunked {
-        memory: NonNull<u8>,
+        memory: *mut u8,
         layout: Layout,
         occupancy: OccupancyMap,
+        padding: u8,
     },
     Exclusive {
-        memory: NonNull<u8>,
+        memory: *mut u8,
         layout: Layout,
+        padding: u8,
     },
 }
 
 impl Drop for ManagedMemoryPage {
     fn drop(&mut self) {
+        // TODO: if it somehow happen that some objects won't deallocate before page gets destroyed
+        // (highly impossible), add consuming headers and finalizing objects.
         unsafe {
             match self {
                 ManagedMemoryPage::Chunked { memory, layout, .. } => {
-                    dealloc(memory.as_ptr(), *layout);
+                    dealloc(*memory, *layout);
                 }
-                ManagedMemoryPage::Exclusive { memory, layout } => {
-                    dealloc(memory.as_ptr(), *layout);
+                ManagedMemoryPage::Exclusive { memory, layout, .. } => {
+                    dealloc(*memory, *layout);
                 }
             }
         }
@@ -199,32 +232,51 @@ impl Drop for ManagedMemoryPage {
 }
 
 impl ManagedMemoryPage {
-    fn new_chunked() -> Self {
-        let layout = Layout::from_size_align(MEMORY_PAGE_SIZE, 1).unwrap();
+    fn new_chunked() -> Option<Self> {
+        let header_layout = Layout::new::<ManagedObjectHeader>().pad_to_align();
+        let layout = Layout::from_size_align(MEMORY_PAGE_SIZE + header_layout.align(), 1).unwrap();
         unsafe {
-            let memory = NonNull::new_unchecked(alloc(layout));
-            memory
-                .as_ptr()
-                .cast::<ManagedObjectHeader>()
-                .write(ManagedObjectHeader::Free);
-            Self::Chunked {
-                memory,
-                layout,
-                occupancy: Default::default(),
+            let memory = alloc(layout);
+            if memory.is_null() {
+                None
+            } else {
+                let padding = pointer_alignment_padding(memory, header_layout.align());
+                for offset in (0..MEMORY_PAGE_SIZE).step_by(MEMORY_CHUNK_SIZE) {
+                    memory
+                        .add(padding + offset)
+                        .cast::<ManagedObjectHeader>()
+                        .write(ManagedObjectHeader::Free);
+                }
+                Some(Self::Chunked {
+                    memory,
+                    layout,
+                    occupancy: Default::default(),
+                    padding: padding as u8,
+                })
             }
         }
     }
 
-    fn new_exclusive(size: usize) -> Self {
+    fn new_exclusive(size: usize, alignment: usize) -> Option<Self> {
         unsafe {
             let header_layout = Layout::new::<ManagedObjectHeader>().pad_to_align();
-            let layout = Layout::from_size_align_unchecked(header_layout.size() + size, 1);
-            let memory = NonNull::new_unchecked(alloc(layout));
-            memory
-                .as_ptr()
-                .cast::<ManagedObjectHeader>()
-                .write(ManagedObjectHeader::Free);
-            Self::Exclusive { layout, memory }
+            let layout =
+                Layout::from_size_align_unchecked(header_layout.size() + size + alignment, 1);
+            let memory = alloc(layout);
+            if memory.is_null() {
+                None
+            } else {
+                let padding = pointer_alignment_padding(memory, header_layout.align());
+                memory
+                    .add(padding)
+                    .cast::<ManagedObjectHeader>()
+                    .write(ManagedObjectHeader::Free);
+                Some(Self::Exclusive {
+                    layout,
+                    memory,
+                    padding: padding as u8,
+                })
+            }
         }
     }
 
@@ -236,34 +288,25 @@ impl ManagedMemoryPage {
         layout: Layout,
         finalizer: unsafe fn(*mut ()),
     ) -> Option<DynamicManagedBox> {
-        let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
+        let header_layout = Layout::new::<ManagedObjectHeader>().pad_to_align();
         match self {
             ManagedMemoryPage::Chunked {
-                memory, occupancy, ..
+                memory,
+                occupancy,
+                padding,
+                ..
             } => unsafe {
-                let range = occupancy
-                    .find_free_space(header_size + layout.size(), OccupancyRange::default())?;
+                let range = occupancy.find_free_space(
+                    header_layout.size() + layout.size(),
+                    OccupancyRange::default(),
+                )?;
+                let memory = memory.add(*padding as usize + range.byte_offset());
+                let padding = pointer_alignment_padding(memory, layout.align());
+                if header_layout.size() + layout.size() - padding > range.byte_size() {
+                    return None;
+                }
                 occupancy.occuppy(range);
-                let memory = memory.as_ptr().add(range.byte_offset());
-                memory
-                    .cast::<ManagedObjectHeader>()
-                    .write(ManagedObjectHeader::Occupied {
-                        id,
-                        type_hash,
-                        lifetime: Default::default(),
-                        layout,
-                        finalizer,
-                        instances_count: 1,
-                    });
-                Some(DynamicManagedBox {
-                    memory: NonNull::new_unchecked(memory.add(header_size)),
-                    id,
-                    page,
-                    drop: true,
-                })
-            },
-            ManagedMemoryPage::Exclusive { memory, .. } => unsafe {
-                memory.as_ptr().cast::<ManagedObjectHeader>().write(
+                *memory.cast::<ManagedObjectHeader>().as_mut().unwrap() =
                     ManagedObjectHeader::Occupied {
                         id,
                         type_hash,
@@ -271,10 +314,32 @@ impl ManagedMemoryPage {
                         layout,
                         finalizer,
                         instances_count: 1,
-                    },
-                );
+                        padding: padding as u8,
+                    };
                 Some(DynamicManagedBox {
-                    memory: NonNull::new_unchecked(memory.as_ptr().add(header_size)),
+                    memory,
+                    id,
+                    page,
+                    drop: true,
+                })
+            },
+            ManagedMemoryPage::Exclusive {
+                memory, padding, ..
+            } => unsafe {
+                let memory = memory.add(*padding as usize);
+                let padding = pointer_alignment_padding(memory, layout.align());
+                *memory.cast::<ManagedObjectHeader>().as_mut().unwrap() =
+                    ManagedObjectHeader::Occupied {
+                        id,
+                        type_hash,
+                        lifetime: Default::default(),
+                        layout,
+                        finalizer,
+                        instances_count: 1,
+                        padding: padding as u8,
+                    };
+                Some(DynamicManagedBox {
+                    memory,
                     id,
                     page,
                     drop: true,
@@ -283,18 +348,16 @@ impl ManagedMemoryPage {
         }
     }
 
-    fn owns_pointer(&self, pointer: NonNull<u8>) -> bool {
+    fn owns_pointer(&self, pointer: *const u8) -> bool {
         let (from, to) = unsafe {
             match self {
-                ManagedMemoryPage::Chunked { memory, layout, .. } => {
-                    (memory.as_ptr(), memory.as_ptr().add(layout.size()))
-                }
-                ManagedMemoryPage::Exclusive { memory, layout } => {
-                    (memory.as_ptr(), memory.as_ptr().add(layout.size()))
+                ManagedMemoryPage::Chunked { memory, layout, .. }
+                | ManagedMemoryPage::Exclusive { memory, layout, .. } => {
+                    (*memory, memory.add(layout.size()))
                 }
             }
         };
-        pointer.as_ptr() >= from && pointer.as_ptr() < to
+        pointer >= from && pointer < to
     }
 
     fn total_size(&self) -> usize {
@@ -307,7 +370,7 @@ impl ManagedMemoryPage {
     fn occupied_size(&self) -> usize {
         match self {
             ManagedMemoryPage::Chunked { occupancy, .. } => {
-                occupancy.map.count_ones() as usize * MEMORY_CHUNK_SIZE
+                occupancy.mask.count_ones() as usize * MEMORY_CHUNK_SIZE
             }
             ManagedMemoryPage::Exclusive { layout, .. } => layout.size(),
         }
@@ -316,7 +379,7 @@ impl ManagedMemoryPage {
     fn free_size(&self) -> usize {
         match self {
             ManagedMemoryPage::Chunked { occupancy, .. } => {
-                occupancy.map.count_zeros() as usize * MEMORY_CHUNK_SIZE
+                occupancy.mask.count_zeros() as usize * MEMORY_CHUNK_SIZE
             }
             ManagedMemoryPage::Exclusive { .. } => 0,
         }
@@ -382,7 +445,7 @@ impl ManagedStorage {
         let size = layout.size() + Layout::new::<ManagedObjectHeader>().size();
         if size > MEMORY_PAGE_SIZE {
             let page_id = self.generate_page_id();
-            let mut page = ManagedMemoryPage::new_exclusive(size);
+            let mut page = ManagedMemoryPage::new_exclusive(size, layout.align()).unwrap();
             let object = page
                 .alloc_uninitialized(id, page_id, type_hash, layout, finalizer)
                 .unwrap();
@@ -390,14 +453,16 @@ impl ManagedStorage {
             object
         } else {
             for (page_id, page) in &mut self.pages {
-                if let Some(object) =
-                    page.alloc_uninitialized(id, *page_id, type_hash, layout, finalizer)
-                {
-                    return object;
+                if matches!(page, ManagedMemoryPage::Chunked { .. }) {
+                    if let Some(object) =
+                        page.alloc_uninitialized(id, *page_id, type_hash, layout, finalizer)
+                    {
+                        return object;
+                    }
                 }
             }
             let page_id = self.generate_page_id();
-            let mut page = ManagedMemoryPage::new_chunked();
+            let mut page = ManagedMemoryPage::new_chunked().unwrap();
             let object = page
                 .alloc_uninitialized(id, page_id, type_hash, layout, finalizer)
                 .unwrap();
@@ -406,17 +471,11 @@ impl ManagedStorage {
         }
     }
 
-    fn increment(&mut self, object_id: usize, page_id: usize, pointer: NonNull<u8>) {
+    fn increment(&mut self, object_id: usize, page_id: usize, pointer: *mut u8) {
         if let Some(page) = self.pages.get(&page_id) {
             if page.owns_pointer(pointer) {
-                let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
                 unsafe {
-                    let header = pointer
-                        .as_ptr()
-                        .sub(header_size)
-                        .cast::<ManagedObjectHeader>()
-                        .as_mut()
-                        .unwrap();
+                    let header = pointer.cast::<ManagedObjectHeader>().as_mut().unwrap();
                     if let ManagedObjectHeader::Occupied {
                         id,
                         instances_count,
@@ -432,46 +491,53 @@ impl ManagedStorage {
         }
     }
 
-    fn decrement(&mut self, object_id: usize, page_id: usize, pointer: NonNull<u8>) {
+    fn decrement(&mut self, object_id: usize, page_id: usize, pointer: *mut u8) {
         if let Some(page) = self.pages.get_mut(&page_id) {
             if page.owns_pointer(pointer) {
                 let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
                 unsafe {
-                    let header = pointer
-                        .as_ptr()
-                        .sub(header_size)
-                        .cast::<ManagedObjectHeader>()
-                        .as_mut()
-                        .unwrap();
+                    let header = pointer.cast::<ManagedObjectHeader>().as_mut().unwrap();
                     if let ManagedObjectHeader::Occupied {
                         id,
-                        lifetime,
                         layout,
                         finalizer,
                         instances_count,
+                        padding,
                         ..
                     } = header
                     {
                         if object_id == *id && *instances_count > 0 {
                             *instances_count -= 1;
                             if *instances_count == 0 {
-                                (finalizer)(pointer.as_ptr().cast::<()>());
-                                std::mem::take(lifetime);
+                                (finalizer)(
+                                    pointer.add(header_size + *padding as usize).cast::<()>(),
+                                );
                                 match page {
                                     ManagedMemoryPage::Chunked {
-                                        memory, occupancy, ..
+                                        memory,
+                                        occupancy,
+                                        padding,
+                                        ..
                                     } => {
                                         let range = OccupancyRange::from_pointer_size(
-                                            *memory,
+                                            memory.add(*padding as usize),
                                             pointer,
                                             header_size + layout.size(),
                                         );
                                         occupancy.free(range);
+                                        *header = ManagedObjectHeader::Free;
+                                        for index in range.range().skip(1) {
+                                            memory
+                                                .add(*padding as usize + index * MEMORY_CHUNK_SIZE)
+                                                .cast::<ManagedObjectHeader>()
+                                                .write(ManagedObjectHeader::Free);
+                                        }
                                         if occupancy.is_free(OccupancyRange::default()) {
                                             self.pages.remove(&page_id);
                                         }
                                     }
                                     ManagedMemoryPage::Exclusive { .. } => {
+                                        *header = ManagedObjectHeader::Free;
                                         self.pages.remove(&page_id);
                                     }
                                 }
@@ -485,34 +551,29 @@ impl ManagedStorage {
 
     fn access_object_lifetime<T>(
         &self,
-        pointer: NonNull<u8>,
+        pointer: *mut u8,
         object_id: usize,
         page_id: usize,
-    ) -> Option<(NonNull<T>, NonNull<Lifetime>)> {
+    ) -> Option<(*mut T, *mut Lifetime)> {
         if let Some(page) = self.pages.get(&page_id) {
             if page.owns_pointer(pointer) {
                 let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
-                let header = unsafe {
-                    pointer
-                        .as_ptr()
-                        .sub(header_size)
-                        .cast::<ManagedObjectHeader>()
-                        .as_mut()
-                        .unwrap()
-                };
+                let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
                 if let ManagedObjectHeader::Occupied {
                     id,
                     type_hash,
                     lifetime,
                     instances_count,
+                    padding,
                     ..
                 } = header
                 {
                     if object_id == *id && *instances_count > 0 && *type_hash == TypeHash::of::<T>()
                     {
-                        return unsafe {
-                            Some((pointer.cast::<T>(), NonNull::new_unchecked(lifetime)))
-                        };
+                        return Some((
+                            unsafe { pointer.add(header_size + *padding as usize).cast::<T>() },
+                            lifetime,
+                        ));
                     }
                 }
             }
@@ -522,21 +583,13 @@ impl ManagedStorage {
 
     fn object_type_hash(
         &self,
-        pointer: NonNull<u8>,
+        pointer: *mut u8,
         object_id: usize,
         page_id: usize,
     ) -> Option<TypeHash> {
         if let Some(page) = self.pages.get(&page_id) {
             if page.owns_pointer(pointer) {
-                let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
-                let header = unsafe {
-                    pointer
-                        .as_ptr()
-                        .sub(header_size)
-                        .cast::<ManagedObjectHeader>()
-                        .as_mut()
-                        .unwrap()
-                };
+                let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
                 if let ManagedObjectHeader::Occupied {
                     id,
                     type_hash,
@@ -553,32 +606,26 @@ impl ManagedStorage {
         None
     }
 
-    fn object_layout(
+    fn object_layout_with_offset(
         &self,
-        pointer: NonNull<u8>,
+        pointer: *mut u8,
         object_id: usize,
         page_id: usize,
-    ) -> Option<Layout> {
+    ) -> Option<(Layout, usize)> {
         if let Some(page) = self.pages.get(&page_id) {
             if page.owns_pointer(pointer) {
                 let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
-                let header = unsafe {
-                    pointer
-                        .as_ptr()
-                        .sub(header_size)
-                        .cast::<ManagedObjectHeader>()
-                        .as_mut()
-                        .unwrap()
-                };
+                let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
                 if let ManagedObjectHeader::Occupied {
                     id,
                     layout,
                     instances_count,
+                    padding,
                     ..
                 } = header
                 {
                     if object_id == *id && *instances_count > 0 {
-                        return Some(*layout);
+                        return Some((*layout, header_size + *padding as usize));
                     }
                 }
             }
@@ -586,23 +633,10 @@ impl ManagedStorage {
         None
     }
 
-    fn object_instances_count(
-        &self,
-        pointer: NonNull<u8>,
-        object_id: usize,
-        page_id: usize,
-    ) -> usize {
+    fn object_instances_count(&self, pointer: *mut u8, object_id: usize, page_id: usize) -> usize {
         if let Some(page) = self.pages.get(&page_id) {
             if page.owns_pointer(pointer) {
-                let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
-                let header = unsafe {
-                    pointer
-                        .as_ptr()
-                        .sub(header_size)
-                        .cast::<ManagedObjectHeader>()
-                        .as_mut()
-                        .unwrap()
-                };
+                let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
                 if let ManagedObjectHeader::Occupied {
                     id,
                     instances_count,
@@ -620,7 +654,7 @@ impl ManagedStorage {
 }
 
 pub struct ManagedBox<T> {
-    memory: NonNull<T>,
+    memory: *mut T,
     id: usize,
     page: usize,
     drop: bool,
@@ -647,23 +681,13 @@ impl<T> ManagedBox<T> {
     where
         T: Finalize,
     {
-        unsafe {
-            STORAGE.with_borrow_mut(|storage| {
-                let mut result = storage.alloc_uninitialized(
-                    TypeHash::of::<T>(),
-                    Layout::new::<T>().pad_to_align(),
-                    T::finalize_raw,
-                );
-                result.drop = false;
-                let result = Self {
-                    memory: result.memory.cast(),
-                    id: result.id,
-                    page: result.page,
-                    drop: true,
-                };
-                result.memory.as_ptr().write(value);
-                result
-            })
+        let mut result = DynamicManagedBox::new(value);
+        result.drop = false;
+        Self {
+            memory: result.memory.cast(),
+            id: result.id,
+            page: result.page,
+            drop: true,
         }
     }
 
@@ -696,85 +720,60 @@ impl<T> ManagedBox<T> {
     }
 
     pub fn borrow(&self) -> Option<ManagedRef<T>> {
-        let (pointer, lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
-                .unwrap()
-        });
-        unsafe {
-            Some(ManagedRef::new(
-                pointer.as_ref(),
-                lifetime.as_ref().borrow()?,
-            ))
-        }
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            unsafe { ManagedRef::new_raw(pointer, lifetime.as_ref()?.borrow()?) }
+        })
     }
 
     pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
-        let (mut pointer, mut lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
-                .unwrap()
-        });
-        unsafe {
-            Some(ManagedRefMut::new(
-                pointer.as_mut(),
-                lifetime.as_mut().borrow_mut()?,
-            ))
-        }
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            unsafe { ManagedRefMut::new_raw(pointer, lifetime.as_mut()?.borrow_mut()?) }
+        })
     }
 
-    pub fn lazy(&self) -> ManagedLazy<T> {
-        let (pointer, lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
-                .unwrap()
-        });
-        unsafe { ManagedLazy::new(pointer.as_ref(), lifetime.as_ref().lazy()) }
+    pub fn lazy(&self) -> Option<ManagedLazy<T>> {
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            unsafe { ManagedLazy::new_raw(pointer, lifetime.as_mut().unwrap().lazy()) }
+        })
     }
 
     pub fn read(&self) -> Option<ValueReadAccess<T>> {
-        let (pointer, lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
-                .unwrap()
-        });
-        unsafe { lifetime.as_ref().read(pointer.as_ref()) }
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            unsafe { lifetime.as_ref()?.read_ptr(pointer) }
+        })
     }
 
     pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
-        let (mut pointer, mut lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
-                .unwrap()
-        });
-        unsafe { lifetime.as_mut().write(pointer.as_mut()) }
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            unsafe { lifetime.as_mut()?.write_ptr(pointer) }
+        })
     }
 
     /// # Safety
     pub unsafe fn as_ptr(&self) -> Option<*const T> {
         STORAGE.with_borrow(|storage| {
-            if storage
-                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
-                .is_some()
-            {
-                Some(self.memory.as_ptr().cast_const())
-            } else {
-                None
-            }
+            let (pointer, _) =
+                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            Some(pointer.cast_const())
         })
     }
 
     /// # Safety
     pub unsafe fn as_ptr_mut(&mut self) -> Option<*mut T> {
         STORAGE.with_borrow(|storage| {
-            if storage
-                .access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)
-                .is_some()
-            {
-                Some(self.memory.as_ptr())
-            } else {
-                None
-            }
+            let (pointer, _) =
+                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            Some(pointer)
         })
     }
 }
@@ -794,7 +793,7 @@ impl<T> Clone for ManagedBox<T> {
 }
 
 pub struct DynamicManagedBox {
-    memory: NonNull<u8>,
+    memory: *mut u8,
     id: usize,
     page: usize,
     drop: bool,
@@ -813,9 +812,9 @@ impl Drop for DynamicManagedBox {
 impl DynamicManagedBox {
     pub fn new<T: Finalize>(value: T) -> Self {
         unsafe {
-            let result =
+            let mut result =
                 Self::new_uninitialized(TypeHash::of::<T>(), Layout::new::<T>(), T::finalize_raw);
-            result.memory.as_ptr().cast::<T>().write(value);
+            result.as_ptr_mut::<T>().unwrap().write(value);
             result
         }
     }
@@ -849,12 +848,8 @@ impl DynamicManagedBox {
             .with_borrow(|storage| storage.object_instances_count(self.memory, self.id, self.page))
     }
 
-    pub fn type_hash(&self) -> TypeHash {
-        STORAGE.with_borrow(|storage| {
-            storage
-                .object_type_hash(self.memory, self.id, self.page)
-                .unwrap()
-        })
+    pub fn type_hash(&self) -> Option<TypeHash> {
+        STORAGE.with_borrow(|storage| storage.object_type_hash(self.memory, self.id, self.page))
     }
 
     pub fn does_share_reference(&self, other: &Self) -> bool {
@@ -870,108 +865,82 @@ impl DynamicManagedBox {
     }
 
     pub fn borrow<T>(&self) -> Option<ManagedRef<T>> {
-        let (pointer, lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory, self.id, self.page)
-                .unwrap()
-        });
-        unsafe {
-            Some(ManagedRef::new(
-                pointer.as_ref(),
-                lifetime.as_ref().borrow()?,
-            ))
-        }
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            unsafe { ManagedRef::new_raw(pointer, lifetime.as_ref()?.borrow()?) }
+        })
     }
 
     pub fn borrow_mut<T>(&mut self) -> Option<ManagedRefMut<T>> {
-        let (mut pointer, mut lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory, self.id, self.page)
-                .unwrap()
-        });
-        unsafe {
-            Some(ManagedRefMut::new(
-                pointer.as_mut(),
-                lifetime.as_mut().borrow_mut()?,
-            ))
-        }
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            unsafe { ManagedRefMut::new_raw(pointer, lifetime.as_mut()?.borrow_mut()?) }
+        })
     }
 
-    pub fn lazy<T>(&self) -> ManagedLazy<T> {
-        let (pointer, lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory, self.id, self.page)
-                .unwrap()
-        });
-        unsafe { ManagedLazy::new(pointer.as_ref(), lifetime.as_ref().lazy()) }
+    pub fn lazy<T>(&self) -> Option<ManagedLazy<T>> {
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            unsafe { ManagedLazy::new_raw(pointer, lifetime.as_mut().unwrap().lazy()) }
+        })
     }
 
     pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
-        let (pointer, lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory, self.id, self.page)
-                .unwrap()
-        });
-        unsafe { lifetime.as_ref().read(pointer.as_ref()) }
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            unsafe { lifetime.as_ref()?.read_ptr(pointer) }
+        })
     }
 
     pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
-        let (mut pointer, mut lifetime) = STORAGE.with_borrow(|storage| {
-            storage
-                .access_object_lifetime::<T>(self.memory, self.id, self.page)
-                .unwrap()
-        });
-        unsafe { lifetime.as_mut().write(pointer.as_mut()) }
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime) =
+                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            unsafe { lifetime.as_mut()?.write_ptr(pointer) }
+        })
     }
 
     /// # Safety
     pub unsafe fn memory(&self) -> Option<&[u8]> {
         STORAGE.with_borrow(|storage| {
             storage
-                .object_layout(self.memory, self.id, self.page)
-                .map(|layout| std::slice::from_raw_parts(self.memory.as_ptr(), layout.size()))
+                .object_layout_with_offset(self.memory, self.id, self.page)
+                .map(|(layout, offset)| {
+                    std::slice::from_raw_parts(self.memory.add(offset), layout.size())
+                })
         })
     }
 
     /// # Safety
     pub unsafe fn memory_mut(&mut self) -> Option<&mut [u8]> {
         STORAGE.with_borrow(|storage| {
-            if let Some(layout) = storage.object_layout(self.memory, self.id, self.page) {
-                Some(std::slice::from_raw_parts_mut(
-                    self.memory.as_ptr(),
-                    layout.size(),
-                ))
-            } else {
-                None
-            }
+            storage
+                .object_layout_with_offset(self.memory, self.id, self.page)
+                .map(|(layout, offset)| {
+                    std::slice::from_raw_parts_mut(self.memory.add(offset), layout.size())
+                })
         })
     }
 
     /// # Safety
     pub unsafe fn as_ptr<T>(&self) -> Option<*const T> {
         STORAGE.with_borrow(|storage| {
-            if storage
-                .access_object_lifetime::<T>(self.memory, self.id, self.page)
-                .is_some()
-            {
-                Some(self.memory.as_ptr().cast_const().cast())
-            } else {
-                None
-            }
+            let (pointer, _) =
+                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            Some(pointer.cast_const().cast())
         })
     }
 
     /// # Safety
     pub unsafe fn as_ptr_mut<T>(&mut self) -> Option<*mut T> {
         STORAGE.with_borrow(|storage| {
-            if storage
-                .access_object_lifetime::<T>(self.memory, self.id, self.page)
-                .is_some()
-            {
-                Some(self.memory.as_ptr().cast())
-            } else {
-                None
-            }
+            let (pointer, _) =
+                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            Some(pointer.cast())
         })
     }
 }
@@ -996,30 +965,63 @@ mod tests {
 
     #[test]
     fn test_occupancy_range() {
+        let v = OccupancyRange {
+            bits_start_inclusive: 0,
+            bits_end_exclusive: 128,
+            ..Default::default()
+        }
+        .update_mask();
+        assert_eq!(v.mask, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+        assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 0..128);
+        assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE);
+
         let v = OccupancyRange::default();
         assert_eq!(v.mask, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
         assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 0..128);
         assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE);
+
         let v = v.split().unwrap().0;
         assert_eq!(v.mask, 0x0000000000000000FFFFFFFFFFFFFFFF);
         assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 0..64);
         assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE / 2);
+
         let v = v.split().unwrap().1;
         assert_eq!(v.mask, 0x0000000000000000FFFFFFFF00000000);
         assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 32..64);
         assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE / 4);
+
         let v = v.split().unwrap().0;
         assert_eq!(v.mask, 0x00000000000000000000FFFF00000000);
         assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 32..48);
         assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE / 8);
+
         let v = v.split().unwrap().1;
         assert_eq!(v.mask, 0x00000000000000000000FF0000000000);
         assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 40..48);
         assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE / 16);
+
         let v = v.split().unwrap().0;
         assert_eq!(v.mask, 0x000000000000000000000F0000000000);
         assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 40..44);
         assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE / 32);
+
+        let v = v.split().unwrap().1;
+        assert_eq!(
+            v.mask,
+            0b0000000000000000000011000000000000000000000000000000000000000000
+        );
+        assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 42..44);
+        assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE / 64);
+
+        let v = v.split().unwrap().0;
+        assert_eq!(
+            v.mask,
+            0b0000000000000000000001000000000000000000000000000000000000000000
+        );
+        assert_eq!(v.bits_start_inclusive..v.bits_end_exclusive, 42..43);
+        assert_eq!(v.byte_size(), MEMORY_PAGE_SIZE / 128);
+
+        assert!(v.split().is_none());
     }
 
     #[test]
@@ -1055,7 +1057,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 128,
                 free_size: 16256,
                 ..Default::default()
@@ -1069,7 +1071,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 128,
                 free_size: 16256,
                 ..Default::default()
@@ -1088,7 +1090,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 128,
                 free_size: 16256,
                 ..Default::default()
@@ -1108,7 +1110,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 128,
                 free_size: 16256,
                 ..Default::default()
@@ -1123,7 +1125,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 128,
                 free_size: 16256,
                 ..Default::default()
@@ -1143,7 +1145,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 128,
                 free_size: 16256,
                 ..Default::default()
@@ -1163,7 +1165,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 256,
                 free_size: 16128,
                 ..Default::default()
@@ -1175,7 +1177,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 1280,
                 free_size: 15104,
                 ..Default::default()
@@ -1187,7 +1189,7 @@ mod tests {
             ManagedStorageStats {
                 pages_count: 1,
                 chunked_pages_count: 1,
-                total_size: 16384,
+                total_size: 16392,
                 occupied_size: 9472,
                 free_size: 6912,
                 ..Default::default()
@@ -1200,9 +1202,9 @@ mod tests {
                 pages_count: 2,
                 chunked_pages_count: 1,
                 exclusive_pages_count: 1,
-                total_size: 96560,
-                occupied_size: 89648,
-                free_size: 6912,
+                total_size: 96592,
+                occupied_size: 89672,
+                free_size: 6912
             }
         );
         drop(a);
@@ -1212,9 +1214,9 @@ mod tests {
                 pages_count: 2,
                 chunked_pages_count: 1,
                 exclusive_pages_count: 1,
-                total_size: 96560,
-                occupied_size: 89392,
-                free_size: 7168,
+                total_size: 96592,
+                occupied_size: 89416,
+                free_size: 7168
             }
         );
         drop(b);
@@ -1224,9 +1226,9 @@ mod tests {
                 pages_count: 2,
                 chunked_pages_count: 1,
                 exclusive_pages_count: 1,
-                total_size: 96560,
-                occupied_size: 88368,
-                free_size: 8192,
+                total_size: 96592,
+                occupied_size: 88392,
+                free_size: 8192
             }
         );
         drop(c);
@@ -1236,9 +1238,9 @@ mod tests {
                 pages_count: 1,
                 chunked_pages_count: 0,
                 exclusive_pages_count: 1,
-                total_size: 80176,
-                occupied_size: 80176,
-                free_size: 0,
+                total_size: 80200,
+                occupied_size: 80200,
+                free_size: 0
             }
         );
         drop(d);
@@ -1251,5 +1253,25 @@ mod tests {
         let r = v.borrow().unwrap();
         drop(v);
         assert!(r.read().is_none());
+    }
+
+    #[test]
+    fn test_fuzz_managed_box() {
+        let builders = [
+            || DynamicManagedBox::new(1u8),
+            || DynamicManagedBox::new(2u16),
+            || DynamicManagedBox::new(3u32),
+            || DynamicManagedBox::new(4u64),
+            || DynamicManagedBox::new(5u128),
+            || DynamicManagedBox::new([42u8; 1000]),
+            || DynamicManagedBox::new([42u8; 10000]),
+            || DynamicManagedBox::new([42u8; 100000]),
+        ];
+        let mut boxes = std::array::from_fn::<_, 50, _>(|_| None);
+        for index in 0..100 {
+            let source = index % builders.len();
+            let target = index % boxes.len();
+            boxes[target] = Some((builders[source])());
+        }
     }
 }

@@ -16,7 +16,7 @@ impl Default for Repl {
     fn default() -> Self {
         let mut registry = Registry::default().with_basic_types();
         crate::library::install(&mut registry);
-        let context = Context::new(1024, 1024, 1024);
+        let context = Context::new(10240, 10240);
         Self {
             script: Default::default(),
             host: Host::new(context, registry.into()),

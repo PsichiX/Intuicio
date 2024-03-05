@@ -172,13 +172,14 @@ impl Reference {
                     std::any::type_name::<T>()
                 )
             });
-        let mut value = unsafe { Object::new_uninitialized(struct_type) };
+        let mut value = unsafe { Object::new_uninitialized(struct_type).unwrap() };
         unsafe { value.as_mut_ptr().cast::<T>().write(data) };
         Self::new_raw(value)
     }
 
     pub fn new_custom<T: 'static>(data: T, ty: &Type) -> Self {
-        let mut value = unsafe { Object::new_uninitialized(ty.data.as_ref().unwrap().clone()) };
+        let mut value =
+            unsafe { Object::new_uninitialized(ty.data.as_ref().unwrap().clone()).unwrap() };
         unsafe { value.as_mut_ptr().cast::<T>().write(data) };
         Self::new_raw(value)
     }
@@ -199,7 +200,7 @@ impl Reference {
 
     /// # Safety
     pub unsafe fn uninitialized(ty: &Type) -> Self {
-        Self::new_raw(Object::new_uninitialized(ty.data.as_ref().unwrap().clone()))
+        Self::new_raw(Object::new_uninitialized(ty.data.as_ref().unwrap().clone()).unwrap())
     }
 
     pub fn type_of(&self) -> Option<Type> {
@@ -276,7 +277,8 @@ impl Reference {
             return None;
         }
         let mut object =
-            Object::new_uninitialized(TRANSFERRED_STRUCT_HANDLE.with(|handle| handle.clone()));
+            Object::new_uninitialized(TRANSFERRED_STRUCT_HANDLE.with(|handle| handle.clone()))
+                .unwrap();
         object
             .as_mut_ptr()
             .cast::<Transferred>()

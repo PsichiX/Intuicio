@@ -32,7 +32,7 @@ fn main() {
             .0,
     ));
 
-    let mut host = Host::new(Context::new(1024, 1024, 1024), registry.into());
+    let mut host = Host::new(Context::new(10240, 10240), registry.into());
     let (result,) = host
         .call_function::<(i32,), _>("main", "main", None)
         .unwrap()

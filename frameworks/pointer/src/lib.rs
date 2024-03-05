@@ -224,7 +224,7 @@ mod tests {
             registry => struct (Ptr<usize>) {}
         });
         let add = registry.add_function(add::define_function(&registry));
-        let mut context = Context::new(1024, 1024, 1024);
+        let mut context = Context::new(10240, 10240);
         let a = 40usize;
         let mut b = 2usize;
         let (r,) = add.call::<(usize,), _>(

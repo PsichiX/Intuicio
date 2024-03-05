@@ -1,9 +1,9 @@
 use crate::{is_copy, is_send, is_sync, meta::Meta, prelude::RuntimeObject, Visibility};
 use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
+use rustc_hash::FxHasher;
 use std::{
     alloc::Layout,
     borrow::Cow,
-    collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     sync::Arc,
 };
@@ -491,6 +491,17 @@ impl<'a> StructFieldQuery<'a> {
                 .map(|visibility| field.visibility.is_visible(visibility))
                 .unwrap_or(true)
     }
+
+    pub fn to_static(&self) -> StructFieldQuery<'static> {
+        StructFieldQuery {
+            name: self
+                .name
+                .as_ref()
+                .map(|name| name.as_ref().to_owned().into()),
+            struct_query: self.struct_query.as_ref().map(|query| query.to_static()),
+            visibility: self.visibility,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Hash)]
@@ -569,9 +580,35 @@ impl<'a> StructQuery<'a> {
     }
 
     pub fn as_hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
         hasher.finish()
+    }
+
+    pub fn to_static(&self) -> StructQuery<'static> {
+        StructQuery {
+            name: self
+                .name
+                .as_ref()
+                .map(|name| name.as_ref().to_owned().into()),
+            module_name: self
+                .module_name
+                .as_ref()
+                .map(|name| name.as_ref().to_owned().into()),
+            type_hash: self.type_hash,
+            type_name: self
+                .type_name
+                .as_ref()
+                .map(|name| name.as_ref().to_owned().into()),
+            visibility: self.visibility,
+            fields: self
+                .fields
+                .as_ref()
+                .iter()
+                .map(|query| query.to_static())
+                .collect(),
+            meta: self.meta,
+        }
     }
 }
 
@@ -735,7 +772,6 @@ mod tests {
     use crate as intuicio_core;
     use crate::object::Object;
     use crate::{meta::*, registry::*, IntuicioStruct};
-    use intuicio_data;
     use intuicio_derive::*;
 
     #[derive(IntuicioStruct, Default)]
