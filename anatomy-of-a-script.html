@@ -174,7 +174,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="anatomy-of-a-script"><a class="header" href="#anatomy-of-a-script">Anatomy of a Script</a></h1>
-<p>Entire <code>Script</code> structure is split into package, modules, functions/structures and at it's core: operations.</p>
+<p>Entire <code>Script</code> structure is split into package, modules, functions/strucs/enums and at it's core: operations.</p>
 <p>Example:</p>
 <ul>
 <li>Package:
@@ -184,6 +184,16 @@
 <li>struct: <code>Foo</code>
 <ul>
 <li>field: <code>a</code>: <code>bool</code></li>
+</ul>
+</li>
+<li>enum: <code>Bar</code>
+<ul>
+<li>variant: <code>A</code></li>
+<li>variant: <code>B</code>
+<ul>
+<li>field: <code>a</code>: <code>bool</code></li>
+</ul>
+</li>
 </ul>
 </li>
 <li>function: <code>main</code>
@@ -234,7 +244,7 @@ impl ScriptExpression for CustomExpression {
 </li>
 <li>
 <p><strong>Define register</strong></p>
-<p>Allocates space for new register of given type defined by <code>StructQuery</code>. Remember to always define register before it gets used! Registers gets removed when scope where they were defined gets dropped.</p>
+<p>Allocates space for new register of given type defined by <code>TypeQuery</code>. Remember to always define register before it gets used! Registers gets removed when scope where they were defined gets dropped.</p>
 </li>
 <li>
 <p><strong>Drop register</strong></p>
