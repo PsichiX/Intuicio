@@ -252,7 +252,7 @@ fn parse_call_function(pair: Pair<Rule>) -> AsmOperation {
                 module_name = Some(parse_path_name(pair));
             }
             Rule::path_type => {
-                type_name = Some(parse_path_name(pair));
+                type_name = Some(parse_path_name(pair.into_inner().next().unwrap()));
             }
             Rule::path_function => {
                 name = parse_path_name(pair);
