@@ -122,7 +122,7 @@ pub extern "C" fn version() -> IntuicioVersion {
 
 #[no_mangle]
 pub extern "C" fn install(registry: &mut Registry) {
-    registry.add_struct(HttpClient::define_struct(registry));
+    registry.add_type(HttpClient::define_struct(registry));
     registry.add_function(HttpClient::get__define_function(registry));
     registry.add_function(HttpClient::post__define_function(registry));
     registry.add_function(HttpClient::status__define_function(registry));

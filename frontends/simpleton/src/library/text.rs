@@ -154,7 +154,7 @@ pub fn not_equals(registry: &Registry, a: Reference, b: Reference) -> Reference 
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod text struct Text (Text) {}
     });
     registry.add_function(length::define_function(registry));

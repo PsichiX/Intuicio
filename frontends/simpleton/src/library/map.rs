@@ -235,7 +235,7 @@ impl MapIter {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod map struct Map (Map) {}
         [override_send = true]
     });
@@ -256,8 +256,8 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(values::define_function(registry));
     registry.add_function(iter::define_function(registry));
     registry.add_function(collect::define_function(registry));
-    registry.add_struct(Pair::define_struct(registry));
-    registry.add_struct(MapIter::define_struct(registry));
+    registry.add_type(Pair::define_struct(registry));
+    registry.add_type(MapIter::define_struct(registry));
     registry.add_function(MapIter::next__define_function(registry));
 }
 

@@ -28,7 +28,12 @@ pub fn type_of(registry: &Registry, value: Reference) -> Reference {
 #[intuicio_function(module_name = "reflect", use_registry)]
 pub fn type_name(registry: &Registry, ty: Reference) -> Reference {
     Reference::new_text(
-        ty.read::<Type>().unwrap().handle().unwrap().name.to_owned(),
+        ty.read::<Type>()
+            .unwrap()
+            .handle()
+            .unwrap()
+            .name()
+            .to_owned(),
         registry,
     )
 }
@@ -40,7 +45,8 @@ pub fn type_fields(registry: &Registry, ty: Reference) -> Reference {
             .unwrap()
             .handle()
             .unwrap()
-            .fields()
+            .struct_fields()
+            .unwrap()
             .iter()
             .map(|field| Reference::new_text(field.name.to_owned(), registry))
             .collect::<Array>(),
@@ -78,8 +84,8 @@ pub fn set_field(mut object: Reference, name: Reference, value: Reference) -> Re
 
 #[intuicio_function(module_name = "reflect")]
 pub fn new(ty: Reference, properties: Reference) -> Reference {
-    let struct_type = ty.read::<Type>().unwrap().handle().unwrap().clone();
-    let mut result = Object::new(struct_type);
+    let type_ = ty.read::<Type>().unwrap().handle().unwrap().clone();
+    let mut result = Object::new(type_);
     for (key, value) in properties.read::<Map>().unwrap().iter() {
         *result.write_field::<Reference>(key).unwrap() = value.clone();
     }
@@ -99,8 +105,9 @@ pub fn pack(mut object: Reference, properties: Reference) -> Reference {
 pub fn unpack(registry: &Registry, object: Reference) -> Reference {
     let object = object.read_object().unwrap();
     let result = object
-        .struct_handle()
-        .fields()
+        .type_handle()
+        .struct_fields()
+        .unwrap()
         .iter()
         .map(|field| {
             (
@@ -271,11 +278,18 @@ pub fn are_same_impl(a: &Reference, b: &Reference) -> bool {
         let a = a.read_object().unwrap();
         let b = b.read_object().unwrap();
         let keys = a
-            .struct_handle()
-            .fields()
+            .type_handle()
+            .struct_fields()
+            .unwrap()
             .iter()
             .map(|field| &field.name)
-            .chain(b.struct_handle().fields().iter().map(|field| &field.name))
+            .chain(
+                b.type_handle()
+                    .struct_fields()
+                    .unwrap()
+                    .iter()
+                    .map(|field| &field.name),
+            )
             .collect::<HashSet<_>>();
         if keys.is_empty() {
             false
@@ -401,13 +415,13 @@ pub fn to_text(registry: &Registry, value: Reference) -> Reference {
     if let Some(value) = value.read::<Type>() {
         let handle = value.handle().unwrap();
         let mut result = "struct ".to_owned();
-        if let Some(name) = handle.module_name.as_ref() {
-            result.push_str(name.as_str());
+        if let Some(name) = handle.module_name() {
+            result.push_str(name);
             result.push_str("::");
         }
-        result.push_str(&handle.name);
+        result.push_str(handle.name());
         result.push_str(" {");
-        for (index, field) in handle.fields().iter().enumerate() {
+        for (index, field) in handle.struct_fields().unwrap().iter().enumerate() {
             if index > 0 {
                 result.push_str(", ");
             }
@@ -448,14 +462,14 @@ pub fn registers_size(context: &mut Context, registry: &Registry) -> Reference {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod reflect struct Reference (Reference) {}
         [override_send = true]
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod reflect struct Type (Type) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod reflect struct Function (Function) {}
     });
     registry.add_function(find_type_by_name::define_function(registry));

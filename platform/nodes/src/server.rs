@@ -288,7 +288,7 @@ mod tests {
     }
 
     impl NodeTypeInfo for TypeInfo {
-        fn struct_query(&self) -> StructQuery {
+        fn type_query(&self) -> TypeQuery {
             Default::default()
         }
 

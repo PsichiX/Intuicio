@@ -23,5 +23,5 @@ impl Engine {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Engine::define_struct(registry));
+    registry.add_type(Engine::define_struct(registry));
 }

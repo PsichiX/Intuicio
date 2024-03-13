@@ -11,7 +11,7 @@ use intuicio_core::{
         ScriptFunctionParameter, ScriptFunctionSignature, ScriptHandle, ScriptModule,
         ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
-    struct_type::StructQuery,
+    types::TypeQuery,
     IntuicioVersion, Visibility,
 };
 use serde::{Deserialize, Serialize};
@@ -80,14 +80,14 @@ impl SimpletonScriptLiteral {
                 module_name,
                 fields_count,
             } => {
-                let struct_type = registry
-                    .find_struct(StructQuery {
+                let type_ = registry
+                    .find_type(TypeQuery {
                         name: Some(name.into()),
                         module_name: Some(module_name.into()),
                         ..Default::default()
                     })
                     .unwrap();
-                let mut result = Object::new(struct_type);
+                let mut result = Object::new(type_);
                 for _ in 0..*fields_count {
                     let name = context.stack().pop::<Reference>().unwrap();
 
@@ -122,7 +122,7 @@ impl ScriptExpression for SimpletonScriptExpression {
                 context.stack().push(Reference::new_type(
                     Type::new(
                         registry
-                            .find_struct(StructQuery {
+                            .find_type(TypeQuery {
                                 name: Some(name.into()),
                                 module_name: Some(module_name.into()),
                                 ..Default::default()
@@ -865,7 +865,7 @@ impl SimpletonStatement {
                     registers.push(name.to_owned());
                 }
                 result.push(ScriptOperation::DefineRegister {
-                    query: StructQuery::of::<Reference>(),
+                    query: TypeQuery::of::<Reference>(),
                 });
                 value.compile(result, registers, closures, closures_index);
                 result.push(ScriptOperation::PopToRegister {
@@ -990,7 +990,7 @@ impl SimpletonStatement {
                     registers.push(variable.to_owned());
                 }
                 operations.push(ScriptOperation::DefineRegister {
-                    query: StructQuery::of::<Reference>(),
+                    query: TypeQuery::of::<Reference>(),
                 });
                 let index = registers
                     .iter()
@@ -1062,7 +1062,7 @@ impl SimpletonFunction {
             meta: None,
             name: self.name.to_owned(),
             module_name: Some(module_name.to_owned()),
-            struct_query: None,
+            type_query: None,
             visibility: Visibility::Public,
             inputs: self
                 .arguments
@@ -1070,13 +1070,13 @@ impl SimpletonFunction {
                 .map(|name| ScriptFunctionParameter {
                     meta: None,
                     name: name.to_owned(),
-                    struct_query: StructQuery::of::<Reference>(),
+                    type_query: TypeQuery::of::<Reference>(),
                 })
                 .collect(),
             outputs: vec![ScriptFunctionParameter {
                 meta: None,
                 name: "result".to_owned(),
-                struct_query: StructQuery::of::<Reference>(),
+                type_query: TypeQuery::of::<Reference>(),
             }],
         };
         let mut registers = Vec::new();
@@ -1086,7 +1086,7 @@ impl SimpletonFunction {
                 registers.push(name.to_owned());
             }
             operations.push(ScriptOperation::DefineRegister {
-                query: StructQuery::of::<Reference>(),
+                query: TypeQuery::of::<Reference>(),
             });
             operations.push(ScriptOperation::PopToRegister {
                 index: registers.iter().position(|n| n == name).unwrap(),
@@ -1125,7 +1125,7 @@ impl SimpletonStruct {
                     meta: None,
                     name: name.to_owned(),
                     visibility: Visibility::Public,
-                    struct_query: StructQuery::of::<Reference>(),
+                    type_query: TypeQuery::of::<Reference>(),
                 })
                 .collect(),
         }
@@ -1155,8 +1155,9 @@ impl SimpletonModule {
             structs: self
                 .structs
                 .iter()
-                .map(|struct_type| struct_type.compile(&self.name))
+                .map(|type_| type_.compile(&self.name))
                 .collect(),
+            enums: vec![],
             functions: self
                 .functions
                 .iter()
@@ -1224,6 +1225,7 @@ impl SimpletonPackage {
         modules.push(ScriptModule {
             name: CLOSURES.to_owned(),
             structs: vec![],
+            enums: vec![],
             functions: closure_functions,
         });
         ScriptPackage { modules }

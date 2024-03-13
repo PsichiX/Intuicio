@@ -158,7 +158,7 @@ impl Image {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Image::define_struct(registry));
+    registry.add_type(Image::define_struct(registry));
     registry.add_function(Image::load__define_function(registry));
     registry.add_function(Image::draw__define_function(registry));
     registry.add_function(Image::draw_advanced__define_function(registry));

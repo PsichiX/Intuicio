@@ -2,7 +2,7 @@ use crate::{
     context::Context,
     meta::Meta,
     registry::Registry,
-    struct_type::{StructHandle, StructQuery},
+    types::{Type, TypeHandle, TypeQuery},
     Visibility,
 };
 use intuicio_data::data_stack::DataStackPack;
@@ -55,15 +55,15 @@ impl std::fmt::Debug for FunctionBody {
 pub struct FunctionParameter {
     pub meta: Option<Meta>,
     pub name: String,
-    pub struct_handle: StructHandle,
+    pub type_handle: TypeHandle,
 }
 
 impl FunctionParameter {
-    pub fn new(name: impl ToString, struct_handle: StructHandle) -> Self {
+    pub fn new(name: impl ToString, type_handle: TypeHandle) -> Self {
         Self {
             meta: None,
             name: name.to_string(),
-            struct_handle,
+            type_handle,
         }
     }
 }
@@ -73,7 +73,7 @@ impl std::fmt::Debug for FunctionParameter {
         f.debug_struct("FunctionParameter")
             .field("meta", &self.meta)
             .field("name", &self.name)
-            .field("struct_handle", &self.struct_handle.name)
+            .field("type_handle", &self.type_handle.name())
             .finish()
     }
 }
@@ -83,7 +83,7 @@ pub struct FunctionSignature {
     pub meta: Option<Meta>,
     pub name: String,
     pub module_name: Option<String>,
-    pub struct_handle: Option<StructHandle>,
+    pub type_handle: Option<TypeHandle>,
     pub visibility: Visibility,
     pub inputs: Vec<FunctionParameter>,
     pub outputs: Vec<FunctionParameter>,
@@ -95,7 +95,7 @@ impl FunctionSignature {
             meta: None,
             name: name.to_string(),
             module_name: None,
-            struct_handle: None,
+            type_handle: None,
             visibility: Visibility::default(),
             inputs: vec![],
             outputs: vec![],
@@ -112,8 +112,8 @@ impl FunctionSignature {
         self
     }
 
-    pub fn with_struct_handle(mut self, handle: StructHandle) -> Self {
-        self.struct_handle = Some(handle);
+    pub fn with_type_handle(mut self, handle: TypeHandle) -> Self {
+        self.type_handle = Some(handle);
         self
     }
 
@@ -140,10 +140,10 @@ impl std::fmt::Debug for FunctionSignature {
             .field("name", &self.name)
             .field("module_name", &self.module_name)
             .field(
-                "struct_handle",
-                match self.struct_handle.as_ref() {
-                    Some(struct_handle) => &struct_handle.name,
-                    None => &"!",
+                "type_handle",
+                &match self.type_handle.as_ref() {
+                    Some(type_handle) => type_handle.name().to_owned(),
+                    None => "!".to_owned(),
                 },
             )
             .field("visibility", &self.visibility)
@@ -161,8 +161,15 @@ impl std::fmt::Display for FunctionSignature {
         if let Some(module_name) = self.module_name.as_ref() {
             write!(f, "mod {} ", module_name)?;
         }
-        if let Some(struct_handle) = self.struct_handle.as_ref() {
-            write!(f, "struct {} ", struct_handle.type_name())?;
+        if let Some(type_handle) = self.type_handle.as_ref() {
+            match &**type_handle {
+                Type::Struct(value) => {
+                    write!(f, "struct {} ", value.type_name())?;
+                }
+                Type::Enum(value) => {
+                    write!(f, "enum {} ", value.type_name())?;
+                }
+            }
         }
         write!(f, "fn {}(", self.name)?;
         for (index, parameter) in self.inputs.iter().enumerate() {
@@ -173,7 +180,7 @@ impl std::fmt::Display for FunctionSignature {
                 f,
                 "{}: {}",
                 parameter.name,
-                parameter.struct_handle.type_name()
+                parameter.type_handle.type_name()
             )?;
         }
         write!(f, ") -> (")?;
@@ -185,7 +192,7 @@ impl std::fmt::Display for FunctionSignature {
                 f,
                 "{}: {}",
                 parameter.name,
-                parameter.struct_handle.type_name()
+                parameter.type_handle.type_name()
             )?;
         }
         write!(f, ")")
@@ -233,7 +240,7 @@ impl Function {
                 );
             }
             for (parameter, type_hash) in self.signature.inputs.iter().zip(input_types) {
-                if parameter.struct_handle.type_hash() != type_hash {
+                if parameter.type_handle.type_hash() != type_hash {
                     panic!(
                         "Function: {} input parameter: {} got wrong value type!",
                         self.signature.name, parameter.name
@@ -241,7 +248,7 @@ impl Function {
                 }
             }
             for (parameter, type_hash) in self.signature.outputs.iter().zip(output_types) {
-                if parameter.struct_handle.type_hash() != type_hash {
+                if parameter.type_handle.type_hash() != type_hash {
                     panic!(
                         "Function: {} output parameter: {} got wrong value type!",
                         self.signature.name, parameter.name
@@ -253,12 +260,17 @@ impl Function {
         self.invoke(context, registry);
         O::stack_pop(context.stack())
     }
+
+    pub fn into_handle(self) -> FunctionHandle {
+        self.into()
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Hash)]
 pub struct FunctionQueryParameter<'a> {
     pub name: Option<Cow<'a, str>>,
-    pub struct_query: Option<StructQuery<'a>>,
+    pub type_query: Option<TypeQuery<'a>>,
+    pub meta: Option<FunctionMetaQuery>,
 }
 
 impl<'a> FunctionQueryParameter<'a> {
@@ -268,9 +280,14 @@ impl<'a> FunctionQueryParameter<'a> {
             .map(|name| name.as_ref() == parameter.name)
             .unwrap_or(true)
             && self
-                .struct_query
+                .type_query
                 .as_ref()
-                .map(|query| query.is_valid(&parameter.struct_handle))
+                .map(|query| query.is_valid(&parameter.type_handle))
+                .unwrap_or(true)
+            && self
+                .meta
+                .as_ref()
+                .map(|query| parameter.meta.as_ref().map(query).unwrap_or(false))
                 .unwrap_or(true)
     }
 
@@ -280,7 +297,8 @@ impl<'a> FunctionQueryParameter<'a> {
                 .name
                 .as_ref()
                 .map(|name| name.as_ref().to_owned().into()),
-            struct_query: self.struct_query.as_ref().map(|query| query.to_static()),
+            type_query: self.type_query.as_ref().map(|query| query.to_static()),
+            meta: self.meta,
         }
     }
 }
@@ -289,7 +307,7 @@ impl<'a> FunctionQueryParameter<'a> {
 pub struct FunctionQuery<'a> {
     pub name: Option<Cow<'a, str>>,
     pub module_name: Option<Cow<'a, str>>,
-    pub struct_query: Option<StructQuery<'a>>,
+    pub type_query: Option<TypeQuery<'a>>,
     pub visibility: Option<Visibility>,
     pub inputs: Cow<'a, [FunctionQueryParameter<'a>]>,
     pub outputs: Cow<'a, [FunctionQueryParameter<'a>]>,
@@ -314,11 +332,11 @@ impl<'a> FunctionQuery<'a> {
                 })
                 .unwrap_or(true)
             && self
-                .struct_query
+                .type_query
                 .as_ref()
                 .map(|query| {
                     signature
-                        .struct_handle
+                        .type_handle
                         .as_ref()
                         .map(|handle| query.is_valid(handle))
                         .unwrap_or(false)
@@ -361,7 +379,7 @@ impl<'a> FunctionQuery<'a> {
                 .module_name
                 .as_ref()
                 .map(|name| name.as_ref().to_owned().into()),
-            struct_query: self.struct_query.as_ref().map(|query| query.to_static()),
+            type_query: self.type_query.as_ref().map(|query| query.to_static()),
             visibility: self.visibility,
             inputs: self
                 .inputs
@@ -386,40 +404,38 @@ macro_rules! function_signature {
         $registry:expr
         =>
         $(mod $module_name:ident)?
-        $(struct ($struct_type:ty))?
+        $(type ($type:ty))?
         fn
         $name:ident
         ($( $input_name:ident : $input_type:ty ),*)
         ->
         ($( $output_name:ident : $output_type:ty ),*)
-    ) => {
-        {
-            let mut result = $crate::function::FunctionSignature::new(stringify!($name));
-            $(
-                result.module_name = Some(stringify!($module_name).to_owned());
-            )?
-            $(
-                result.struct_handle = Some($registry.find_struct($crate::struct_type::StructQuery::of::<$struct_type>()).unwrap());
-            )?
-            $(
-                result.inputs.push(
-                    $crate::function::FunctionParameter::new(
-                        stringify!($input_name).to_owned(),
-                        $registry.find_struct($crate::struct_type::StructQuery::of::<$input_type>()).unwrap()
-                    )
-                );
-            )*
-            $(
-                result.outputs.push(
-                    $crate::function::FunctionParameter::new(
-                        stringify!($output_name).to_owned(),
-                        $registry.find_struct($crate::struct_type::StructQuery::of::<$output_type>()).unwrap()
-                    )
-                );
-            )*
-            result
-        }
-    };
+    ) => {{
+        let mut result = $crate::function::FunctionSignature::new(stringify!($name));
+        $(
+            result.module_name = Some(stringify!($module_name).to_owned());
+        )?
+        $(
+            result.type_handle = Some($registry.find_type($crate::types::TypeQuery::of::<$type>()).unwrap());
+        )?
+        $(
+            result.inputs.push(
+                $crate::function::FunctionParameter::new(
+                    stringify!($input_name).to_owned(),
+                    $registry.find_type($crate::types::TypeQuery::of::<$input_type>()).unwrap()
+                )
+            );
+        )*
+        $(
+            result.outputs.push(
+                $crate::function::FunctionParameter::new(
+                    stringify!($output_name).to_owned(),
+                    $registry.find_type($crate::types::TypeQuery::of::<$output_type>()).unwrap()
+                )
+            );
+        )*
+        result
+    }};
 }
 
 #[macro_export]
@@ -428,7 +444,7 @@ macro_rules! define_function {
         $registry:expr
         =>
         $(mod $module_name:ident)?
-        $(struct ($struct_type:ty))?
+        $(type ($type:ty))?
         fn
         $name:ident
         ($( $input_name:ident : $input_type:ty),*)
@@ -441,7 +457,7 @@ macro_rules! define_function {
                 $registry
                 =>
                 $(mod $module_name)?
-                $(struct ($struct_type))?
+                $(type ($type))?
                 fn
                 $name
                 ($($input_name : $input_type),*)
@@ -461,7 +477,7 @@ macro_rules! define_function {
 #[cfg(test)]
 mod tests {
     use crate as intuicio_core;
-    use crate::{context::*, function::*, registry::*, struct_type::*};
+    use crate::{context::*, function::*, registry::*, types::struct_type::*};
     use intuicio_data;
     use intuicio_derive::*;
 
@@ -476,7 +492,10 @@ mod tests {
             context.stack().push(a + b);
         }
 
-        let i32_handle = NativeStructBuilder::new::<i32>().build_handle();
+        let i32_handle = NativeStructBuilder::new::<i32>()
+            .build()
+            .into_type()
+            .into_handle();
         let signature = FunctionSignature::new("add")
             .with_input(FunctionParameter::new("a", i32_handle.clone()))
             .with_input(FunctionParameter::new("b", i32_handle.clone()))

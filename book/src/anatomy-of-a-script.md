@@ -1,12 +1,16 @@
 # Anatomy of a Script
 
-Entire `Script` structure is split into package, modules, functions/structures and at it's core: operations.
+Entire `Script` structure is split into package, modules, functions/strucs/enums and at it's core: operations.
 
 Example:
 - Package:
     - module: `test`
         - struct: `Foo`
             - field: `a`: `bool`
+        - enum: `Bar`
+            - variant: `A`
+            - variant: `B`
+                - field: `a`: `bool`
         - function: `main`
             - output: `result`: `i32`
             - operations:
@@ -46,7 +50,7 @@ Intuicio scripts by default have a very limited set of operations, because of be
 
 - **Define register**
 
-    Allocates space for new register of given type defined by `StructQuery`. Remember to always define register before it gets used! Registers gets removed when scope where they were defined gets dropped.
+    Allocates space for new register of given type defined by `TypeQuery`. Remember to always define register before it gets used! Registers gets removed when scope where they were defined gets dropped.
 
 - **Drop register**
 

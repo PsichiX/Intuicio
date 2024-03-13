@@ -364,8 +364,8 @@ impl Image {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(ImageProcessingConfig::define_struct(registry));
-    registry.add_struct(Image::define_struct(registry));
+    registry.add_type(ImageProcessingConfig::define_struct(registry));
+    registry.add_type(Image::define_struct(registry));
     registry.add_function(Image::new__define_function(registry));
     registry.add_function(Image::clone__define_function(registry));
     registry.add_function(Image::resize__define_function(registry));

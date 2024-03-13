@@ -68,7 +68,7 @@ pub fn current_time(registry: &Registry) -> Reference {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(CommandOutput::define_struct(registry));
+    registry.add_type(CommandOutput::define_struct(registry));
     registry.add_function(panic::define_function(registry));
     registry.add_function(command::define_function(registry));
     registry.add_function(current_time::define_function(registry));

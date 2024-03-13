@@ -77,7 +77,7 @@ impl Rect {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Rect::define_struct(registry));
+    registry.add_type(Rect::define_struct(registry));
     registry.add_function(Rect::left__define_function(registry));
     registry.add_function(Rect::right__define_function(registry));
     registry.add_function(Rect::top__define_function(registry));

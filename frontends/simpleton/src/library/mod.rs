@@ -23,7 +23,7 @@ pub mod text;
 pub mod toml;
 
 use crate::{Map, Reference};
-use intuicio_core::{object::Object, registry::Registry, struct_type::StructQuery};
+use intuicio_core::{object::Object, registry::Registry, types::TypeQuery};
 
 pub struct ObjectBuilder {
     name: String,
@@ -46,14 +46,14 @@ impl ObjectBuilder {
     }
 
     pub fn build(self, registry: &Registry) -> Object {
-        let struct_type = registry
-            .find_struct(StructQuery {
+        let type_ = registry
+            .find_type(TypeQuery {
                 name: Some(self.name.into()),
                 module_name: Some(self.module_name.into()),
                 ..Default::default()
             })
             .unwrap();
-        let mut result = Object::new(struct_type);
+        let mut result = Object::new(type_);
         for (key, value) in self.fields {
             *result.write_field::<Reference>(&key).unwrap() = value;
         }

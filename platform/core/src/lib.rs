@@ -2,29 +2,84 @@ pub mod context;
 pub mod function;
 pub mod host;
 pub mod meta;
-pub mod nativizer;
 pub mod object;
 pub mod registry;
 pub mod script;
-pub mod struct_type;
 pub mod transformer;
+pub mod types;
 pub mod utils;
+
+pub use memoffset::offset_of as __internal__offset_of__;
+
+/// Assumes `repr(u8)` enums only.
+#[macro_export]
+macro_rules! __internal__offset_of_enum__ {
+    ($type:tt :: $variant:ident [ $( $field:ident ),* ] => $used_field:ident => $discriminant:literal) => {{
+        let mut data = std::mem::MaybeUninit::<$type>::uninit();
+        let ptr = data.as_mut_ptr().cast::<u8>();
+        unsafe {
+            ptr.write($discriminant);
+            #[allow(unused_variables)]
+            match data.assume_init_ref() {
+                $type::$variant( $( $field ),* ) => {
+                    ($used_field as *const _ as *const u8).offset_from(ptr) as usize
+                }
+                _ => unreachable!(),
+            }
+        }
+    }};
+    ($type:tt :: $variant:ident ( $index:tt ) => $discriminant:literal) => {{
+        let mut data = std::mem::MaybeUninit::<$type>::uninit();
+        let ptr = data.as_mut_ptr().cast::<u8>();
+        unsafe {
+            ptr.write($discriminant);
+            #[allow(unused_variables)]
+            match data.assume_init_ref() {
+                $type::$variant {
+                    $index: __value__, ..
+                } => (__value__ as *const _ as *const u8).offset_from(ptr) as usize,
+                _ => unreachable!(),
+            }
+        }
+    }};
+    ($type:tt :: $variant:ident { $field:ident } => $discriminant:literal) => {{
+        let mut data = std::mem::MaybeUninit::<$type>::uninit();
+        let ptr = data.as_mut_ptr().cast::<u8>();
+        unsafe {
+            ptr.write($discriminant);
+            #[allow(unused_variables)]
+            match data.assume_init_ref() {
+                $type::$variant { $field, .. } => {
+                    ($field as *const _ as *const u8).offset_from(ptr) as usize
+                }
+                _ => unreachable!(),
+            }
+        }
+    }};
+}
 
 pub mod prelude {
     pub use crate::{
-        context::*, function::*, host::*, nativizer::*, object::*, registry::*, script::*,
-        struct_type::*, transformer::*, IntuicioStruct, IntuicioVersion, Visibility,
+        context::*,
+        function::*,
+        host::*,
+        object::*,
+        registry::*,
+        script::*,
+        transformer::*,
+        types::{enum_type::*, struct_type::*, *},
+        IntuicioEnum, IntuicioStruct, IntuicioVersion, Visibility,
     };
     pub use crate::{
-        define_function, define_native_struct, define_runtime_struct, function_signature,
+        define_function, define_native_enum, define_native_struct, define_runtime_enum,
+        define_runtime_struct, function_signature,
     };
 }
 
-pub mod __internal {
-    pub use memoffset::offset_of;
-}
-
-use crate::{registry::Registry, struct_type::Struct};
+use crate::{
+    registry::Registry,
+    types::{enum_type::Enum, struct_type::Struct},
+};
 use serde::{Deserialize, Serialize};
 use std::{cell::Cell, marker::PhantomData};
 
@@ -58,6 +113,10 @@ impl Visibility {
 
 pub trait IntuicioStruct {
     fn define_struct(registry: &Registry) -> Struct;
+}
+
+pub trait IntuicioEnum {
+    fn define_enum(registry: &Registry) -> Enum;
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -185,5 +244,26 @@ mod tests {
         assert!(Visibility::Public.is_visible(Visibility::Private));
         assert!(Visibility::Public.is_visible(Visibility::Module));
         assert!(Visibility::Public.is_visible(Visibility::Public));
+    }
+
+    #[test]
+    fn test_offset_of_enum() {
+        #[allow(dead_code)]
+        #[repr(u8)]
+        enum Foo {
+            A,
+            B(usize),
+            C(u8, u16),
+            D { a: u32, b: u64 },
+        }
+
+        assert_eq!(__internal__offset_of_enum__!(Foo::B[v] => v => 1), 8);
+        assert_eq!(__internal__offset_of_enum__!(Foo::B(0) => 1), 8);
+        assert_eq!(__internal__offset_of_enum__!(Foo::C[a, b] => a => 2), 1);
+        assert_eq!(__internal__offset_of_enum__!(Foo::C[a, b] => b => 2), 2);
+        assert_eq!(__internal__offset_of_enum__!(Foo::C(0) => 2), 1);
+        assert_eq!(__internal__offset_of_enum__!(Foo::C(1) => 2), 2);
+        assert_eq!(__internal__offset_of_enum__!(Foo::D { a } => 3), 4);
+        assert_eq!(__internal__offset_of_enum__!(Foo::D { b } => 3), 8);
     }
 }

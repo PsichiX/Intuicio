@@ -57,7 +57,7 @@ impl Closure {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Closure::define_struct(registry));
+    registry.add_type(Closure::define_struct(registry));
     registry.add_function(Closure::new__define_function(registry));
     registry.add_function(Closure::call__define_function(registry));
 }

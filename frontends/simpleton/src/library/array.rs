@@ -216,7 +216,7 @@ impl ArrayIter {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod array struct Array (Array) {}
         [override_send = true]
     });
@@ -237,6 +237,6 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(join::define_function(registry));
     registry.add_function(iter::define_function(registry));
     registry.add_function(collect::define_function(registry));
-    registry.add_struct(ArrayIter::define_struct(registry));
+    registry.add_type(ArrayIter::define_struct(registry));
     registry.add_function(ArrayIter::next__define_function(registry));
 }

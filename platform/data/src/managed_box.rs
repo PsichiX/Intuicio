@@ -1,7 +1,7 @@
 use crate::{
+    lifetime::{Lifetime, ValueReadAccess, ValueWriteAccess},
     managed::{ManagedLazy, ManagedRef, ManagedRefMut},
     pointer_alignment_padding,
-    prelude::{Lifetime, ValueReadAccess, ValueWriteAccess},
     type_hash::TypeHash,
     Finalize,
 };

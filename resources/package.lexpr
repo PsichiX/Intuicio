@@ -4,7 +4,7 @@
         (name . "main")
         (outputs (
             (name . "result")
-            (struct_name . "usize")
+            (type_name . "usize")
         ))
         (script
             (Expression Literal Usize . 40)

@@ -1,7 +1,6 @@
-use std::alloc::dealloc;
-
-use crate::{object::Object, prelude::StructQuery, registry::Registry};
+use crate::{object::Object, registry::Registry, types::TypeQuery};
 use intuicio_data::data_stack::DataStack;
+use std::alloc::dealloc;
 
 pub fn object_push_to_stack(object: Object, data_stack: &mut DataStack) -> bool {
     unsafe {
@@ -21,7 +20,7 @@ pub fn object_push_to_stack(object: Object, data_stack: &mut DataStack) -> bool 
 pub fn object_pop_from_stack(data_stack: &mut DataStack, registry: &Registry) -> Option<Object> {
     unsafe {
         let (layout, type_hash, finalizer, data) = data_stack.pop_raw()?;
-        if let Some(handle) = registry.find_struct(StructQuery {
+        if let Some(handle) = registry.find_type(TypeQuery {
             type_hash: Some(type_hash),
             ..Default::default()
         }) {

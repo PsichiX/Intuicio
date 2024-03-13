@@ -1,9 +1,11 @@
 use proc_macro::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, Ident, ItemStruct, Lit, Meta, NestedMeta, Visibility};
+use syn::{
+    parse_macro_input, Expr, Fields, Ident, Index, ItemEnum, Lit, Meta, NestedMeta, Visibility,
+};
 
 #[derive(Default)]
-struct StructAttributes {
+struct EnumAttributes {
     pub name: Option<Ident>,
     pub module_name: Option<Ident>,
     pub override_send: Option<bool>,
@@ -11,6 +13,15 @@ struct StructAttributes {
     pub override_copy: Option<bool>,
     pub debug: bool,
     pub meta: Option<String>,
+    pub is_repr_u8: bool,
+}
+
+#[derive(Default)]
+struct VariantAttributes {
+    pub name: Option<Ident>,
+    pub ignore: bool,
+    pub meta: Option<String>,
+    pub is_default: bool,
 }
 
 #[derive(Default)]
@@ -20,9 +31,9 @@ struct FieldAttributes {
     pub meta: Option<String>,
 }
 
-macro_rules! parse_struct_attributes {
+macro_rules! parse_enum_attributes {
     ($attributes:expr) => {{
-        let mut result = StructAttributes::default();
+        let mut result = EnumAttributes::default();
         for attribute in $attributes {
             let attribute = match attribute.parse_meta() {
                 Ok(attribute) => attribute,
@@ -95,12 +106,73 @@ macro_rules! parse_struct_attributes {
                                 _ => {}
                             }
                         }
+                    } else if list.path.is_ident("repr") {
+                        for meta in list.nested.iter() {
+                            if let NestedMeta::Meta(Meta::Path(path)) = meta {
+                                if path.is_ident("u8") {
+                                    result.is_repr_u8 = true;
+                                }
+                            }
+                        }
                     }
                 }
                 _ => {}
             }
         }
         result
+    }};
+}
+
+macro_rules! parse_variant_attributes {
+    ($attributes:expr) => {{
+        let mut result = VariantAttributes::default();
+        for attribute in $attributes {
+            let attribute = match attribute.parse_meta() {
+                Ok(attribute) => attribute,
+                Err(err) => return Some(TokenStream::from(err.to_compile_error()).into()),
+            };
+            match attribute {
+                Meta::List(list) => {
+                    if list.path.is_ident("intuicio") {
+                        for meta in list.nested.iter() {
+                            match meta {
+                                NestedMeta::Meta(meta) => match meta {
+                                    Meta::Path(path) => {
+                                        if path.is_ident("ignore") {
+                                            result.ignore = true;
+                                        }
+                                    }
+                                    Meta::NameValue(name_value) => {
+                                        if name_value.path.is_ident("name") {
+                                            match &name_value.lit {
+                                                Lit::Str(content) => {
+                                                    result.name = Some(Ident::new(
+                                                        &content.value(),
+                                                        Span::call_site().into(),
+                                                    ))
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if name_value.path.is_ident("meta") {
+                                            match &name_value.lit {
+                                                Lit::Str(content) => {
+                                                    result.meta = Some(content.value());
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                },
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Some(result)
     }};
 }
 
@@ -157,16 +229,16 @@ macro_rules! parse_field_attributes {
     }};
 }
 
-pub fn intuicio_struct(input: TokenStream) -> TokenStream {
+pub fn intuicio_enum(input: TokenStream) -> TokenStream {
     let input2 = input.clone();
-    let ItemStruct {
+    let ItemEnum {
         attrs,
         ident,
         vis,
-        fields,
+        variants,
         ..
-    } = parse_macro_input!(input2 as ItemStruct);
-    let StructAttributes {
+    } = parse_macro_input!(input2 as ItemEnum);
+    let EnumAttributes {
         name,
         module_name,
         override_send,
@@ -174,7 +246,11 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
         override_copy,
         debug,
         meta,
-    } = parse_struct_attributes!(attrs);
+        is_repr_u8,
+    } = parse_enum_attributes!(attrs);
+    if !is_repr_u8 {
+        panic!("Enum: {} does not have `repr(u8)` attribute!", ident);
+    }
     let name = if let Some(name) = name {
         quote! { stringify!(#name) }
     } else {
@@ -194,50 +270,138 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     } else {
         quote! {}
     };
-    let fields = fields
+    let mut discriminant = 0u8;
+    let mut default_variant = None;
+    let variants = variants
         .iter()
-        .filter_map(|field| {
-            let FieldAttributes { name, ignore, meta } = parse_field_attributes!(&field.attrs)?;
+        .filter_map(|variant| {
+            let VariantAttributes {
+                name,
+                ignore,
+                meta,
+                is_default
+            } = parse_variant_attributes!(&variant.attrs)?;
             if ignore {
                 return None;
             }
-            let field_name = match field.ident.as_ref() {
-                Some(ident) => ident,
-                None => panic!("Struct: {} has field without a name!", ident),
-            };
+            let variant_name = variant.ident.clone();
             let name = if let Some(name) = name {
                 quote! { stringify!(#name) }
             } else {
-                quote! { stringify!(#field_name) }
+                quote! { stringify!(#variant_name) }
             };
-            let field_type = &field.ty;
-            let visibility = match field.vis {
-                Visibility::Inherited => {
-                    quote! { field.visibility = intuicio_core::Visibility::Private; }
+            if let Some((_, value)) = variant.discriminant.as_ref() {
+                let Expr::Lit(value) = value else {
+                    panic!("Enum: {} variant: {} has non-literal discriminant!", ident, variant_name);
+                };
+                let Lit::Int(value) = &value.lit else {
+                    panic!("Enum: {} variant: {} has non-integer discriminant!", ident, variant_name);
+                };
+                discriminant = value.base10_parse().unwrap();
+            }
+            let fields = match &variant.fields {
+                Fields::Named(fields) => {
+                    fields
+                        .named
+                        .iter()
+                        .filter_map(|field| {
+                            let FieldAttributes {
+                                name,
+                                ignore,
+                                meta
+                            } = parse_field_attributes!(&field.attrs)?;
+                            if ignore {
+                                return None;
+                            }
+                            let field_name = match field.ident.as_ref() {
+                                Some(ident) => ident,
+                                None => panic!("Enum: {} variant: {} has field without a name!", ident, variant_name),
+                            };
+                            let name = if let Some(name) = name {
+                                quote! { stringify!(#name) }
+                            } else {
+                                quote! { stringify!(#field_name) }
+                            };
+                            let field_type = &field.ty;
+                            let meta = if let Some(meta) = meta {
+                                quote! { field.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+                            } else {
+                                quote! {}
+                            };
+                            Some(quote! {
+                                let mut field = intuicio_core::types::struct_type::StructField::new(
+                                    #name,
+                                    registry
+                                        .find_type(intuicio_core::types::TypeQuery::of_type_name::<#field_type>())
+                                        .unwrap(),
+                                );
+                                #meta
+                                variant = variant.with_field_with_offset(
+                                    field,
+                                    intuicio_core::__internal__offset_of_enum__!(#ident :: #variant_name { #field_name } => #discriminant),
+                                );
+                            })
+                        })
+                        .collect::<Vec<_>>()
                 }
-                Visibility::Restricted(_) | Visibility::Crate(_) => {
-                    quote! { field.visibility = intuicio_core::Visibility::Module; }
-                }
-                Visibility::Public(_) => quote! {},
+                Fields::Unnamed(fields) => {
+                    fields
+                        .unnamed
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, field)| {
+                            let FieldAttributes {
+                                name,
+                                ignore,
+                                meta
+                            } = parse_field_attributes!(&field.attrs)?;
+                            if ignore {
+                                return None;
+                            }
+                            let name = if let Some(name) = name {
+                                quote! { stringify!(#name) }
+                            } else {
+                                quote! { stringify!(#index) }
+                            };
+                            let field_type = &field.ty;
+                            let meta = if let Some(meta) = meta {
+                                quote! { field.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+                            } else {
+                                quote! {}
+                            };
+                            let field_name = Index::from(index);
+                            Some(quote! {
+                                let mut field = intuicio_core::types::struct_type::StructField::new(
+                                    #name,
+                                    registry
+                                        .find_type(intuicio_core::types::TypeQuery::of_type_name::<#field_type>())
+                                        .unwrap(),
+                                );
+                                #meta
+                                variant = variant.with_field_with_offset(
+                                    field,
+                                    intuicio_core::__internal__offset_of_enum__!(#ident :: #variant_name ( #field_name ) => #discriminant),
+                                );
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                },
+                Fields::Unit => vec![],
             };
             let meta = if let Some(meta) = meta {
-                quote! { field.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+                quote! { variant.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
             } else {
                 quote! {}
             };
+            if is_default {
+                default_variant = Some(discriminant);
+            }
+            discriminant += 1;
             Some(quote! {
-                let mut field = intuicio_core::types::struct_type::StructField::new(
-                    #name,
-                    registry
-                        .find_type(intuicio_core::types::TypeQuery::of_type_name::<#field_type>())
-                        .unwrap(),
-                );
-                #visibility
+                let mut variant = intuicio_core::types::enum_type::EnumVariant::new(#name);
+                #(#fields)*
                 #meta
-                result = result.field(
-                    field,
-                    intuicio_core::__internal__offset_of__!(#ident, #field_name),
-                );
+                result = result.variant(variant, #discriminant);
             })
         })
         .collect::<Vec<_>>();
@@ -261,17 +425,23 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     } else {
         quote! {}
     };
+    let default_variant = if let Some(discriminant) = default_variant {
+        quote! { result = result.set_default_variant(#discriminant); }
+    } else {
+        quote! {}
+    };
     let result = quote! {
-        impl intuicio_core::IntuicioStruct for #ident {
+        impl intuicio_core::IntuicioEnum for #ident {
             #[allow(dead_code)]
-            fn define_struct(
+            fn define_enum(
                 registry: &intuicio_core::registry::Registry,
-            ) -> intuicio_core::types::struct_type::Struct {
+            ) -> intuicio_core::types::enum_type::Enum {
                 let name = #name;
-                let mut result = intuicio_core::types::struct_type::NativeStructBuilder::new_named::<#ident>(name);
+                let mut result = intuicio_core::types::enum_type::NativeEnumBuilder::new_named::<#ident>(name);
                 #visibility
                 #module_name
-                #(#fields)*
+                #(#variants)*
+                #default_variant
                 #override_send
                 #override_sync
                 #override_copy
@@ -282,7 +452,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     }.into();
     if debug {
         println!(
-            "* Debug of `IntuicioStruct` derive macro\n- Input: {}\n- Result: {}",
+            "* Debug of `IntuicioEnum` derive macro\n- Input: {}\n- Result: {}",
             input, result
         );
     }

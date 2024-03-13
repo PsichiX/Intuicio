@@ -668,10 +668,10 @@ pub extern "C" fn version() -> IntuicioVersion {
 
 #[no_mangle]
 pub extern "C" fn install(registry: &mut Registry) {
-    registry.add_struct(Renderer::define_struct(registry));
-    registry.add_struct(RenderBuffer::define_struct(registry));
-    registry.add_struct(Transform::define_struct(registry));
-    registry.add_struct(Image::define_struct(registry));
+    registry.add_type(Renderer::define_struct(registry));
+    registry.add_type(RenderBuffer::define_struct(registry));
+    registry.add_type(Transform::define_struct(registry));
+    registry.add_type(Image::define_struct(registry));
     registry.add_function(Renderer::new__define_function(registry));
     registry.add_function(Renderer::create_shader__define_function(registry));
     registry.add_function(Renderer::destroy_shader__define_function(registry));

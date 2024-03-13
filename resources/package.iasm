@@ -1,4 +1,15 @@
 mod test {
+    struct Foo {
+        a: struct usize,
+    }
+
+    enum Bar {
+        A,
+        B {
+            a: struct usize,
+        }
+    }
+
     fn main() -> (result: struct usize) {
         literal 40 usize;
         literal 2 usize;

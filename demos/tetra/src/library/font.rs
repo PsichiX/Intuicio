@@ -175,7 +175,7 @@ impl Font {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Font::define_struct(registry));
+    registry.add_type(Font::define_struct(registry));
     registry.add_function(Font::load__define_function(registry));
     registry.add_function(Font::draw__define_function(registry));
     registry.add_function(Font::draw_advanced__define_function(registry));

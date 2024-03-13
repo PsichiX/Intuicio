@@ -3,7 +3,7 @@ use intuicio_core::{
     function::{FunctionHandle, FunctionQuery},
     object::Object,
     registry::Registry,
-    struct_type::{NativeStructBuilder, StructHandle, StructQuery},
+    types::{struct_type::NativeStructBuilder, TypeHandle, TypeQuery},
 };
 use intuicio_data::{shared::Shared, type_hash::TypeHash};
 use std::{
@@ -19,17 +19,17 @@ pub type Array = Vec<Reference>;
 pub type Map = HashMap<Text, Reference>;
 
 thread_local! {
-    static TRANSFERRED_STRUCT_HANDLE: StructHandle = NativeStructBuilder::new::<Transferred>().build_handle();
+    static TRANSFERRED_STRUCT_HANDLE: TypeHandle = NativeStructBuilder::new::<Transferred>().build().into_type().into_handle();
 }
 
 #[derive(Default, Clone)]
 pub struct Type {
-    data: Option<StructHandle>,
+    data: Option<TypeHandle>,
 }
 
 impl Type {
     pub fn by_name(name: &str, module_name: &str, registry: &Registry) -> Option<Self> {
-        Some(Self::new(registry.find_struct(StructQuery {
+        Some(Self::new(registry.find_type(TypeQuery {
             name: Some(name.into()),
             module_name: Some(module_name.into()),
             ..Default::default()
@@ -37,17 +37,17 @@ impl Type {
     }
 
     pub fn of<T: 'static>(registry: &Registry) -> Option<Self> {
-        Some(Self::new(registry.find_struct(StructQuery {
+        Some(Self::new(registry.find_type(TypeQuery {
             type_hash: Some(TypeHash::of::<T>()),
             ..Default::default()
         })?))
     }
 
-    pub fn new(handle: StructHandle) -> Self {
+    pub fn new(handle: TypeHandle) -> Self {
         Self { data: Some(handle) }
     }
 
-    pub fn handle(&self) -> Option<&StructHandle> {
+    pub fn handle(&self) -> Option<&TypeHandle> {
         self.data.as_ref()
     }
 
@@ -164,14 +164,12 @@ impl Reference {
     }
 
     pub fn new<T: 'static>(data: T, registry: &Registry) -> Self {
-        let struct_type = registry
-            .find_struct(StructQuery::of::<T>())
-            .unwrap_or_else(|| {
-                panic!(
-                    "Could not make a reference of type: {}",
-                    std::any::type_name::<T>()
-                )
-            });
+        let struct_type = registry.find_type(TypeQuery::of::<T>()).unwrap_or_else(|| {
+            panic!(
+                "Could not make a reference of type: {}",
+                std::any::type_name::<T>()
+            )
+        });
         let mut value = unsafe { Object::new_uninitialized(struct_type).unwrap() };
         unsafe { value.as_mut_ptr().cast::<T>().write(data) };
         Self::new_raw(value)
@@ -204,14 +202,12 @@ impl Reference {
     }
 
     pub fn type_of(&self) -> Option<Type> {
-        Some(Type::new(
-            self.data.as_ref()?.read()?.struct_handle().clone(),
-        ))
+        Some(Type::new(self.data.as_ref()?.read()?.type_handle().clone()))
     }
 
     pub fn read<T: 'static>(&self) -> Option<Ref<T>> {
         let result = self.data.as_ref()?.read()?;
-        if result.struct_handle().type_hash() == TypeHash::of::<T>() {
+        if result.type_handle().type_hash() == TypeHash::of::<T>() {
             Some(Ref::map(result, |data| data.read::<T>().unwrap()))
         } else {
             None
@@ -220,7 +216,7 @@ impl Reference {
 
     pub fn write<T: 'static>(&mut self) -> Option<RefMut<T>> {
         let result = self.data.as_mut()?.write()?;
-        if result.struct_handle().type_hash() == TypeHash::of::<T>() {
+        if result.type_handle().type_hash() == TypeHash::of::<T>() {
             Some(RefMut::map(result, |data| data.write::<T>().unwrap()))
         } else {
             None
@@ -273,7 +269,7 @@ impl Reference {
         if let Some(data) = data.read::<Transferred>() {
             return Some(Err(data.0));
         }
-        if !data.struct_handle().is_send() {
+        if !data.type_handle().is_send() {
             return None;
         }
         let mut object =
@@ -419,20 +415,42 @@ impl Transferable {
                 .collect();
             objects.insert(address, TransferableObject::Map { object, pairs });
         } else {
-            let fields = object
-                .struct_handle()
-                .clone()
-                .fields()
-                .iter()
-                .filter_map(|field| {
-                    let value = object.write_field::<Reference>(&field.name)?;
-                    Some((
-                        field.name.to_owned(),
-                        Self::produce(std::mem::replace(value, Reference::null()), objects),
-                    ))
-                })
-                .collect();
-            objects.insert(address, TransferableObject::Object { object, fields });
+            match &*object.type_handle().clone() {
+                intuicio_core::types::Type::Struct(type_) => {
+                    let fields = type_
+                        .fields()
+                        .iter()
+                        .filter_map(|field| {
+                            let value = object.write_field::<Reference>(&field.name)?;
+                            Some((
+                                field.name.to_owned(),
+                                Self::produce(std::mem::replace(value, Reference::null()), objects),
+                            ))
+                        })
+                        .collect();
+                    objects.insert(address, TransferableObject::Object { object, fields });
+                }
+                intuicio_core::types::Type::Enum(type_) => {
+                    let discriminant = unsafe { object.as_ptr().read() };
+                    if let Some(variant) = type_.find_variant_by_discriminant(discriminant) {
+                        let fields = variant
+                            .fields
+                            .iter()
+                            .filter_map(|field| {
+                                let value = object.write_field::<Reference>(&field.name)?;
+                                Some((
+                                    field.name.to_owned(),
+                                    Self::produce(
+                                        std::mem::replace(value, Reference::null()),
+                                        objects,
+                                    ),
+                                ))
+                            })
+                            .collect();
+                        objects.insert(address, TransferableObject::Object { object, fields });
+                    }
+                }
+            }
         }
         Some(address)
     }
@@ -480,20 +498,51 @@ impl Transferable {
                 }
                 TransferableReference::Object { reference, fields } => {
                     if let Some(mut object) = reference.write_object() {
-                        let names = object
-                            .struct_handle()
-                            .fields()
-                            .iter()
-                            .map(|field| field.name.to_owned())
-                            .collect::<Vec<_>>();
-                        for name in names {
-                            if let Some(value) = object.write_field::<Reference>(&name) {
-                                if let Some(address) = fields.get(&name) {
-                                    *value = address
-                                        .and_then(|address| references.get(&address).cloned())
-                                        .unwrap_or_default();
-                                } else {
-                                    *value = Reference::null();
+                        match &**object.type_handle() {
+                            intuicio_core::types::Type::Struct(type_) => {
+                                let names = type_
+                                    .fields()
+                                    .iter()
+                                    .map(|field| field.name.to_owned())
+                                    .collect::<Vec<_>>();
+                                for name in names {
+                                    if let Some(value) = object.write_field::<Reference>(&name) {
+                                        if let Some(address) = fields.get(&name) {
+                                            *value = address
+                                                .and_then(|address| {
+                                                    references.get(&address).cloned()
+                                                })
+                                                .unwrap_or_default();
+                                        } else {
+                                            *value = Reference::null();
+                                        }
+                                    }
+                                }
+                            }
+                            intuicio_core::types::Type::Enum(type_) => {
+                                let discriminant = unsafe { object.as_ptr().read() };
+                                if let Some(variant) =
+                                    type_.find_variant_by_discriminant(discriminant)
+                                {
+                                    let names = variant
+                                        .fields
+                                        .iter()
+                                        .map(|field| field.name.to_owned())
+                                        .collect::<Vec<_>>();
+                                    for name in names {
+                                        if let Some(value) = object.write_field::<Reference>(&name)
+                                        {
+                                            if let Some(address) = fields.get(&name) {
+                                                *value = address
+                                                    .and_then(|address| {
+                                                        references.get(&address).cloned()
+                                                    })
+                                                    .unwrap_or_default();
+                                            } else {
+                                                *value = Reference::null();
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -517,32 +566,32 @@ impl From<Reference> for Transferable {
 pub struct Transferred(usize);
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod reflect struct Reference (Reference) {}
         [override_send = true]
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod reflect struct Type (Type) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod reflect struct Function (Function) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Boolean (Boolean) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Integer (Integer) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Real (Real) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Text (Text) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Array (Array) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Map (Map) {}
     });
 }
@@ -551,7 +600,7 @@ pub fn install(registry: &mut Registry) {
 mod tests {
     use crate::{Integer, Reference, Transferable};
     use intuicio_core::prelude::*;
-    use intuicio_derive::IntuicioStruct;
+    use intuicio_derive::*;
     use std::thread::spawn;
 
     #[test]
@@ -563,14 +612,25 @@ mod tests {
             pub me: Reference,
         }
 
+        #[derive(IntuicioEnum, Default)]
+        #[intuicio(name = "Bar", module_name = "test", override_send = true)]
+        #[repr(u8)]
+        enum Bar {
+            #[default]
+            A,
+            B(Reference),
+        }
+
         let mut registry = Registry::default();
         crate::install(&mut registry);
-        let foo_type = registry.add_struct(Foo::define_struct(&registry));
+        let foo_type = registry.add_type(Foo::define_struct(&registry));
         assert!(foo_type.is_send());
+        let bar_type = registry.add_type(Bar::define_enum(&registry));
+        assert!(bar_type.is_send());
 
         let mut value = Reference::new(
             Foo {
-                v: Reference::new(0 as Integer, &registry),
+                v: Reference::new(Bar::B(Reference::new(0 as Integer, &registry)), &registry),
                 me: Default::default(),
             },
             &registry,
@@ -590,9 +650,12 @@ mod tests {
             {
                 let mut value = object.clone();
                 let mut value = value.write::<Foo>().unwrap();
-                let mut value = value.v.write::<Integer>().unwrap();
-                while *value < 42 {
-                    *value += 1;
+                let mut value = value.v.write::<Bar>().unwrap();
+                if let Bar::B(value) = &mut *value {
+                    let mut value = value.write::<Integer>().unwrap();
+                    while *value < 42 {
+                        *value += 1;
+                    }
                 }
             }
 
@@ -604,8 +667,11 @@ mod tests {
         assert!(object.type_of().unwrap().is::<Foo>());
         let value = object.read::<Foo>().unwrap();
         assert!(!value.v.is_null());
-        assert!(value.v.type_of().unwrap().is::<Integer>());
-        assert_eq!(*value.v.read::<Integer>().unwrap(), 42);
+        assert!(value.v.type_of().unwrap().is::<Bar>());
+        if let Bar::B(value) = &*value.v.read::<Bar>().unwrap() {
+            assert!(value.type_of().unwrap().is::<Integer>());
+            assert_eq!(*value.read::<Integer>().unwrap(), 42);
+        }
         assert!(!value.me.is_null());
         assert!(value.me.type_of().unwrap().is::<Foo>());
         assert!(value.me.does_share_reference(&object, true));

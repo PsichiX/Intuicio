@@ -92,7 +92,7 @@ impl Promise {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Promise::define_struct(registry));
+    registry.add_type(Promise::define_struct(registry));
     registry.add_function(Promise::new__define_function(registry));
     registry.add_function(Promise::then__define_function(registry));
     registry.add_function(Promise::resolve__define_function(registry));

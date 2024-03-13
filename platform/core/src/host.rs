@@ -1,9 +1,8 @@
 use crate::{
     context::Context,
-    function::FunctionQuery,
-    prelude::{FunctionHandle, FunctionQueryParameter},
+    function::{FunctionHandle, FunctionQuery, FunctionQueryParameter},
     registry::{Registry, RegistryHandle},
-    struct_type::StructQuery,
+    types::TypeQuery,
 };
 use intuicio_data::data_stack::DataStackPack;
 use std::{cell::RefCell, marker::PhantomData, sync::Arc};
@@ -96,13 +95,13 @@ impl Host {
         &self,
         name: &str,
         module_name: &str,
-        struct_name: Option<&str>,
+        type_name: Option<&str>,
     ) -> Option<FunctionHandle> {
         self.registry.find_function(FunctionQuery {
             name: Some(name.into()),
             module_name: Some(module_name.into()),
-            struct_query: struct_name.map(|struct_name| StructQuery {
-                name: Some(struct_name.into()),
+            type_query: type_name.map(|type_name| TypeQuery {
+                name: Some(type_name.into()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -113,12 +112,12 @@ impl Host {
         &mut self,
         name: &str,
         module_name: &str,
-        struct_name: Option<&str>,
+        type_name: Option<&str>,
     ) -> Option<HostFunctionCall<I, O>> {
         let inputs_query = I::pack_types()
             .into_iter()
             .map(|type_hash| FunctionQueryParameter {
-                struct_query: Some(StructQuery {
+                type_query: Some(TypeQuery {
                     type_hash: Some(type_hash),
                     ..Default::default()
                 }),
@@ -128,7 +127,7 @@ impl Host {
         let outputs_query = O::pack_types()
             .into_iter()
             .map(|type_hash| FunctionQueryParameter {
-                struct_query: Some(StructQuery {
+                type_query: Some(TypeQuery {
                     type_hash: Some(type_hash),
                     ..Default::default()
                 }),
@@ -138,8 +137,8 @@ impl Host {
         let handle = self.registry.find_function(FunctionQuery {
             name: Some(name.into()),
             module_name: Some(module_name.into()),
-            struct_query: struct_name.map(|struct_name| StructQuery {
-                name: Some(struct_name.into()),
+            type_query: type_name.map(|type_name| TypeQuery {
+                name: Some(type_name.into()),
                 ..Default::default()
             }),
             inputs: inputs_query.into(),

@@ -3,7 +3,11 @@ use crate::{
     function::{Function, FunctionBody, FunctionParameter, FunctionQuery, FunctionSignature},
     meta::Meta,
     registry::Registry,
-    struct_type::{RuntimeStructBuilder, StructField, StructHandle, StructQuery},
+    types::{
+        enum_type::{EnumVariant, RuntimeEnumBuilder},
+        struct_type::{RuntimeStructBuilder, StructField},
+        TypeQuery,
+    },
     Visibility,
 };
 use std::{
@@ -58,7 +62,7 @@ pub enum ScriptOperation<'a, SE: ScriptExpression> {
         expression: SE,
     },
     DefineRegister {
-        query: StructQuery<'a>,
+        query: TypeQuery<'a>,
     },
     DropRegister {
         index: usize,
@@ -128,7 +132,7 @@ impl<'a, SE: ScriptExpression> ScriptBuilder<'a, SE> {
         self
     }
 
-    pub fn define_register(mut self, query: StructQuery<'a>) -> Self {
+    pub fn define_register(mut self, query: TypeQuery<'a>) -> Self {
         self.0.push(ScriptOperation::DefineRegister { query });
         self
     }
@@ -195,7 +199,7 @@ impl<'a, SE: ScriptExpression> ScriptBuilder<'a, SE> {
 pub struct ScriptFunctionParameter<'a> {
     pub meta: Option<Meta>,
     pub name: String,
-    pub struct_query: StructQuery<'a>,
+    pub type_query: TypeQuery<'a>,
 }
 
 impl<'a> ScriptFunctionParameter<'a> {
@@ -203,9 +207,9 @@ impl<'a> ScriptFunctionParameter<'a> {
         FunctionParameter {
             meta: self.meta.to_owned(),
             name: self.name.to_owned(),
-            struct_handle: registry
-                .structs()
-                .find(|struct_type| self.struct_query.is_valid(struct_type))
+            type_handle: registry
+                .types()
+                .find(|type_| self.type_query.is_valid(type_))
                 .unwrap()
                 .clone(),
         }
@@ -217,7 +221,7 @@ pub struct ScriptFunctionSignature<'a> {
     pub meta: Option<Meta>,
     pub name: String,
     pub module_name: Option<String>,
-    pub struct_query: Option<StructQuery<'a>>,
+    pub type_query: Option<TypeQuery<'a>>,
     pub visibility: Visibility,
     pub inputs: Vec<ScriptFunctionParameter<'a>>,
     pub outputs: Vec<ScriptFunctionParameter<'a>>,
@@ -229,10 +233,10 @@ impl<'a> ScriptFunctionSignature<'a> {
             meta: self.meta.to_owned(),
             name: self.name.to_owned(),
             module_name: self.module_name.to_owned(),
-            struct_handle: self.struct_query.as_ref().map(|struct_query| {
+            type_handle: self.type_query.as_ref().map(|type_query| {
                 registry
-                    .structs()
-                    .find(|struct_type| struct_query.is_valid(struct_type))
+                    .types()
+                    .find(|type_| type_query.is_valid(type_))
                     .unwrap()
                     .clone()
             }),
@@ -296,7 +300,7 @@ pub struct ScriptStructField<'a> {
     pub meta: Option<Meta>,
     pub name: String,
     pub visibility: Visibility,
-    pub struct_query: StructQuery<'a>,
+    pub type_query: TypeQuery<'a>,
 }
 
 impl<'a> ScriptStructField<'a> {
@@ -304,8 +308,8 @@ impl<'a> ScriptStructField<'a> {
         let mut result = StructField::new(
             &self.name,
             registry
-                .structs()
-                .find(|struct_type| self.struct_query.is_valid(struct_type))
+                .types()
+                .find(|type_| self.type_query.is_valid(type_))
                 .unwrap()
                 .clone(),
         )
@@ -334,29 +338,34 @@ impl<'a> ScriptStruct<'a> {
         if let Some(meta) = self.meta.as_ref() {
             builder = builder.meta(meta.to_owned());
         }
-        registry.add_struct(builder.build());
+        registry.add_type(builder.build());
     }
 
     pub fn define(&self, registry: &mut Registry) {
-        unsafe {
-            let pointer = StructHandle::as_ptr(
-                &registry
-                    .find_struct(StructQuery {
-                        name: Some(self.name.as_str().into()),
-                        module_name: self
-                            .module_name
-                            .as_ref()
-                            .map(|module_name| module_name.into()),
-                        ..Default::default()
-                    })
-                    .unwrap(),
-            )
-            .cast_mut();
-            let mut builder = RuntimeStructBuilder::from(pointer.read());
+        let query = TypeQuery {
+            name: Some(self.name.as_str().into()),
+            module_name: self
+                .module_name
+                .as_ref()
+                .map(|module_name| module_name.into()),
+            ..Default::default()
+        };
+        if let Some(handle) = registry.find_type(query) {
+            let mut builder = RuntimeStructBuilder::new(&self.name);
+            builder = builder.visibility(self.visibility);
+            if let Some(module_name) = self.module_name.as_ref() {
+                builder = builder.module_name(module_name);
+            }
+            if let Some(meta) = self.meta.as_ref() {
+                builder = builder.meta(meta.to_owned());
+            }
             for field in &self.fields {
                 builder = builder.field(field.build(registry));
             }
-            pointer.write(builder.build());
+            unsafe {
+                let type_ = Arc::as_ptr(&handle).cast_mut();
+                *type_ = builder.build().into();
+            }
         }
     }
 
@@ -369,7 +378,110 @@ impl<'a> ScriptStruct<'a> {
         for field in &self.fields {
             builder = builder.field(field.build(registry));
         }
-        registry.add_struct(builder.build());
+        registry.add_type(builder.build());
+    }
+}
+
+#[derive(Debug)]
+pub struct ScriptEnumVariant<'a> {
+    pub meta: Option<Meta>,
+    pub name: String,
+    pub fields: Vec<ScriptStructField<'a>>,
+    pub discriminant: Option<u8>,
+}
+
+impl<'a> ScriptEnumVariant<'a> {
+    pub fn build(&self, registry: &Registry) -> EnumVariant {
+        let mut result = EnumVariant::new(&self.name);
+        result.fields = self
+            .fields
+            .iter()
+            .map(|field| field.build(registry))
+            .collect();
+        result.meta = self.meta.to_owned();
+        result
+    }
+}
+
+#[derive(Debug)]
+pub struct ScriptEnum<'a> {
+    pub meta: Option<Meta>,
+    pub name: String,
+    pub module_name: Option<String>,
+    pub visibility: Visibility,
+    pub variants: Vec<ScriptEnumVariant<'a>>,
+    pub default_variant: Option<u8>,
+}
+
+impl<'a> ScriptEnum<'a> {
+    pub fn declare(&self, registry: &mut Registry) {
+        let mut builder = RuntimeEnumBuilder::new(&self.name);
+        if let Some(discriminant) = self.default_variant {
+            builder = builder.set_default_variant(discriminant);
+        }
+        builder = builder.visibility(self.visibility);
+        if let Some(module_name) = self.module_name.as_ref() {
+            builder = builder.module_name(module_name);
+        }
+        if let Some(meta) = self.meta.as_ref() {
+            builder = builder.meta(meta.to_owned());
+        }
+        registry.add_type(builder.build());
+    }
+
+    pub fn define(&self, registry: &mut Registry) {
+        let query = TypeQuery {
+            name: Some(self.name.as_str().into()),
+            module_name: self
+                .module_name
+                .as_ref()
+                .map(|module_name| module_name.into()),
+            ..Default::default()
+        };
+        if let Some(handle) = registry.find_type(query) {
+            let mut builder = RuntimeEnumBuilder::new(&self.name);
+            if let Some(discriminant) = self.default_variant {
+                builder = builder.set_default_variant(discriminant);
+            }
+            builder = builder.visibility(self.visibility);
+            if let Some(module_name) = self.module_name.as_ref() {
+                builder = builder.module_name(module_name);
+            }
+            if let Some(meta) = self.meta.as_ref() {
+                builder = builder.meta(meta.to_owned());
+            }
+            for variant in &self.variants {
+                if let Some(discriminant) = variant.discriminant {
+                    builder =
+                        builder.variant_with_discriminant(variant.build(registry), discriminant);
+                } else {
+                    builder = builder.variant(variant.build(registry));
+                }
+            }
+            unsafe {
+                let type_ = Arc::as_ptr(&handle).cast_mut();
+                *type_ = builder.build().into();
+            }
+        }
+    }
+
+    pub fn install(&self, registry: &mut Registry) {
+        let mut builder = RuntimeEnumBuilder::new(&self.name);
+        if let Some(discriminant) = self.default_variant {
+            builder = builder.set_default_variant(discriminant);
+        }
+        builder = builder.visibility(self.visibility);
+        if let Some(module_name) = self.module_name.as_ref() {
+            builder = builder.module_name(module_name);
+        }
+        for variant in &self.variants {
+            if let Some(discriminant) = variant.discriminant {
+                builder = builder.variant_with_discriminant(variant.build(registry), discriminant);
+            } else {
+                builder = builder.variant(variant.build(registry));
+            }
+        }
+        registry.add_type(builder.build());
     }
 }
 
@@ -377,34 +489,44 @@ impl<'a> ScriptStruct<'a> {
 pub struct ScriptModule<'a, SE: ScriptExpression> {
     pub name: String,
     pub structs: Vec<ScriptStruct<'a>>,
+    pub enums: Vec<ScriptEnum<'a>>,
     pub functions: Vec<ScriptFunction<'a, SE>>,
 }
 
 impl<'a, SE: ScriptExpression> ScriptModule<'a, SE> {
     pub fn fix_module_names(&mut self) {
-        for struct_type in &mut self.structs {
-            struct_type.module_name = Some(self.name.to_owned());
+        for type_ in &mut self.structs {
+            type_.module_name = Some(self.name.to_owned());
+        }
+        for type_ in &mut self.enums {
+            type_.module_name = Some(self.name.to_owned());
         }
         for function in &mut self.functions {
             function.signature.module_name = Some(self.name.to_owned());
         }
     }
 
-    pub fn declare_structs(&self, registry: &mut Registry) {
-        for struct_type in &self.structs {
-            struct_type.declare(registry);
+    pub fn declare_types(&self, registry: &mut Registry) {
+        for type_ in &self.structs {
+            type_.declare(registry);
+        }
+        for type_ in &self.enums {
+            type_.declare(registry);
         }
     }
 
-    pub fn define_structs(&self, registry: &mut Registry) {
-        for struct_type in &self.structs {
-            struct_type.define(registry);
+    pub fn define_types(&self, registry: &mut Registry) {
+        for type_ in &self.structs {
+            type_.define(registry);
+        }
+        for type_ in &self.enums {
+            type_.define(registry);
         }
     }
 
-    pub fn install_structs(&self, registry: &mut Registry) {
-        self.declare_structs(registry);
-        self.define_structs(registry);
+    pub fn install_types(&self, registry: &mut Registry) {
+        self.declare_types(registry);
+        self.define_types(registry);
     }
 }
 
@@ -436,7 +558,7 @@ impl<SE: ScriptExpression> ScriptPackage<'static, SE> {
         SFG::Input: Clone,
     {
         for module in &self.modules {
-            module.install_structs(registry);
+            module.install_types(registry);
         }
         for module in &self.modules {
             module.install_functions::<SFG>(registry, input.clone());

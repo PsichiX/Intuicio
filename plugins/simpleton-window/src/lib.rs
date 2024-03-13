@@ -433,16 +433,16 @@ pub extern "C" fn version() -> IntuicioVersion {
 
 #[no_mangle]
 pub extern "C" fn install(registry: &mut Registry) {
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod gl struct Gl (Gl) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod window_interface struct WindowInterface (WindowInterface) {}
     });
-    registry.add_struct(MouseInput::define_struct(registry));
-    registry.add_struct(KeyboardInput::define_struct(registry));
-    registry.add_struct(WindowConfig::define_struct(registry));
-    registry.add_struct(Window::define_struct(registry));
+    registry.add_type(MouseInput::define_struct(registry));
+    registry.add_type(KeyboardInput::define_struct(registry));
+    registry.add_type(WindowConfig::define_struct(registry));
+    registry.add_type(Window::define_struct(registry));
     registry.add_function(Window::new__define_function(registry));
     registry.add_function(Window::run__define_function(registry));
     registry.add_function(Window::gl__define_function(registry));

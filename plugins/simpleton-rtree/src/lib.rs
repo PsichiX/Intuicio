@@ -222,8 +222,8 @@ pub extern "C" fn version() -> IntuicioVersion {
 
 #[no_mangle]
 pub extern "C" fn install(registry: &mut Registry) {
-    registry.add_struct(Rtree::define_struct(registry));
-    registry.add_struct(RtreeResult::define_struct(registry));
+    registry.add_type(Rtree::define_struct(registry));
+    registry.add_type(RtreeResult::define_struct(registry));
     registry.add_function(Rtree::add__define_function(registry));
     registry.add_function(Rtree::remove__define_function(registry));
     registry.add_function(Rtree::clear__define_function(registry));

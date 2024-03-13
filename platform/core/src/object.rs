@@ -1,4 +1,4 @@
-use crate::struct_type::{StructFieldQuery, StructHandle, StructQuery};
+use crate::types::{StructFieldQuery, Type, TypeHandle, TypeQuery};
 use intuicio_data::{type_hash::TypeHash, Initialize};
 use std::{
     alloc::{alloc, dealloc},
@@ -14,7 +14,7 @@ impl Initialize for RuntimeObject {
 }
 
 pub struct Object {
-    handle: StructHandle,
+    handle: TypeHandle,
     memory: *mut u8,
     drop: bool,
 }
@@ -26,10 +26,25 @@ impl Drop for Object {
                 if self.handle.is_native() {
                     self.handle.finalize(self.memory.cast::<()>());
                 } else {
-                    for field in self.handle.fields() {
-                        field
-                            .struct_handle()
-                            .finalize(self.memory.add(field.address_offset()).cast::<()>());
+                    match &*self.handle {
+                        Type::Struct(type_) => {
+                            for field in type_.fields() {
+                                field
+                                    .type_handle()
+                                    .finalize(self.memory.add(field.address_offset()).cast::<()>());
+                            }
+                        }
+                        Type::Enum(type_) => {
+                            let discriminant = self.memory.read();
+                            if let Some(variant) = type_.find_variant_by_discriminant(discriminant)
+                            {
+                                for field in &variant.fields {
+                                    field.type_handle().finalize(
+                                        self.memory.add(field.address_offset()).cast::<()>(),
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
                 dealloc(self.memory, *self.handle.layout());
@@ -39,12 +54,12 @@ impl Drop for Object {
 }
 
 impl Object {
-    pub fn new(handle: StructHandle) -> Self {
+    pub fn new(handle: TypeHandle) -> Self {
         if !handle.can_initialize() {
             panic!(
                 "Objects of type `{}::{}` cannot be initialized!",
-                handle.module_name.as_deref().unwrap_or(""),
-                handle.name
+                handle.module_name().unwrap_or(""),
+                handle.name()
             );
         }
         let memory = unsafe { alloc(*handle.layout()) };
@@ -57,7 +72,7 @@ impl Object {
         result
     }
 
-    pub fn try_new(handle: StructHandle) -> Option<Self> {
+    pub fn try_new(handle: TypeHandle) -> Option<Self> {
         if handle.can_initialize() {
             let memory = unsafe { alloc(*handle.layout()) };
             if memory.is_null() {
@@ -77,7 +92,7 @@ impl Object {
     }
 
     /// # Safety
-    pub unsafe fn new_uninitialized(handle: StructHandle) -> Option<Self> {
+    pub unsafe fn new_uninitialized(handle: TypeHandle) -> Option<Self> {
         let memory = alloc(*handle.layout());
         if memory.is_null() {
             None
@@ -91,7 +106,7 @@ impl Object {
     }
 
     /// # Safety
-    pub unsafe fn new_raw(handle: StructHandle, memory: *mut u8) -> Self {
+    pub unsafe fn new_raw(handle: TypeHandle, memory: *mut u8) -> Self {
         Self {
             memory,
             handle,
@@ -100,7 +115,7 @@ impl Object {
     }
 
     /// # Safety
-    pub unsafe fn from_bytes(handle: StructHandle, bytes: &[u8]) -> Option<Self> {
+    pub unsafe fn from_bytes(handle: TypeHandle, bytes: &[u8]) -> Option<Self> {
         if handle.layout().size() == bytes.len() {
             let memory = alloc(*handle.layout());
             if memory.is_null() {
@@ -118,7 +133,7 @@ impl Object {
         }
     }
 
-    pub fn with_value<T: 'static>(handle: StructHandle, value: T) -> Option<Self> {
+    pub fn with_value<T: 'static>(handle: TypeHandle, value: T) -> Option<Self> {
         if handle.type_hash() == TypeHash::of::<T>() {
             unsafe {
                 let mut result = Self::new_uninitialized(handle)?;
@@ -135,10 +150,24 @@ impl Object {
         if self.handle.is_native() {
             self.handle.initialize(self.memory.cast::<()>());
         } else {
-            for field in self.handle.fields() {
-                field
-                    .struct_handle()
-                    .initialize(self.memory.add(field.address_offset()).cast::<()>());
+            match &*self.handle {
+                Type::Struct(type_) => {
+                    for field in type_.fields() {
+                        field
+                            .type_handle()
+                            .initialize(self.memory.add(field.address_offset()).cast::<()>());
+                    }
+                }
+                Type::Enum(type_) => {
+                    if let Some(variant) = type_.default_variant() {
+                        self.memory.write(variant.discriminant());
+                        for field in &variant.fields {
+                            field
+                                .type_handle()
+                                .initialize(self.memory.add(field.address_offset()).cast::<()>());
+                        }
+                    }
+                }
             }
         }
     }
@@ -153,33 +182,45 @@ impl Object {
     }
 
     /// # Safety
-    pub unsafe fn into_inner(mut self) -> (StructHandle, *mut u8) {
+    pub unsafe fn into_inner(mut self) -> (TypeHandle, *mut u8) {
         self.drop = false;
         (self.handle.clone(), self.memory)
     }
 
-    pub fn struct_handle(&self) -> &StructHandle {
+    pub fn type_handle(&self) -> &TypeHandle {
         &self.handle
     }
 
     /// # Safety
     pub unsafe fn memory(&self) -> &[u8] {
-        std::slice::from_raw_parts(self.memory, self.struct_handle().layout().size())
+        std::slice::from_raw_parts(self.memory, self.type_handle().layout().size())
     }
 
     /// # Safety
     pub unsafe fn memory_mut(&mut self) -> &mut [u8] {
-        std::slice::from_raw_parts_mut(self.memory, self.struct_handle().layout().size())
+        std::slice::from_raw_parts_mut(self.memory, self.type_handle().layout().size())
     }
 
     /// # Safety
     pub unsafe fn field_memory<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&[u8]> {
-        self.handle.find_field(query).map(|field| {
-            std::slice::from_raw_parts(
-                self.memory.add(field.address_offset()),
-                field.struct_handle().layout().size(),
-            )
-        })
+        match &*self.handle {
+            Type::Struct(type_) => {
+                let field = type_.find_field(query)?;
+                Some(std::slice::from_raw_parts(
+                    self.memory.add(field.address_offset()),
+                    field.type_handle().layout().size(),
+                ))
+            }
+            Type::Enum(type_) => {
+                let discriminant = self.memory.read();
+                let variant = type_.find_variant_by_discriminant(discriminant)?;
+                let field = variant.find_field(query)?;
+                Some(std::slice::from_raw_parts(
+                    self.memory.add(field.address_offset()),
+                    field.type_handle().layout().size(),
+                ))
+            }
+        }
     }
 
     /// # Safety
@@ -187,12 +228,24 @@ impl Object {
         &'a mut self,
         query: StructFieldQuery<'a>,
     ) -> Option<&mut [u8]> {
-        self.handle.find_field(query).map(|field| {
-            std::slice::from_raw_parts_mut(
-                self.memory.add(field.address_offset()),
-                field.struct_handle().layout().size(),
-            )
-        })
+        match &*self.handle {
+            Type::Struct(type_) => {
+                let field = type_.find_field(query)?;
+                Some(std::slice::from_raw_parts_mut(
+                    self.memory.add(field.address_offset()),
+                    field.type_handle().layout().size(),
+                ))
+            }
+            Type::Enum(type_) => {
+                let discriminant = self.memory.read();
+                let variant = type_.find_variant_by_discriminant(discriminant)?;
+                let field = variant.find_field(query)?;
+                Some(std::slice::from_raw_parts_mut(
+                    self.memory.add(field.address_offset()),
+                    field.type_handle().layout().size(),
+                ))
+            }
+        }
     }
 
     pub fn read<T: 'static>(&self) -> Option<&T> {
@@ -212,26 +265,36 @@ impl Object {
     }
 
     pub fn read_field<'a, T: 'static>(&'a self, field: &str) -> Option<&'a T> {
-        let field = self.handle.find_field(StructFieldQuery {
+        let query = StructFieldQuery {
             name: Some(field.into()),
-            struct_query: Some(StructQuery {
-                type_hash: Some(TypeHash::of::<T>()),
-                ..Default::default()
-            }),
+            type_query: Some(TypeQuery::of::<T>()),
             ..Default::default()
-        })?;
+        };
+        let field = match &*self.handle {
+            Type::Struct(type_) => type_.find_field(query),
+            Type::Enum(type_) => {
+                let discriminant = unsafe { self.memory.read() };
+                let variant = type_.find_variant_by_discriminant(discriminant)?;
+                variant.find_field(query)
+            }
+        }?;
         unsafe { self.memory.add(field.address_offset()).cast::<T>().as_ref() }
     }
 
     pub fn write_field<'a, T: 'static>(&'a mut self, field: &str) -> Option<&'a mut T> {
-        let field = self.handle.find_field(StructFieldQuery {
+        let query = StructFieldQuery {
             name: Some(field.into()),
-            struct_query: Some(StructQuery {
-                type_hash: Some(TypeHash::of::<T>()),
-                ..Default::default()
-            }),
+            type_query: Some(TypeQuery::of::<T>()),
             ..Default::default()
-        })?;
+        };
+        let field = match &*self.handle {
+            Type::Struct(type_) => type_.find_field(query),
+            Type::Enum(type_) => {
+                let discriminant = unsafe { self.memory.read() };
+                let variant = type_.find_variant_by_discriminant(discriminant)?;
+                variant.find_field(query)
+            }
+        }?;
         unsafe { self.memory.add(field.address_offset()).cast::<T>().as_mut() }
     }
 
@@ -260,8 +323,8 @@ impl std::fmt::Debug for Object {
                     "type",
                     &format!(
                         "{}::{}",
-                        self.handle.module_name.as_deref().unwrap_or_default(),
-                        self.handle.name
+                        self.handle.module_name().unwrap_or_default(),
+                        self.handle.name()
                     ),
                 )
                 .finish()
@@ -348,7 +411,7 @@ mod tests {
     use crate::{
         object::*,
         registry::Registry,
-        struct_type::*,
+        types::struct_type::*,
         utils::{object_pop_from_stack, object_push_to_stack},
     };
     use intuicio_data::prelude::*;
@@ -389,36 +452,113 @@ mod tests {
             }
         }
 
-        let bool_handle = NativeStructBuilder::new::<bool>().build_handle();
-        let f32_handle = NativeStructBuilder::new::<f32>().build_handle();
-        let usize_handle = NativeStructBuilder::new::<usize>().build_handle();
-        let pass_handle = NativeStructBuilder::new::<Pass>().build_handle();
-        let droppable_handle = NativeStructBuilder::new::<Droppable>().build_handle();
+        let bool_handle = NativeStructBuilder::new::<bool>()
+            .build()
+            .into_type()
+            .into_handle();
+        let f32_handle = NativeStructBuilder::new::<f32>()
+            .build()
+            .into_type()
+            .into_handle();
+        let usize_handle = NativeStructBuilder::new::<usize>()
+            .build()
+            .into_type()
+            .into_handle();
+        let pass_handle = NativeStructBuilder::new::<Pass>()
+            .build()
+            .into_type()
+            .into_handle();
+        let droppable_handle = NativeStructBuilder::new::<Droppable>()
+            .build()
+            .into_type()
+            .into_handle();
         let handle = RuntimeStructBuilder::new("Foo")
             .field(StructField::new("a", bool_handle))
             .field(StructField::new("b", f32_handle))
             .field(StructField::new("c", usize_handle))
             .field(StructField::new("d", pass_handle))
             .field(StructField::new("e", droppable_handle))
-            .build_handle();
+            .build()
+            .into_type()
+            .into_handle();
         assert_eq!(handle.layout().size(), 24);
         assert_eq!(handle.layout().align(), 8);
-        assert_eq!(handle.fields().len(), 5);
-        assert_eq!(handle.fields()[0].struct_handle().layout().size(), 1);
-        assert_eq!(handle.fields()[0].struct_handle().layout().align(), 1);
-        assert_eq!(handle.fields()[0].address_offset(), 0);
-        assert_eq!(handle.fields()[1].struct_handle().layout().size(), 4);
-        assert_eq!(handle.fields()[1].struct_handle().layout().align(), 4);
-        assert_eq!(handle.fields()[1].address_offset(), 4);
-        assert_eq!(handle.fields()[2].struct_handle().layout().size(), 8);
-        assert_eq!(handle.fields()[2].struct_handle().layout().align(), 8);
-        assert_eq!(handle.fields()[2].address_offset(), 8);
-        assert_eq!(handle.fields()[3].struct_handle().layout().size(), 0);
-        assert_eq!(handle.fields()[3].struct_handle().layout().align(), 1);
-        assert_eq!(handle.fields()[3].address_offset(), 16);
-        assert_eq!(handle.fields()[4].struct_handle().layout().size(), 8);
-        assert_eq!(handle.fields()[4].struct_handle().layout().align(), 8);
-        assert_eq!(handle.fields()[4].address_offset(), 16);
+        assert_eq!(handle.as_struct().unwrap().fields().len(), 5);
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[0]
+                .type_handle()
+                .layout()
+                .size(),
+            1
+        );
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[0]
+                .type_handle()
+                .layout()
+                .align(),
+            1
+        );
+        assert_eq!(handle.as_struct().unwrap().fields()[0].address_offset(), 0);
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[1]
+                .type_handle()
+                .layout()
+                .size(),
+            4
+        );
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[1]
+                .type_handle()
+                .layout()
+                .align(),
+            4
+        );
+        assert_eq!(handle.as_struct().unwrap().fields()[1].address_offset(), 4);
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[2]
+                .type_handle()
+                .layout()
+                .size(),
+            8
+        );
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[2]
+                .type_handle()
+                .layout()
+                .align(),
+            8
+        );
+        assert_eq!(handle.as_struct().unwrap().fields()[2].address_offset(), 8);
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[3]
+                .type_handle()
+                .layout()
+                .size(),
+            0
+        );
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[3]
+                .type_handle()
+                .layout()
+                .align(),
+            1
+        );
+        assert_eq!(handle.as_struct().unwrap().fields()[3].address_offset(), 16);
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[4]
+                .type_handle()
+                .layout()
+                .size(),
+            8
+        );
+        assert_eq!(
+            handle.as_struct().unwrap().fields()[4]
+                .type_handle()
+                .layout()
+                .align(),
+            8
+        );
+        assert_eq!(handle.as_struct().unwrap().fields()[4].address_offset(), 16);
         let mut object = Object::new(handle);
         *object.write_field::<bool>("a").unwrap() = true;
         *object.write_field::<f32>("b").unwrap() = 4.2;
@@ -441,7 +581,10 @@ mod tests {
 
         let lifetime = Lifetime::default();
         assert!(lifetime.state().can_write(0));
-        let handle = NativeStructBuilder::new_uninitialized::<Wrapper>().build_handle();
+        let handle = NativeStructBuilder::new_uninitialized::<Wrapper>()
+            .build()
+            .into_type()
+            .into_handle();
         let object = Object::with_value(handle, lifetime.borrow_mut().unwrap()).unwrap();
         assert!(!lifetime.state().can_write(0));
         drop(object);
@@ -453,12 +596,7 @@ mod tests {
         let mut stack = DataStack::new(10240, DataStackMode::Values);
         assert_eq!(stack.position(), 0);
         let registry = Registry::default().with_basic_types();
-        let handle = registry
-            .find_struct(StructQuery {
-                type_hash: Some(TypeHash::of::<usize>()),
-                ..Default::default()
-            })
-            .unwrap();
+        let handle = registry.find_type(TypeQuery::of::<usize>()).unwrap();
         let mut object = Object::new(handle);
         *object.write::<usize>().unwrap() = 42;
         let (handle, data) = unsafe { object.into_inner() };

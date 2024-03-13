@@ -5,11 +5,11 @@ use intuicio_core::{
     meta::Meta,
     registry::Registry,
     script::{
-        ScriptContentProvider, ScriptExpression, ScriptFunction, ScriptFunctionParameter,
-        ScriptFunctionSignature, ScriptHandle, ScriptModule, ScriptOperation, ScriptPackage,
-        ScriptStruct, ScriptStructField,
+        ScriptContentProvider, ScriptEnum, ScriptEnumVariant, ScriptExpression, ScriptFunction,
+        ScriptFunctionParameter, ScriptFunctionSignature, ScriptHandle, ScriptModule,
+        ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
-    struct_type::StructQuery,
+    types::TypeQuery,
     IntuicioVersion, Visibility,
 };
 use intuicio_nodes::nodes::{
@@ -113,7 +113,7 @@ pub enum SerdeOperation {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         module_name: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        struct_name: Option<String>,
+        type_name: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         visibility: Option<Visibility>,
     },
@@ -141,7 +141,7 @@ fn build_script(script: &SerdeScript) -> ScriptHandle<'static, SerdeExpression> 
                 },
                 SerdeOperation::MakeRegister { name, module_name } => {
                     ScriptOperation::DefineRegister {
-                        query: StructQuery {
+                        query: TypeQuery {
                             name: Some(name.to_owned().into()),
                             module_name: module_name.as_ref().map(|name| name.to_owned().into()),
                             ..Default::default()
@@ -160,13 +160,13 @@ fn build_script(script: &SerdeScript) -> ScriptHandle<'static, SerdeExpression> 
                 SerdeOperation::CallFunction {
                     name,
                     module_name,
-                    struct_name,
+                    type_name,
                     visibility,
                 } => ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some(name.to_owned().into()),
                         module_name: module_name.as_ref().map(|name| name.to_owned().into()),
-                        struct_query: struct_name.as_ref().map(|name| StructQuery {
+                        type_query: type_name.as_ref().map(|name| TypeQuery {
                             name: Some(name.to_owned().into()),
                             module_name: module_name.as_ref().map(|name| name.to_owned().into()),
                             ..Default::default()
@@ -199,7 +199,7 @@ pub struct SerdeFunctionParameter {
     pub meta: Option<Meta>,
     pub name: String,
     pub module_name: Option<String>,
-    pub struct_name: String,
+    pub type_name: String,
 }
 
 impl SerdeFunctionParameter {
@@ -207,8 +207,8 @@ impl SerdeFunctionParameter {
         ScriptFunctionParameter {
             meta: self.meta.to_owned(),
             name: self.name.to_owned(),
-            struct_query: StructQuery {
-                name: Some(self.struct_name.to_owned().into()),
+            type_query: TypeQuery {
+                name: Some(self.type_name.to_owned().into()),
                 module_name: self
                     .module_name
                     .as_ref()
@@ -225,7 +225,7 @@ pub struct SerdeFunction {
     pub meta: Option<Meta>,
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub struct_name: Option<String>,
+    pub type_name: Option<String>,
     #[serde(default)]
     pub visibility: Visibility,
     #[serde(default)]
@@ -242,8 +242,8 @@ impl SerdeFunction {
                 meta: self.meta.to_owned(),
                 name: self.name.to_owned(),
                 module_name: Some(module_name.to_owned()),
-                struct_query: self.struct_name.as_ref().map(|struct_name| StructQuery {
-                    name: Some(struct_name.to_owned().into()),
+                type_query: self.type_name.as_ref().map(|type_name| TypeQuery {
+                    name: Some(type_name.to_owned().into()),
                     ..Default::default()
                 }),
                 visibility: self.visibility,
@@ -271,7 +271,7 @@ pub struct SerdeStructField {
     #[serde(default, skip_serializing_if = "Visibility::is_public")]
     pub visibility: Visibility,
     pub module_name: Option<String>,
-    pub struct_name: String,
+    pub type_name: String,
 }
 
 impl SerdeStructField {
@@ -280,8 +280,8 @@ impl SerdeStructField {
             meta: self.meta.to_owned(),
             name: self.name.to_owned(),
             visibility: self.visibility,
-            struct_query: StructQuery {
-                name: Some(self.struct_name.to_owned().into()),
+            type_query: TypeQuery {
+                name: Some(self.type_name.to_owned().into()),
                 module_name: self
                     .module_name
                     .as_ref()
@@ -316,10 +316,62 @@ impl SerdeStruct {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerdeEnumVariant {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Meta>,
+    pub name: String,
+    pub fields: Vec<SerdeStructField>,
+    pub discriminant: Option<u8>,
+}
+
+impl SerdeEnumVariant {
+    pub fn compile(&self) -> ScriptEnumVariant<'static> {
+        ScriptEnumVariant {
+            meta: self.meta.to_owned(),
+            name: self.name.to_owned(),
+            fields: self.fields.iter().map(|field| field.compile()).collect(),
+            discriminant: self.discriminant,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerdeEnum {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Meta>,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Visibility::is_public")]
+    pub visibility: Visibility,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variants: Vec<SerdeEnumVariant>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_variant: Option<u8>,
+}
+
+impl SerdeEnum {
+    pub fn compile(&self, module_name: &str) -> ScriptEnum<'static> {
+        ScriptEnum {
+            meta: self.meta.to_owned(),
+            name: self.name.to_owned(),
+            module_name: Some(module_name.to_owned()),
+            visibility: self.visibility,
+            variants: self
+                .variants
+                .iter()
+                .map(|variant| variant.compile())
+                .collect(),
+            default_variant: self.default_variant,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerdeModule {
     pub name: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub structs: Vec<SerdeStruct>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub enums: Vec<SerdeEnum>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub functions: Vec<SerdeFunction>,
 }
@@ -332,6 +384,11 @@ impl SerdeModule {
                 .structs
                 .iter()
                 .map(|struct_type| struct_type.compile(&self.name))
+                .collect(),
+            enums: self
+                .enums
+                .iter()
+                .map(|enum_type| enum_type.compile(&self.name))
                 .collect(),
             functions: self
                 .functions
@@ -414,8 +471,8 @@ impl SerdeNodeTypeInfo {
 }
 
 impl NodeTypeInfo for SerdeNodeTypeInfo {
-    fn struct_query(&self) -> StructQuery {
-        StructQuery {
+    fn type_query(&self) -> TypeQuery {
+        TypeQuery {
             name: Some(self.name.as_str().into()),
             module_name: self.module_name.as_ref().map(|name| name.into()),
             ..Default::default()
@@ -511,8 +568,8 @@ impl NodeDefinition for SerdeNodes {
                 },
                 SerdeOperation::MakeRegister { .. } => vec![
                     NodePin::execute("In", false),
-                    NodePin::property("Struct name"),
-                    NodePin::property("Struct module name"),
+                    NodePin::property("Type name"),
+                    NodePin::property("Type module name"),
                 ],
                 SerdeOperation::DropRegister { .. }
                 | SerdeOperation::PushFromRegister { .. }
@@ -523,7 +580,7 @@ impl NodeDefinition for SerdeNodes {
                     NodePin::execute("In", false),
                     NodePin::property("Name"),
                     NodePin::property("Module name"),
-                    NodePin::property("Struct name"),
+                    NodePin::property("Type name"),
                     NodePin::property("Visibility"),
                 ],
                 _ => vec![NodePin::execute("In", false)],
@@ -815,7 +872,7 @@ impl NodeDefinition for SerdeNodes {
                     SerdeNodes::Operation(SerdeOperation::CallFunction {
                         name: "Function".to_owned(),
                         module_name: None,
-                        struct_name: None,
+                        type_name: None,
                         visibility: None,
                     }),
                 ),
@@ -888,8 +945,8 @@ impl NodeDefinition for SerdeNodes {
                     }
                 }
                 SerdeOperation::MakeRegister { name, module_name } => match property_name {
-                    "Struct name" => PropertyValue::new(name).ok(),
-                    "Struct module name" => module_name
+                    "Type name" => PropertyValue::new(name).ok(),
+                    "Type module name" => module_name
                         .as_ref()
                         .and_then(|name| PropertyValue::new(name).ok()),
                     _ => None,
@@ -909,14 +966,14 @@ impl NodeDefinition for SerdeNodes {
                 SerdeOperation::CallFunction {
                     name,
                     module_name,
-                    struct_name,
+                    type_name,
                     visibility,
                 } => match property_name {
                     "Name" => PropertyValue::new(name).ok(),
                     "Module name" => module_name
                         .as_ref()
                         .and_then(|name| PropertyValue::new(name).ok()),
-                    "Struct name" => struct_name
+                    "Type name" => type_name
                         .as_ref()
                         .and_then(|name| PropertyValue::new(name).ok()),
                     "Visibility" => visibility
@@ -1026,12 +1083,12 @@ impl NodeDefinition for SerdeNodes {
                     }
                 }
                 SerdeOperation::MakeRegister { name, module_name } => match property_name {
-                    "Struct name" => {
+                    "Type name" => {
                         if let Ok(v) = property_value.get_exact::<String>() {
                             *name = v;
                         }
                     }
-                    "Struct module name" => {
+                    "Type module name" => {
                         *module_name = if let Ok(v) = property_value.get_exact::<String>() {
                             Some(v)
                         } else {
@@ -1064,7 +1121,7 @@ impl NodeDefinition for SerdeNodes {
                 SerdeOperation::CallFunction {
                     name,
                     module_name,
-                    struct_name,
+                    type_name,
                     visibility,
                 } => match property_name {
                     "Name" => {
@@ -1079,8 +1136,8 @@ impl NodeDefinition for SerdeNodes {
                             None
                         };
                     }
-                    "Struct name" => {
-                        *struct_name = if let Ok(v) = property_value.get_exact::<String>() {
+                    "Type name" => {
+                        *type_name = if let Ok(v) = property_value.get_exact::<String>() {
                             Some(v)
                         } else {
                             None
@@ -1247,7 +1304,7 @@ mod tests {
                     SerdeNodes::Operation(SerdeOperation::CallFunction {
                         name: "add".to_owned(),
                         module_name: Some("intrinsics".to_owned()),
-                        struct_name: None,
+                        type_name: None,
                         visibility: None,
                     }),
                 ),
@@ -1266,7 +1323,7 @@ mod tests {
                 SerdeOperation::CallFunction {
                     name: "add".to_owned(),
                     module_name: Some("intrinsics".to_owned()),
-                    struct_name: None,
+                    type_name: None,
                     visibility: None,
                 }
             ]

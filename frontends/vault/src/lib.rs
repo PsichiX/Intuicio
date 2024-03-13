@@ -4,14 +4,13 @@ use intuicio_core::{
     function::{FunctionQuery, FunctionQueryParameter},
     registry::Registry,
     script::{
-        BytesContentParser, ScriptContentProvider, ScriptExpression, ScriptFunction,
-        ScriptFunctionParameter, ScriptFunctionSignature, ScriptHandle, ScriptModule,
-        ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
+        BytesContentParser, ScriptContentProvider, ScriptEnum, ScriptEnumVariant, ScriptExpression,
+        ScriptFunction, ScriptFunctionParameter, ScriptFunctionSignature, ScriptHandle,
+        ScriptModule, ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
-    struct_type::StructQuery,
+    types::TypeQuery,
     IntuicioVersion, Visibility,
 };
-use intuicio_data::type_hash::TypeHash;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error};
 
@@ -87,12 +86,12 @@ impl ScriptExpression for VaultScriptExpression {
                 registry
                     .find_function(FunctionQuery {
                         name: Some(name.into()),
-                        struct_query: Some(StructQuery {
+                        type_query: Some(TypeQuery {
                             type_hash: Some(type_hash),
                             ..Default::default()
                         }),
                         inputs: [FunctionQueryParameter {
-                            struct_query: Some(StructQuery {
+                            type_query: Some(TypeQuery {
                                 type_hash: Some(type_hash),
                                 ..Default::default()
                             }),
@@ -137,7 +136,7 @@ pub enum VaultExpression {
     CallMethod {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         module_name: Option<String>,
-        struct_name: String,
+        type_name: String,
         name: String,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         arguments: Vec<VaultExpression>,
@@ -231,7 +230,7 @@ impl VaultExpression {
             }
             Self::CallMethod {
                 module_name,
-                struct_name,
+                type_name,
                 name,
                 arguments,
             } => {
@@ -241,8 +240,8 @@ impl VaultExpression {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some(name.to_owned().into()),
-                        struct_query: Some(StructQuery {
-                            name: Some(struct_name.to_owned().into()),
+                        type_query: Some(TypeQuery {
+                            name: Some(type_name.to_owned().into()),
                             ..Default::default()
                         }),
                         module_name: module_name.as_ref().map(|name| name.to_owned().into()),
@@ -383,7 +382,7 @@ impl VaultFunctionParameter {
         ScriptFunctionParameter {
             meta: None,
             name: self.name.to_owned(),
-            struct_query: StructQuery {
+            type_query: TypeQuery {
                 name: Some(self.arg_type.as_str().to_owned().into()),
                 ..Default::default()
             },
@@ -405,28 +404,25 @@ impl VaultFunction {
     pub fn compile(
         &self,
         module_name: &str,
-        struct_query: Option<StructQuery<'static>>,
+        type_query: Option<TypeQuery<'static>>,
     ) -> ScriptFunction<'static, VaultScriptExpression> {
         let signature = ScriptFunctionSignature {
             meta: None,
             name: self.name.to_owned(),
             module_name: module_name.to_owned().into(),
-            struct_query,
+            type_query,
             visibility: Visibility::Public,
             inputs: self.arguments.iter().map(|input| input.build()).collect(),
             outputs: vec![ScriptFunctionParameter {
                 meta: None,
                 name: "result".to_owned(),
-                struct_query: if let Some(return_type) = &self.return_type {
-                    StructQuery {
+                type_query: if let Some(return_type) = &self.return_type {
+                    TypeQuery {
                         name: Some(return_type.to_owned().into()),
                         ..Default::default()
                     }
                 } else {
-                    StructQuery {
-                        type_hash: Some(TypeHash::of::<()>()),
-                        ..Default::default()
-                    }
+                    TypeQuery::of::<()>()
                 },
             }],
         };
@@ -439,7 +435,7 @@ impl VaultFunction {
                 registers.push(argument.name.to_owned());
             }
             operations.push(ScriptOperation::DefineRegister {
-                query: StructQuery {
+                query: TypeQuery {
                     name: Some(argument.arg_type.to_owned().into()),
                     ..Default::default()
                 },
@@ -461,7 +457,7 @@ impl VaultFunction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultStructField {
     pub name: String,
-    pub struct_name: String,
+    pub type_name: String,
 }
 
 impl VaultStructField {
@@ -470,8 +466,8 @@ impl VaultStructField {
             meta: None,
             name: self.name.to_owned(),
             visibility: Visibility::Public,
-            struct_query: StructQuery {
-                name: Some(self.struct_name.as_str().to_owned().into()),
+            type_query: TypeQuery {
+                name: Some(self.type_name.as_str().to_owned().into()),
                 ..Default::default()
             },
         }
@@ -502,14 +498,68 @@ impl VaultStruct {
         &self,
         module_name: &str,
     ) -> Vec<ScriptFunction<'static, VaultScriptExpression>> {
-        let struct_query = StructQuery {
+        let type_query = TypeQuery {
             name: Some(self.name.as_str().to_owned().into()),
             module_name: Some(module_name.to_owned().into()),
             ..Default::default()
         };
         self.methods
             .iter()
-            .map(|method| method.compile(module_name, Some(struct_query.clone())))
+            .map(|method| method.compile(module_name, Some(type_query.clone())))
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultEnumVariant {
+    pub name: String,
+    pub fields: Vec<VaultStructField>,
+}
+
+impl VaultEnumVariant {
+    pub fn build(&self) -> ScriptEnumVariant<'static> {
+        ScriptEnumVariant {
+            meta: None,
+            name: self.name.to_owned(),
+            fields: self.fields.iter().map(|field| field.build()).collect(),
+            discriminant: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultEnum {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variants: Vec<VaultEnumVariant>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub methods: Vec<VaultFunction>,
+}
+
+impl VaultEnum {
+    pub fn compile_enum(&self, module_name: &str) -> ScriptEnum<'static> {
+        ScriptEnum {
+            meta: None,
+            name: self.name.to_owned(),
+            module_name: Some(module_name.to_owned()),
+            visibility: Visibility::Public,
+            variants: self.variants.iter().map(|field| field.build()).collect(),
+            default_variant: None,
+        }
+    }
+
+    pub fn compile_methods(
+        &self,
+        module_name: &str,
+    ) -> Vec<ScriptFunction<'static, VaultScriptExpression>> {
+        let type_query = TypeQuery {
+            name: Some(self.name.as_str().to_owned().into()),
+            module_name: Some(module_name.to_owned().into()),
+            ..Default::default()
+        };
+        self.methods
+            .iter()
+            .map(|method| method.compile(module_name, Some(type_query.clone())))
             .collect()
     }
 }
@@ -518,6 +568,7 @@ impl VaultStruct {
 pub enum VaultDefinition {
     Function(VaultFunction),
     Struct(VaultStruct),
+    Enum(VaultEnum),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -547,6 +598,14 @@ impl VaultModule {
                     _ => None,
                 })
                 .collect(),
+            enums: self
+                .definitions
+                .iter()
+                .filter_map(|definition| match definition {
+                    VaultDefinition::Enum(enum_type) => Some(enum_type.compile_enum(&self.name)),
+                    _ => None,
+                })
+                .collect(),
             functions: self
                 .definitions
                 .iter()
@@ -560,6 +619,9 @@ impl VaultModule {
                         .filter_map(|definition| match definition {
                             VaultDefinition::Struct(struct_type) => {
                                 Some(struct_type.compile_methods(&self.name))
+                            }
+                            VaultDefinition::Enum(enum_type) => {
+                                Some(enum_type.compile_methods(&self.name))
                             }
                             _ => None,
                         })
@@ -666,7 +728,7 @@ macro_rules! define_vault_method {
         $registry:expr
         =>
         $(mod $module_name:ident)?
-        struct ($struct_type:ty)
+        type ($type:ty)
         fn
         $name:ident
         ($( $argument_name:ident : $argument_type:ty),*)
@@ -679,7 +741,7 @@ macro_rules! define_vault_method {
                 $registry
                 =>
                 $(mod $module_name)?
-                struct ($struct_type)
+                type ($type)
                 fn
                 $name
                 ($($argument_name : $argument_type),*)
@@ -726,7 +788,7 @@ mod tests {
             }
         });
         registry.add_function(define_function! {
-            registry => mod intrinsics struct (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
+            registry => mod intrinsics type (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
                 (this, this)
             }
         });

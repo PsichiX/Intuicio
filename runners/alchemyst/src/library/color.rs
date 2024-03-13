@@ -62,7 +62,7 @@ impl Color {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Color::define_struct(registry));
+    registry.add_type(Color::define_struct(registry));
     registry.add_function(Color::from_array__define_function(registry));
     registry.add_function(Color::to_array__define_function(registry));
 }

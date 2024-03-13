@@ -385,8 +385,8 @@ impl Job {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Jobs::define_struct(registry));
-    registry.add_struct(Job::define_struct(registry));
+    registry.add_type(Jobs::define_struct(registry));
+    registry.add_type(Job::define_struct(registry));
     registry.add_function(Jobs::new__define_function(registry));
     registry.add_function(Jobs::sleep__define_function(registry));
     registry.add_function(Jobs::workers__define_function(registry));

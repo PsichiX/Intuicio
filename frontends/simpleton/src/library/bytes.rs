@@ -663,7 +663,7 @@ impl Bytes {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Bytes::define_struct(registry));
+    registry.add_type(Bytes::define_struct(registry));
     registry.add_function(Bytes::new__define_function(registry));
     registry.add_function(Bytes::from__define_function(registry));
     registry.add_function(Bytes::into__define_function(registry));

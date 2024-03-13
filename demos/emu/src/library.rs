@@ -8,7 +8,7 @@ macro_rules! impl_type {
         let memory_ = $memory.clone();
         $registry.add_function(Function::new(
             function_signature! {
-                $registry => struct ($type) fn read_ram(address: i16) -> (result: $type)
+                $registry => type ($type) fn read_ram(address: i16) -> (result: $type)
             },
             FunctionBody::closure(move |context, _| {
                 let address = context.stack().pop::<i16>().unwrap();
@@ -36,7 +36,7 @@ macro_rules! impl_type {
         let memory_ = $memory.clone();
         $registry.add_function(Function::new(
             function_signature! {
-                $registry => struct ($type) fn write_ram(address: i16, value: $type) -> ()
+                $registry => type ($type) fn write_ram(address: i16, value: $type) -> ()
             },
             FunctionBody::closure(move |context, _| {
                 let address = context.stack().pop::<i16>().unwrap();
@@ -60,122 +60,122 @@ macro_rules! impl_type {
             }),
         ));
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn clone(value: $type) -> (original: $type, cloned: $type) {
+            $registry => type ($type) fn clone(value: $type) -> (original: $type, cloned: $type) {
                 (value, value)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn swap(a: $type, b: $type) -> (b: $type, a: $type) {
+            $registry => type ($type) fn swap(a: $type, b: $type) -> (b: $type, a: $type) {
                 (b, a)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn negate(value: $type) -> (result: $type) {
+            $registry => type ($type) fn negate(value: $type) -> (result: $type) {
                 (-value,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn add(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn add(a: $type, b: $type) -> (result: $type) {
                 (a + b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn sub(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn sub(a: $type, b: $type) -> (result: $type) {
                 (a - b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn mul(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn mul(a: $type, b: $type) -> (result: $type) {
                 (a * b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn div(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn div(a: $type, b: $type) -> (result: $type) {
                 (a / b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn abs(value: $type) -> (result: $type) {
+            $registry => type ($type) fn abs(value: $type) -> (result: $type) {
                 (value.abs(),)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn increment(value: $type) -> (result: $type) {
+            $registry => type ($type) fn increment(value: $type) -> (result: $type) {
                 (value + 1,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn decrement(value: $type) -> (result: $type) {
+            $registry => type ($type) fn decrement(value: $type) -> (result: $type) {
                 (value - 1,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn modulo(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn modulo(a: $type, b: $type) -> (result: $type) {
                 (a % b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn shl(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn shl(a: $type, b: $type) -> (result: $type) {
                 (a << b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn shr(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn shr(a: $type, b: $type) -> (result: $type) {
                 (a >> b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn and(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn and(a: $type, b: $type) -> (result: $type) {
                 (a & b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn or(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn or(a: $type, b: $type) -> (result: $type) {
                 (a | b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn xor(a: $type, b: $type) -> (result: $type) {
+            $registry => type ($type) fn xor(a: $type, b: $type) -> (result: $type) {
                 (a ^ b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn eq(a: $type, b: $type) -> (result: bool) {
+            $registry => type ($type) fn eq(a: $type, b: $type) -> (result: bool) {
                 (a == b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn neq(a: $type, b: $type) -> (result: bool) {
+            $registry => type ($type) fn neq(a: $type, b: $type) -> (result: bool) {
                 (a != b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn lt(a: $type, b: $type) -> (result: bool) {
+            $registry => type ($type) fn lt(a: $type, b: $type) -> (result: bool) {
                 (a < b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn lte(a: $type, b: $type) -> (result: bool) {
+            $registry => type ($type) fn lte(a: $type, b: $type) -> (result: bool) {
                 (a <= b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn gt(a: $type, b: $type) -> (result: bool) {
+            $registry => type ($type) fn gt(a: $type, b: $type) -> (result: bool) {
                 (a > b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn gte(a: $type, b: $type) -> (result: bool) {
+            $registry => type ($type) fn gte(a: $type, b: $type) -> (result: bool) {
                 (a >= b,)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn random() -> (result: $type) {
+            $registry => type ($type) fn random() -> (result: $type) {
                 (rand::thread_rng().gen::<$type>(),)
             }
         });
         $registry.add_function(define_function! {
-            $registry => struct ($type) fn debug(value: $type) -> (result: $type) {
+            $registry => type ($type) fn debug(value: $type) -> (result: $type) {
                 println!("* {}: {}", std::any::type_name::<$type>(), value);
                 (value,)
             }
@@ -184,42 +184,42 @@ macro_rules! impl_type {
 }
 
 pub fn install(registry: &mut Registry, memory: AsyncShared<Memory>) {
-    registry.add_struct(NativeStructBuilder::new::<bool>().build());
-    registry.add_struct(NativeStructBuilder::new::<i8>().build());
-    registry.add_struct(NativeStructBuilder::new::<i16>().build());
+    registry.add_type(NativeStructBuilder::new::<bool>().build());
+    registry.add_type(NativeStructBuilder::new::<i8>().build());
+    registry.add_type(NativeStructBuilder::new::<i16>().build());
 
     registry.add_function(define_function! {
-        registry => struct (bool) fn clone(value: bool) -> (original: bool, cloned: bool) {
+        registry => type (bool) fn clone(value: bool) -> (original: bool, cloned: bool) {
             (value, value)
         }
     });
     registry.add_function(define_function! {
-        registry => struct (bool) fn swap(a: bool, b: bool) -> (b: bool, a: bool) {
+        registry => type (bool) fn swap(a: bool, b: bool) -> (b: bool, a: bool) {
             (b, a)
         }
     });
     registry.add_function(define_function! {
-        registry => struct (bool) fn and(a: bool, b: bool) -> (result: bool) {
+        registry => type (bool) fn and(a: bool, b: bool) -> (result: bool) {
             (a && b,)
         }
     });
     registry.add_function(define_function! {
-        registry => struct (bool) fn or(a: bool, b: bool) -> (result: bool) {
+        registry => type (bool) fn or(a: bool, b: bool) -> (result: bool) {
             (a || b,)
         }
     });
     registry.add_function(define_function! {
-        registry => struct (bool) fn to_i8(value: bool) -> (result: i8) {
+        registry => type (bool) fn to_i8(value: bool) -> (result: i8) {
             (value as i8,)
         }
     });
     registry.add_function(define_function! {
-        registry => struct (bool) fn to_i16(value: bool) -> (result: i16) {
+        registry => type (bool) fn to_i16(value: bool) -> (result: i16) {
             (value as i16,)
         }
     });
     registry.add_function(define_function! {
-        registry => struct (bool) fn debug(value: bool) -> (result: bool) {
+        registry => type (bool) fn debug(value: bool) -> (result: bool) {
             println!("* bool: {}", value);
             (value,)
         }
@@ -227,7 +227,7 @@ pub fn install(registry: &mut Registry, memory: AsyncShared<Memory>) {
 
     impl_type!(i8, registry, memory);
     registry.add_function(define_function! {
-        registry => struct (i8) fn to_i16(low: i8, high: i8) -> (result: i16) {
+        registry => type (i8) fn to_i16(low: i8, high: i8) -> (result: i16) {
             let low = low as i16;
             let high = (high as i16) << 8;
             (low | high,)
@@ -236,7 +236,7 @@ pub fn install(registry: &mut Registry, memory: AsyncShared<Memory>) {
 
     impl_type!(i16, registry, memory);
     registry.add_function(define_function! {
-        registry => struct (i16) fn to_i8(value: i16) -> (low: i8, high: i8) {
+        registry => type (i16) fn to_i8(value: i16) -> (low: i8, high: i8) {
             let low = value & 0x00FF;
             #[allow(overflowing_literals)]
             let high = (value & 0xFF00) >> 8;

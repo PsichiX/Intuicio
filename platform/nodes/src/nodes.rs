@@ -1,4 +1,4 @@
-use intuicio_core::{registry::Registry, struct_type::StructQuery};
+use intuicio_core::{registry::Registry, types::TypeQuery};
 use rstar::{Envelope, Point, PointDistance, RTree, RTreeObject, AABB};
 use serde::{Deserialize, Serialize};
 use serde_intermediate::{
@@ -47,7 +47,7 @@ impl PropertyValue {
 pub trait NodeTypeInfo:
     Clone + std::fmt::Debug + Display + PartialEq + Serialize + for<'de> Deserialize<'de>
 {
-    fn struct_query(&self) -> StructQuery;
+    fn type_query(&self) -> TypeQuery;
     fn are_compatible(&self, other: &Self) -> bool;
 }
 
@@ -923,8 +923,8 @@ mod tests {
     }
 
     impl NodeTypeInfo for String {
-        fn struct_query(&self) -> StructQuery {
-            StructQuery {
+        fn type_query(&self) -> TypeQuery {
+            TypeQuery {
                 name: Some(self.into()),
                 ..Default::default()
             }

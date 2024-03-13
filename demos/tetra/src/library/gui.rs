@@ -605,8 +605,8 @@ impl Gui {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Gui::define_struct(registry));
-    registry.add_struct(NineSlice::define_struct(registry));
+    registry.add_type(Gui::define_struct(registry));
+    registry.add_type(NineSlice::define_struct(registry));
     registry.add_function(Gui::new__define_function(registry));
     registry.add_function(Gui::screen__define_function(registry));
     registry.add_function(Gui::clone__define_function(registry));

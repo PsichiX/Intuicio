@@ -414,13 +414,13 @@ pub fn greater_than_or_equal(registry: &Registry, a: Reference, b: Reference) ->
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Boolean (Boolean) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Integer (Integer) {}
     });
-    registry.add_struct(define_native_struct! {
+    registry.add_type(define_native_struct! {
         registry => mod math struct Real (Real) {}
     });
     registry.add_function(min::define_function(registry));

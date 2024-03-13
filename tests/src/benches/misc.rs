@@ -2,7 +2,7 @@ use crate::{benches::DURATION, Benchmark};
 use intuicio_backend_vm::scope::VmScope;
 use intuicio_core::{
     define_function, function::FunctionQuery, registry::Registry, script::FileContentProvider,
-    struct_type::StructQuery,
+    types::TypeQuery,
 };
 use intuicio_frontend_vault::{
     define_vault_function, VaultContentParser, VaultPackage, VaultScriptExpression,
@@ -35,11 +35,11 @@ pub fn bench() {
     {
         println!();
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
-            "hashing struct query",
+            "hashing type query",
             || {},
             |_| {
-                StructQuery {
-                    name: Some("structure".to_owned().into()),
+                TypeQuery {
+                    name: Some("type".to_owned().into()),
                     module_name: Some("module".to_owned().into()),
                     ..Default::default()
                 }
@@ -59,13 +59,13 @@ pub fn bench() {
             .compile()
             .install::<VmScope<VaultScriptExpression>>(&mut registry, None);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
-            "querying struct",
-            || StructQuery {
+            "querying type",
+            || TypeQuery {
                 name: Some("usize".to_owned().into()),
                 ..Default::default()
             },
             |query| {
-                let _ = registry.find_struct(query);
+                let _ = registry.find_type(query);
             },
             |_| {},
         )
@@ -91,7 +91,7 @@ pub fn bench() {
             }
         });
         registry.add_function(define_function! {
-            registry => mod intrinsics struct (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
+            registry => mod intrinsics type (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
                 (this, this)
             }
         });

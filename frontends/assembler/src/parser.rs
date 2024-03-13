@@ -1,6 +1,6 @@
 use crate::{
-    AsmExpression, AsmFile, AsmFunction, AsmFunctionParameter, AsmLiteral, AsmModule, AsmOperation,
-    AsmStruct, AsmStructField,
+    AsmEnum, AsmEnumVariant, AsmExpression, AsmFile, AsmFunction, AsmFunctionParameter, AsmLiteral,
+    AsmModule, AsmOperation, AsmStruct, AsmStructField,
 };
 use intuicio_core::Visibility;
 use pest::{iterators::Pair, Parser};
@@ -54,6 +54,7 @@ fn parse_module(pair: Pair<Rule>) -> AsmModule {
     let mut result = AsmModule {
         name: parse_identifier(pairs.next().unwrap()),
         structs: vec![],
+        enums: vec![],
         functions: vec![],
     };
     for pair in pairs {
@@ -64,6 +65,9 @@ fn parse_module(pair: Pair<Rule>) -> AsmModule {
             }
             Rule::structure => {
                 result.structs.push(parse_structure(pair));
+            }
+            Rule::enumerator => {
+                result.enums.push(parse_enumerator(pair));
             }
             rule => unreachable!("{:?}", rule),
         }
@@ -89,7 +93,7 @@ fn parse_struct_field(pair: Pair<Rule>) -> AsmStructField {
         name: Default::default(),
         visibility: Visibility::Public,
         module_name: None,
-        struct_name: Default::default(),
+        type_name: Default::default(),
     };
     for pair in pairs {
         match pair.as_rule() {
@@ -102,8 +106,8 @@ fn parse_struct_field(pair: Pair<Rule>) -> AsmStructField {
             Rule::path_module => {
                 result.module_name = Some(parse_path_name(pair));
             }
-            Rule::path_struct => {
-                result.name = parse_path_name(pair);
+            Rule::path_type => {
+                result.type_name = parse_path_name(pair.into_inner().next().unwrap());
             }
             rule => unreachable!("{:?}", rule),
         }
@@ -125,6 +129,62 @@ fn parse_struct_header(pair: Pair<Rule>) -> AsmStruct {
                 result.visibility = parse_visibility(pair);
             }
             Rule::path_struct => {
+                result.name = parse_path_name(pair);
+            }
+            rule => unreachable!("{:?}", rule),
+        }
+    }
+    result
+}
+
+fn parse_enumerator(pair: Pair<Rule>) -> AsmEnum {
+    let mut pairs = pair.into_inner();
+    let mut result = parse_enumerator_header(pairs.next().unwrap());
+    result.variants = parse_enumerator_variants(pairs.next().unwrap());
+    result
+}
+
+fn parse_enumerator_variants(pair: Pair<Rule>) -> Vec<AsmEnumVariant> {
+    pair.into_inner().map(parse_enumerator_variant).collect()
+}
+
+fn parse_enumerator_variant(pair: Pair<Rule>) -> AsmEnumVariant {
+    let pairs = pair.into_inner();
+    let mut result = AsmEnumVariant {
+        meta: None,
+        name: Default::default(),
+        fields: vec![],
+        discriminant: None,
+    };
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::identifier => {
+                result.name = parse_identifier(pair);
+            }
+            Rule::structure_fields => {
+                result.fields = parse_struct_fields(pair);
+            }
+            rule => unreachable!("{:?}", rule),
+        }
+    }
+    result
+}
+
+fn parse_enumerator_header(pair: Pair<Rule>) -> AsmEnum {
+    let pairs = pair.into_inner();
+    let mut result = AsmEnum {
+        meta: None,
+        name: Default::default(),
+        visibility: Visibility::Public,
+        variants: vec![],
+        default_variant: None,
+    };
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::visibility => {
+                result.visibility = parse_visibility(pair);
+            }
+            Rule::path_enum => {
                 result.name = parse_path_name(pair);
             }
             rule => unreachable!("{:?}", rule),
@@ -181,7 +241,7 @@ fn parse_call_function(pair: Pair<Rule>) -> AsmOperation {
     let pairs = pair.into_inner();
     let mut name = Default::default();
     let mut module_name = None;
-    let mut struct_name = None;
+    let mut type_name = None;
     let mut visibility = None;
     for pair in pairs {
         match pair.as_rule() {
@@ -191,8 +251,8 @@ fn parse_call_function(pair: Pair<Rule>) -> AsmOperation {
             Rule::path_module => {
                 module_name = Some(parse_path_name(pair));
             }
-            Rule::path_struct => {
-                struct_name = Some(parse_path_name(pair));
+            Rule::path_type => {
+                type_name = Some(parse_path_name(pair));
             }
             Rule::path_function => {
                 name = parse_path_name(pair);
@@ -203,7 +263,7 @@ fn parse_call_function(pair: Pair<Rule>) -> AsmOperation {
     AsmOperation::CallFunction {
         name,
         module_name,
-        struct_name,
+        type_name,
         visibility,
     }
 }
@@ -235,7 +295,7 @@ fn parse_make_register(pair: Pair<Rule>) -> AsmOperation {
             Rule::path_module => {
                 module_name = Some(parse_path_name(pair));
             }
-            Rule::path_struct => {
+            Rule::path_type => {
                 name = parse_path_name(pair);
             }
             rule => unreachable!("{:?}", rule),
@@ -336,15 +396,15 @@ fn parse_function_parameter(pair: Pair<Rule>) -> AsmFunctionParameter {
         meta: None,
         name: parse_identifier(pairs.next().unwrap()),
         module_name: None,
-        struct_name: Default::default(),
+        type_name: Default::default(),
     };
     for pair in pairs {
         match pair.as_rule() {
             Rule::path_module => {
                 result.module_name = Some(parse_path_name(pair));
             }
-            Rule::path_struct => {
-                result.struct_name = parse_path_name(pair);
+            Rule::path_type => {
+                result.type_name = parse_path_name(pair.into_inner().next().unwrap());
             }
             rule => unreachable!("{:?}", rule),
         }
@@ -357,7 +417,7 @@ fn parse_function_header(pair: Pair<Rule>) -> AsmFunction {
     let mut result = AsmFunction {
         meta: None,
         name: Default::default(),
-        struct_name: None,
+        type_name: None,
         visibility: Visibility::Public,
         inputs: vec![],
         outputs: vec![],
@@ -368,8 +428,8 @@ fn parse_function_header(pair: Pair<Rule>) -> AsmFunction {
             Rule::visibility => {
                 result.visibility = parse_visibility(pair);
             }
-            Rule::path_struct => {
-                result.struct_name = Some(parse_path_name(pair));
+            Rule::path_type => {
+                result.type_name = Some(parse_path_name(pair.into_inner().next().unwrap()));
             }
             Rule::path_function => {
                 result.name = parse_path_name(pair);

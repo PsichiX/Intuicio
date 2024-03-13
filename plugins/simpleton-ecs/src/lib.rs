@@ -575,8 +575,8 @@ pub extern "C" fn version() -> IntuicioVersion {
 
 #[no_mangle]
 pub extern "C" fn install(registry: &mut Registry) {
-    registry.add_struct(World::define_struct(registry));
-    registry.add_struct(IterQuery::define_struct(registry));
+    registry.add_type(World::define_struct(registry));
+    registry.add_type(IterQuery::define_struct(registry));
     registry.add_function(World::new__define_function(registry));
     registry.add_function(World::spawn__define_function(registry));
     registry.add_function(World::despawn__define_function(registry));

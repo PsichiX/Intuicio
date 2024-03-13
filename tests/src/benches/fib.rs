@@ -272,7 +272,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
             }
         });
         registry.add_function(define_function! {
-            registry => mod intrinsics struct (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
+            registry => mod intrinsics type (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
                 (this, this)
             }
         });
@@ -319,7 +319,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
             }
         });
         registry.add_function(define_function! {
-            registry => mod intrinsics struct (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
+            registry => mod intrinsics type (usize) fn clone(this: usize) -> (original: usize, clone: usize) {
                 (this, this)
             }
         });

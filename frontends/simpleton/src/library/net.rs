@@ -134,11 +134,11 @@ impl Channel {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Server::define_struct(registry));
+    registry.add_type(Server::define_struct(registry));
     registry.add_function(Server::new__define_function(registry));
     registry.add_function(Server::set_nonblocking__define_function(registry));
     registry.add_function(Server::accept__define_function(registry));
-    registry.add_struct(Channel::define_struct(registry));
+    registry.add_type(Channel::define_struct(registry));
     registry.add_function(Channel::connect__define_function(registry));
     registry.add_function(Channel::set_nonblocking__define_function(registry));
     registry.add_function(Channel::set_no_delay__define_function(registry));

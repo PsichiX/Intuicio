@@ -83,11 +83,11 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                 }
                 ScriptOperation::DefineRegister { query } => {
                     let handle = registry
-                        .structs()
+                        .types()
                         .find(|handle| query.is_valid(handle))
                         .unwrap_or_else(|| {
                             panic!(
-                                "Could not define register for non-existent struct: {:#?}",
+                                "Could not define register for non-existent type: {:#?}",
                                 query
                             )
                         });
@@ -258,11 +258,13 @@ impl<SE: ScriptExpression + 'static> ScriptFunctionGenerator<SE> for VmScope<'st
 mod tests {
     use crate::scope::*;
     use intuicio_core::prelude::*;
-    use intuicio_data::type_hash::TypeHash;
 
     #[test]
     fn test_vm_scope() {
-        let i32_handle = NativeStructBuilder::new::<i32>().build_handle();
+        let i32_handle = NativeStructBuilder::new::<i32>()
+            .build()
+            .into_type()
+            .into_handle();
         let mut registry = Registry::default().with_basic_types();
         registry.add_function(Function::new(
             FunctionSignature::new("add")
@@ -282,37 +284,28 @@ mod tests {
                         meta: None,
                         name: "add_script".to_owned(),
                         module_name: None,
-                        struct_query: None,
+                        type_query: None,
                         visibility: Visibility::Public,
                         inputs: vec![
                             ScriptFunctionParameter {
                                 meta: None,
                                 name: "a".to_owned(),
-                                struct_query: StructQuery {
-                                    type_hash: Some(TypeHash::of::<i32>()),
-                                    ..Default::default()
-                                },
+                                type_query: TypeQuery::of::<i32>(),
                             },
                             ScriptFunctionParameter {
                                 meta: None,
                                 name: "b".to_owned(),
-                                struct_query: StructQuery {
-                                    type_hash: Some(TypeHash::of::<i32>()),
-                                    ..Default::default()
-                                },
+                                type_query: TypeQuery::of::<i32>(),
                             },
                         ],
                         outputs: vec![ScriptFunctionParameter {
                             meta: None,
                             name: "result".to_owned(),
-                            struct_query: StructQuery {
-                                type_hash: Some(TypeHash::of::<i32>()),
-                                ..Default::default()
-                            },
+                            type_query: TypeQuery::of::<i32>(),
                         }],
                     },
                     script: ScriptBuilder::<()>::default()
-                        .define_register(StructQuery::of::<i32>())
+                        .define_register(TypeQuery::of::<i32>())
                         .pop_to_register(0)
                         .push_from_register(0)
                         .call_function(FunctionQuery {
@@ -327,7 +320,7 @@ mod tests {
             .unwrap()
             .0,
         );
-        registry.add_struct_handle(i32_handle);
+        registry.add_type_handle(i32_handle);
         let mut context = Context::new(10240, 10240);
         let (result,) = registry
             .find_function(FunctionQuery {

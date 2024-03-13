@@ -1,5 +1,5 @@
 use crate::{script::SimpletonLiteral, Reference};
-use intuicio_core::{function::FunctionQuery, registry::Registry, struct_type::StructQuery};
+use intuicio_core::{function::FunctionQuery, registry::Registry, types::TypeQuery};
 use intuicio_nodes::nodes::{
     Node, NodeDefinition, NodePin, NodeSuggestion, NodeTypeInfo, PropertyValue,
     ResponseSuggestionNode,
@@ -12,8 +12,8 @@ pub struct SimpletonNodeTypeInfo;
 impl SimpletonNodeTypeInfo {}
 
 impl NodeTypeInfo for SimpletonNodeTypeInfo {
-    fn struct_query(&self) -> StructQuery {
-        StructQuery::of::<Reference>()
+    fn type_query(&self) -> TypeQuery {
+        TypeQuery::of::<Reference>()
     }
 
     fn are_compatible(&self, _: &Self) -> bool {

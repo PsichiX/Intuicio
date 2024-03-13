@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn test_raw_pointer_on_stack() {
         let mut registry = Registry::default().with_basic_types();
-        registry.add_struct(define_native_struct! {
+        registry.add_type(define_native_struct! {
             registry => struct (Ptr<usize>) {}
         });
         let add = registry.add_function(add::define_function(&registry));

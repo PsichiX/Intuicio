@@ -9,7 +9,7 @@ use syn::{
 struct Attributes {
     pub name: Option<Ident>,
     pub module_name: Option<Ident>,
-    pub struct_type: Option<TypePath>,
+    pub type_path: Option<TypePath>,
     pub use_registry: bool,
     pub use_context: bool,
     pub debug: bool,
@@ -55,10 +55,10 @@ macro_rules! parse_attributes {
                                 }
                                 _ => {}
                             }
-                        } else if name_value.path.is_ident("struct_type") {
+                        } else if name_value.path.is_ident("type_path") {
                             match name_value.lit {
                                 Lit::Str(content) => {
-                                    result.struct_type = Some(TypePath {
+                                    result.type_path = Some(TypePath {
                                         qself: None,
                                         path: parse_str::<Path>(&content.value()).unwrap(),
                                     });
@@ -108,7 +108,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
     let Attributes {
         name,
         module_name,
-        struct_type,
+        type_path,
         use_registry,
         use_context,
         debug,
@@ -139,14 +139,14 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
     } else {
         quote! {}
     };
-    let struct_handle = if let Some(struct_type) = struct_type {
+    let type_handle = if let Some(type_path) = type_path {
         quote! {
-            result.struct_handle = Some(
+            result.type_handle = Some(
                 registry
-                    .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#struct_type>())
+                    .find_type(intuicio_core::types::TypeQuery::of_type_name::<#type_path>())
                     .unwrap_or_else(|| panic!(
-                        "Could not find struct: `{}` for function: `{}`",
-                        std::any::type_name::<#struct_type>(),
+                        "Could not find type: `{}` for function: `{}`",
+                        std::any::type_name::<#type_path>(),
                         stringify!(#ident),
                     ))
             );
@@ -298,7 +298,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
         ReturnType::Default => vec![],
         ReturnType::Type(_, _) => vec!["result"],
     };
-    let return_structs = match item.sig.output {
+    let return_types = match item.sig.output {
         ReturnType::Default => vec![],
         ReturnType::Type(_, ref ty) => vec![transformer
             .as_ref()
@@ -342,7 +342,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
     } else {
         (vec![], vec![])
     };
-    let result = if return_structs.is_empty() {
+    let result = if return_types.is_empty() {
         quote! {
             {
                 #(#transform_arg_deref)*
@@ -384,16 +384,16 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
                 #visibility
                 #name
                 #module_name
-                #struct_handle
+                #type_handle
                 #meta
                 #(
                     result.inputs.push(
                         intuicio_core::function::FunctionParameter::new(
                             stringify!(#arg_idents),
                             registry
-                                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#arg_types>())
+                                .find_type(intuicio_core::types::TypeQuery::of_type_name::<#arg_types>())
                                 .unwrap_or_else(|| panic!(
-                                    "Could not find struct: `{}` for argument: `{}` for function: `{}`",
+                                    "Could not find type: `{}` for argument: `{}` for function: `{}`",
                                     std::any::type_name::<#arg_types>(),
                                     stringify!(#arg_idents),
                                     stringify!(#ident),
@@ -406,10 +406,10 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
                         intuicio_core::function::FunctionParameter::new(
                             #return_idents,
                             registry
-                                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#return_structs>())
+                                .find_type(intuicio_core::types::TypeQuery::of_type_name::<#return_types>())
                                 .unwrap_or_else(|| panic!(
-                                    "Could not find struct: `{}` for result: `{}` for function: `{}`",
-                                    std::any::type_name::<#return_structs>(),
+                                    "Could not find type: `{}` for result: `{}` for function: `{}`",
+                                    std::any::type_name::<#return_types>(),
                                     stringify!(#return_idents),
                                     stringify!(#ident),
                                 ))

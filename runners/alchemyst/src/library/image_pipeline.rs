@@ -335,9 +335,9 @@ impl Sampler {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Fragment::define_struct(registry));
-    registry.add_struct(Sampler::define_struct(registry));
-    registry.add_struct(Pipeline::define_struct(registry));
+    registry.add_type(Fragment::define_struct(registry));
+    registry.add_type(Sampler::define_struct(registry));
+    registry.add_type(Pipeline::define_struct(registry));
     registry.add_function(Pipeline::process_single_thread__define_function(registry));
     registry.add_function(Pipeline::process_multi_thread__define_function(registry));
     registry.add_function(Sampler::new__define_function(registry));

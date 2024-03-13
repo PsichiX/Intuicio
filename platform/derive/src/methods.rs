@@ -135,12 +135,12 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
     } else {
         quote! {}
     };
-    let struct_type = &item.self_ty;
-    let struct_handle = quote! {
-        result.struct_handle = Some(
+    let type_path = &item.self_ty;
+    let type_handle = quote! {
+        result.type_handle = Some(
             registry
-                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#struct_type>())
-                .unwrap_or_else(|| panic!("Could not find struct: `{}`", std::any::type_name::<#struct_type>()))
+                .find_type(intuicio_core::types::TypeQuery::of_type_name::<#type_path>())
+                .unwrap_or_else(|| panic!("Could not find type: `{}`", std::any::type_name::<#type_path>()))
         );
     };
     let items = item
@@ -238,7 +238,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
             .inputs
             .iter()
             .filter_map(|arg| match arg {
-                FnArg::Receiver(_) => Some(*struct_type.clone()),
+                FnArg::Receiver(_) => Some(*type_path.clone()),
                 FnArg::Typed(meta) => {
                     let ident = match &*meta.pat {
                         Pat::Ident(ident) => &ident.ident,
@@ -342,7 +342,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
             ReturnType::Default => vec![],
             ReturnType::Type(_, _) => vec!["result"],
         };
-        let return_structs = match item.sig.output {
+        let return_types = match item.sig.output {
             ReturnType::Default => vec![],
             ReturnType::Type(_, ref ty) => vec![transformer
                 .as_ref()
@@ -386,18 +386,18 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         } else {
             (vec![], vec![])
         };
-        let result = if return_structs.is_empty() {
+        let result = if return_types.is_empty() {
             quote! {
                 {
                     #(#transform_arg_deref)*
-                    #struct_type::#ident(#(#call_arg_idents,)*)
+                    #type_path::#ident(#(#call_arg_idents,)*)
                 }
             }
         } else {
             quote! {
                 let result = {
                     #(#transform_arg_deref)*
-                    #struct_type::#ident(#(#call_arg_idents,)*)
+                    #type_path::#ident(#(#call_arg_idents,)*)
                 };
                 #(#return_transform)*
                 (result,).stack_push_reversed(context.stack());
@@ -427,16 +427,16 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 #visibility
                 #name
                 #module_name
-                #struct_handle
+                #type_handle
                 #meta
                 #(
                     result.inputs.push(
                         intuicio_core::function::FunctionParameter::new(
                             stringify!(#arg_idents),
                             registry
-                                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#arg_types>())
+                                .find_type(intuicio_core::types::TypeQuery::of_type_name::<#arg_types>())
                                 .unwrap_or_else(|| panic!(
-                                    "Could not find struct: `{}` for argument: `{}` for function: `{}`",
+                                    "Could not find type: `{}` for argument: `{}` for function: `{}`",
                                     std::any::type_name::<#arg_types>(),
                                     stringify!(#arg_idents),
                                     stringify!(#ident),
@@ -449,10 +449,10 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                         intuicio_core::function::FunctionParameter::new(
                             #return_idents,
                             registry
-                                .find_struct(intuicio_core::struct_type::StructQuery::of_type_name::<#return_structs>())
+                                .find_type(intuicio_core::types::TypeQuery::of_type_name::<#return_types>())
                                 .unwrap_or_else(|| panic!(
-                                    "Could not find struct: `{}` for result: `{}` for function: `{}`",
-                                    std::any::type_name::<#return_structs>(),
+                                    "Could not find type: `{}` for result: `{}` for function: `{}`",
+                                    std::any::type_name::<#return_types>(),
                                     stringify!(#return_idents),
                                     stringify!(#ident),
                                 ))
@@ -468,8 +468,8 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 registry: &intuicio_core::registry::Registry
             ) -> intuicio_core::function::Function {
                 intuicio_core::function::Function::new(
-                    #struct_type::#define_signature_ident(registry),
-                    intuicio_core::function::FunctionBody::pointer(#struct_type::#intuicio_function_ident),
+                    #type_path::#define_signature_ident(registry),
+                    intuicio_core::function::FunctionBody::pointer(#type_path::#intuicio_function_ident),
                 )
             }
         };
@@ -483,7 +483,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         methods.push(result);
     }
     quote! {
-        impl #struct_type {
+        impl #type_path {
             #(#methods)*
         }
 

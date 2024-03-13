@@ -94,7 +94,7 @@ impl Event {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Event::define_struct(registry));
+    registry.add_type(Event::define_struct(registry));
     registry.add_function(Event::bind__define_function(registry));
     registry.add_function(Event::bind_once__define_function(registry));
     registry.add_function(Event::unbind__define_function(registry));

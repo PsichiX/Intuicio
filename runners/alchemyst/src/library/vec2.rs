@@ -173,7 +173,7 @@ impl Vec2 {
 }
 
 pub fn install(registry: &mut Registry) {
-    registry.add_struct(Vec2::define_struct(registry));
+    registry.add_type(Vec2::define_struct(registry));
     registry.add_function(Vec2::zero__define_function(registry));
     registry.add_function(Vec2::one__define_function(registry));
     registry.add_function(Vec2::from_array__define_function(registry));
