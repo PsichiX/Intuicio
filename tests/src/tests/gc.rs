@@ -30,9 +30,9 @@ impl Adder {
 fn test_gc() {
     let mut context = Context::new(10240, 10240);
     let mut registry = Registry::default().with_basic_types();
-    registry.add_struct(NativeStructBuilder::new::<Gc<i32>>().build());
+    registry.add_type(NativeStructBuilder::new::<Gc<i32>>().build());
     let add = registry.add_function(add::define_function(&registry));
-    registry.add_struct(Adder::define_struct(&registry));
+    registry.add_type(Adder::define_struct(&registry));
     let calculate = registry.add_function(Adder::calculate__define_function(&registry));
 
     let x = Gc::new(40);

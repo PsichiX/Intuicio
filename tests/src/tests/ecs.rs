@@ -26,8 +26,8 @@ fn test_ecs() {
     let mut context = Context::new(10240, 10240);
     let mut registry = Registry::default().with_basic_types();
 
-    registry.add_struct(NativeStructBuilder::new_uninitialized::<ManagedRefMut<Health>>().build());
-    registry.add_struct(NativeStructBuilder::new_uninitialized::<ManagedRef<Damage>>().build());
+    registry.add_type(NativeStructBuilder::new_uninitialized::<ManagedRefMut<Health>>().build());
+    registry.add_type(NativeStructBuilder::new_uninitialized::<ManagedRef<Damage>>().build());
 
     let deal_damage = registry.add_function(deal_damage::define_function(&registry));
 

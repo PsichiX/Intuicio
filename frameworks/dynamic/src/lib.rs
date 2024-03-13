@@ -164,13 +164,13 @@ impl Reference {
     }
 
     pub fn new<T: 'static>(data: T, registry: &Registry) -> Self {
-        let struct_type = registry.find_type(TypeQuery::of::<T>()).unwrap_or_else(|| {
+        let type_ = registry.find_type(TypeQuery::of::<T>()).unwrap_or_else(|| {
             panic!(
                 "Could not make a reference of type: {}",
                 std::any::type_name::<T>()
             )
         });
-        let mut value = unsafe { Object::new_uninitialized(struct_type).unwrap() };
+        let mut value = unsafe { Object::new_uninitialized(type_).unwrap() };
         unsafe { value.as_mut_ptr().cast::<T>().write(data) };
         Self::new_raw(value)
     }
