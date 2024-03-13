@@ -1,0 +1,26 @@
+mod example_enums {
+    struct VariantA {}
+    struct VariantB { value }
+
+    func main(args) {
+        var v = <struct example_enums::VariantA>;
+        if reflect::does_share_type(v, <struct example_enums::VariantA>) {
+            console::log_line("vaule is enum variant A");
+        }
+
+        v = example_enums::VariantA {};
+        if reflect::does_share_type(v, <struct example_enums::VariantA>) {
+            console::log_line("vaule is enum variant A");
+        }
+
+        v = example_enums::VariantB { value: 42 };
+        if reflect::does_share_type(v, <struct example_enums::VariantB>) {
+            console::log_line(
+                text::format(
+                    "value is enum variant B with data: {0}",
+                    [ reflect::to_text(v.value) ]
+                )
+            );
+        }
+    }
+}

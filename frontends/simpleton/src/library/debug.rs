@@ -149,7 +149,7 @@ fn debug_impl(value: &Reference, result: &mut dyn Write, indent: &mut Option<usi
                 }
                 write!(result, "}}").unwrap();
             }
-            intuicio_core::types::Type::Enum(_) => todo!(),
+            intuicio_core::types::Type::Enum(_) => {}
         }
     } else {
         write!(result, "<?>").unwrap();

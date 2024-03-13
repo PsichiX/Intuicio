@@ -253,6 +253,25 @@ pub fn does_share_reference(registry: &Registry, a: Reference, b: Reference) -> 
     Reference::new_boolean(a.does_share_reference(&b, false), registry)
 }
 
+#[intuicio_function(module_name = "reflect", use_registry)]
+pub fn does_share_type(registry: &Registry, a: Reference, b: Reference) -> Reference {
+    let a = if let Some(type_) = a.read::<Type>() {
+        type_.clone()
+    } else if let Some(type_) = a.type_of() {
+        type_.clone()
+    } else {
+        return Reference::new_boolean(false, registry);
+    };
+    let b = if let Some(type_) = b.read::<Type>() {
+        type_.clone()
+    } else if let Some(type_) = b.type_of() {
+        type_.clone()
+    } else {
+        return Reference::new_boolean(false, registry);
+    };
+    Reference::new_boolean(a.is_same_as(&b), registry)
+}
+
 pub fn are_same_impl(a: &Reference, b: &Reference) -> bool {
     if a.is_null() && b.is_null() {
         true
@@ -493,6 +512,7 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(is_being_written::define_function(registry));
     registry.add_function(references_count::define_function(registry));
     registry.add_function(does_share_reference::define_function(registry));
+    registry.add_function(does_share_type::define_function(registry));
     registry.add_function(are_same::define_function(registry));
     registry.add_function(to_boolean::define_function(registry));
     registry.add_function(to_integer::define_function(registry));
