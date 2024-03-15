@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-assembler"
-version = "0.31.3"
+version = "0.31.4"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Assembly frontend module for Intuicio scripting platform"

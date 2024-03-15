@@ -1,18 +1,16 @@
 [package]
-name = "intuicio-framework-dynamic"
+name = "intuicio-framework-text"
 version = "0.31.4"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
-description = "Dynamic type framework module for Intuicio scripting platform"
+description = "Text types framework module for Intuicio scripting platform"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
-documentation = "https://docs.rs/intuicio-framework-dynamic"
+documentation = "https://docs.rs/intuicio-framework-text"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-data = { version = "0.31", path = "../../platform/data" }
 intuicio-core = { version = "0.31", path = "../../platform/core" }
-
-[dev-dependencies]
 intuicio-derive = { version = "0.31", path = "../../platform/derive" }
+string-interner = "0.15"
