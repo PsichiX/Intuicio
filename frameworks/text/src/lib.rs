@@ -1,20 +1,24 @@
 use intuicio_derive::IntuicioStruct;
-use std::{cell::RefCell, marker::PhantomData, ops::Deref, ptr::NonNull, str::FromStr, sync::Arc};
+use lazy_static::lazy_static;
+use std::{
+    ops::Deref,
+    str::FromStr,
+    sync::{Arc, RwLock},
+};
 use string_interner::{
     backend::{Backend, BufferBackend},
     StringInterner,
 };
 
-thread_local! {
-    static INTERNER: RefCell<StringInterner<BufferBackend>> = RefCell::new(StringInterner::<BufferBackend>::new());
+lazy_static! {
+    static ref INTERNER: RwLock<StringInterner<BufferBackend>> =
+        RwLock::new(StringInterner::<BufferBackend>::new());
 }
 
 #[derive(IntuicioStruct, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name {
     #[intuicio(ignore)]
     symbol: <BufferBackend as Backend>::Symbol,
-    #[intuicio(ignore)]
-    _phantom: PhantomData<NonNull<()>>,
 }
 
 impl Default for Name {
@@ -25,17 +29,15 @@ impl Default for Name {
 
 impl Name {
     pub fn new(value: impl AsRef<str>) -> Self {
-        INTERNER.with_borrow_mut(|interner| Self {
-            symbol: interner.get_or_intern(value),
-            _phantom: PhantomData,
-        })
+        Self {
+            symbol: INTERNER.write().unwrap().get_or_intern(value),
+        }
     }
 
     pub fn new_static(value: &'static str) -> Self {
-        INTERNER.with_borrow_mut(|interner| Self {
-            symbol: interner.get_or_intern_static(value),
-            _phantom: PhantomData,
-        })
+        Self {
+            symbol: INTERNER.write().unwrap().get_or_intern_static(value),
+        }
     }
 
     pub fn symbol(this: &Self) -> <BufferBackend as Backend>::Symbol {
@@ -43,14 +45,12 @@ impl Name {
     }
 
     pub fn read(this: &Self) -> &str {
-        INTERNER.with_borrow(|interner| {
-            interner
-                .resolve(this.symbol)
-                .map(|content| unsafe { std::mem::transmute(content) })
-                .unwrap_or_else(|| {
-                    panic!("Could not resolve TextId with symbol: {:?}", this.symbol)
-                })
-        })
+        INTERNER
+            .read()
+            .unwrap()
+            .resolve(this.symbol)
+            .map(|content| unsafe { std::mem::transmute(content) })
+            .unwrap_or_else(|| panic!("Could not resolve Name with symbol: {:?}", this.symbol))
     }
 }
 
@@ -171,7 +171,7 @@ impl std::fmt::Display for Text {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use std::{collections::HashMap, thread::spawn};
 
     #[test]
     fn test_name() {
@@ -235,5 +235,25 @@ mod tests {
         assert_eq!(map.get(&Name::new("foo")).unwrap().as_ref(), "Foo");
         assert_eq!(map.get(&Name::new("bar")).unwrap().as_ref(), "Bar");
         assert_eq!(map.get(&Name::new("bar2")).unwrap().as_ref(), "Bar");
+    }
+
+    #[test]
+    fn test_multi_threading() {
+        let name = Name::new_static("foo");
+        let text = Text::new("Foo");
+
+        assert_eq!(name.as_ref(), "foo");
+        assert_eq!(text.as_ref(), "Foo");
+
+        let (name, text) = spawn(move || {
+            assert_eq!(name.as_ref(), "foo");
+            assert_eq!(text.as_ref(), "Foo");
+            (name, text)
+        })
+        .join()
+        .unwrap();
+
+        assert_eq!(name.as_ref(), "foo");
+        assert_eq!(text.as_ref(), "Foo");
     }
 }
