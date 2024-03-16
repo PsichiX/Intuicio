@@ -1,7 +1,7 @@
 use intuicio_core::prelude::*;
 use intuicio_data::prelude::*;
 use intuicio_derive::*;
-use intuicio_framework_text::{Name, Text};
+use intuicio_framework_text::{name, text, Name, Text};
 use std::collections::HashMap;
 
 #[derive(IntuicioStruct, Debug, Default)]
@@ -41,10 +41,10 @@ fn test_text() {
     let get = registry.add_function(Loc::get__define_function(&registry));
     let set = registry.add_function(Loc::set__define_function(&registry));
 
-    let foo_name = Name::new_static("foo");
-    let bar_name = Name::new_static("bar");
-    let foo_text = Text::new("Foo");
-    let bar_text = Text::new("Bar");
+    let foo_name = name!("foo");
+    let bar_name = name!("bar");
+    let foo_text = text!("Foo");
+    let bar_text = text!("Bar");
 
     let loc = ManagedBox::<Loc>::default();
     Loc::set(loc.clone(), foo_name, foo_text.clone());

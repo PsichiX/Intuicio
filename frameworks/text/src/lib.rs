@@ -168,6 +168,20 @@ impl std::fmt::Display for Text {
     }
 }
 
+#[macro_export]
+macro_rules! name {
+    ($content:literal) => {
+        $crate::Name::new_static($content)
+    };
+}
+
+#[macro_export]
+macro_rules! text {
+    ($content:literal) => {
+        $crate::Text::new($content)
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,10 +189,10 @@ mod tests {
 
     #[test]
     fn test_name() {
-        let a = Name::new_static("foo");
-        let b = Name::new_static("foo");
+        let a = name!("foo");
+        let b = name!("foo");
         let c = a;
-        let d = Name::new_static("bar");
+        let d = name!("bar");
 
         assert_eq!(a.as_ref(), "foo");
         assert_eq!(b.as_ref(), "foo");
@@ -200,10 +214,10 @@ mod tests {
 
     #[test]
     fn test_text() {
-        let a = Text::new("foo");
-        let b = Text::new("foo");
+        let a = text!("foo");
+        let b = text!("foo");
         let c = a.clone();
-        let d = Text::new("bar");
+        let d = text!("bar");
 
         assert_eq!(a.as_ref(), "foo");
         assert_eq!(b.as_ref(), "foo");
@@ -226,21 +240,21 @@ mod tests {
     #[test]
     fn test_name_text_map() {
         let mut map = HashMap::new();
-        map.insert(Name::new("foo"), Text::new("Foo"));
-        let bar = Text::new("Bar");
-        map.insert(Name::new("bar"), bar.clone());
-        map.insert(Name::new("bar2"), bar);
+        map.insert(name!("foo"), text!("Foo"));
+        let bar = text!("Bar");
+        map.insert(name!("bar"), bar.clone());
+        map.insert(name!("bar2"), bar);
 
         assert_eq!(map.len(), 3);
-        assert_eq!(map.get(&Name::new("foo")).unwrap().as_ref(), "Foo");
-        assert_eq!(map.get(&Name::new("bar")).unwrap().as_ref(), "Bar");
-        assert_eq!(map.get(&Name::new("bar2")).unwrap().as_ref(), "Bar");
+        assert_eq!(map.get(&name!("foo")).unwrap().as_ref(), "Foo");
+        assert_eq!(map.get(&name!("bar")).unwrap().as_ref(), "Bar");
+        assert_eq!(map.get(&name!("bar2")).unwrap().as_ref(), "Bar");
     }
 
     #[test]
     fn test_multi_threading() {
-        let name = Name::new_static("foo");
-        let text = Text::new("Foo");
+        let name = name!("foo");
+        let text = text!("Foo");
 
         assert_eq!(name.as_ref(), "foo");
         assert_eq!(text.as_ref(), "Foo");
