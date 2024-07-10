@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-value"
-version = "0.31.6"
+version = "0.32.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Type erased value framework module for Intuicio scripting platform"
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/intuicio-framework-value"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-data = { version = "0.31", path = "../../platform/data" }
+intuicio-data = { version = "0.32", path = "../../platform/data" }
 
 [dev-dependencies]
-intuicio-derive = { version = "0.31", path = "../../platform/derive" }
+intuicio-derive = { version = "0.32", path = "../../platform/derive" }

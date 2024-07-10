@@ -38,7 +38,7 @@ Backends are used to "run" scripts, or more specifically to use scripts produced
 
 An obvious backend that anyone can think of is a Virtual Machine, already made as `intuicio-backend-vm` crate. This one grabs script data and executes it directly in `VmScope`s that are self-contained units that executes set of Intuicio script operations.
 
-Another example of backend can be "nativizer" - nativizers are units that transpile scripts into native code, in this case Rust code. Nativizers are great way to speed up scripts execution, by removing the need for constructing and loading scripts at runtime, rather to just get native code that would do what scripts do, but without extra overhead. Although there is an `intuicio-backend-rust` crate that aims to do that, it is still incomplete, mostly non-functional until it gets proper definition, but experiments are being made and eventually Intuicio will have its own default nativizer.
+Another example of backend can be "nativizer" - nativizers are units that transpile scripts into native code, in this case Rust code. Nativizers are great way to speed up scripts execution, by removing the need for constructing and loading scripts at runtime, rather to just get native code that would do what scripts do, but without extra overhead.
 
 ## Host
 

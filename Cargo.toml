@@ -10,4 +10,8 @@ members = [
     "essentials",
     "demos/*",
     "tests",
+    "benches",
 ]
+
+[profile.release.package."benches"]
+debug = true

@@ -45,7 +45,8 @@ impl LifetimeState {
     }
 
     pub fn try_lock(&self) -> Option<LifetimeStateAccess> {
-        if !self.locked.swap(true, Ordering::AcqRel) {
+        if !self.locked.load(Ordering::Acquire) {
+            self.locked.store(true, Ordering::Release);
             Some(LifetimeStateAccess {
                 state: self,
                 unlock: true,
@@ -56,7 +57,9 @@ impl LifetimeState {
     }
 
     pub fn lock(&self) -> LifetimeStateAccess {
-        while self.locked.load(Ordering::Acquire) {}
+        while self.locked.load(Ordering::Acquire) {
+            std::hint::spin_loop();
+        }
         self.locked.store(true, Ordering::Release);
         LifetimeStateAccess {
             state: self,
@@ -64,7 +67,8 @@ impl LifetimeState {
         }
     }
 
-    pub fn lock_unchecked(&self) -> LifetimeStateAccess {
+    /// # Safety
+    pub unsafe fn lock_unchecked(&self) -> LifetimeStateAccess {
         LifetimeStateAccess {
             state: self,
             unlock: true,
@@ -712,7 +716,7 @@ pub struct ValueReadAccess<'a, T: 'a + ?Sized> {
 
 impl<'a, T: ?Sized> Drop for ValueReadAccess<'a, T> {
     fn drop(&mut self) {
-        self.lifetime.lock_unchecked().release_read_access();
+        unsafe { self.lifetime.lock_unchecked().release_read_access() };
     }
 }
 
@@ -754,7 +758,7 @@ pub struct ValueWriteAccess<'a, T: 'a + ?Sized> {
 
 impl<'a, T: ?Sized> Drop for ValueWriteAccess<'a, T> {
     fn drop(&mut self) {
-        self.lifetime.lock_unchecked().release_write_access();
+        unsafe { self.lifetime.lock_unchecked().release_write_access() };
     }
 }
 
@@ -784,7 +788,8 @@ impl<'a, T: ?Sized> ValueWriteAccess<'a, T> {
         self,
         f: impl FnOnce(&mut T) -> Option<&mut U>,
     ) -> Result<ValueWriteAccess<'a, U>, Self> {
-        if let Some(data) = f(unsafe { std::mem::transmute(&mut *self.data) }) {
+        if let Some(data) = f(unsafe { std::mem::transmute::<&mut T, &'a mut T>(&mut *self.data) })
+        {
             Ok(ValueWriteAccess {
                 lifetime: self.lifetime.clone(),
                 data,

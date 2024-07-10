@@ -314,7 +314,7 @@ impl<'a> ScriptStructField<'a> {
                 .clone(),
         )
         .with_visibility(self.visibility);
-        result.meta = self.meta.to_owned();
+        result.meta.clone_from(&self.meta);
         result
     }
 }
@@ -398,7 +398,7 @@ impl<'a> ScriptEnumVariant<'a> {
             .iter()
             .map(|field| field.build(registry))
             .collect();
-        result.meta = self.meta.to_owned();
+        result.meta.clone_from(&self.meta);
         result
     }
 }

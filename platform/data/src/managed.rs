@@ -73,7 +73,7 @@ impl<T> Managed<T> {
     }
 
     pub fn lazy(&mut self) -> ManagedLazy<T> {
-        unsafe { ManagedLazy::new_raw(&mut self.data as *mut T, self.lifetime.lazy()).unwrap() }
+        ManagedLazy::new(&mut self.data, self.lifetime.lazy())
     }
 
     /// # Safety

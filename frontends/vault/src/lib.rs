@@ -158,7 +158,7 @@ impl VaultExpression {
         match self {
             Self::DefineVariable { name } => {
                 if let Some(item) = registers.iter_mut().find(|n| n == &name) {
-                    *item = name.to_owned();
+                    item.clone_from(name);
                 } else {
                     registers.push(name.to_owned());
                 }
@@ -426,11 +426,11 @@ impl VaultFunction {
                 },
             }],
         };
-        let mut registers = Vec::new();
+        let mut registers = Vec::<String>::new();
         let mut operations = vec![];
         for argument in &self.arguments {
             if let Some(item) = registers.iter_mut().find(|n| *n == &argument.name) {
-                *item = argument.name.to_owned();
+                item.clone_from(&argument.name);
             } else {
                 registers.push(argument.name.to_owned());
             }

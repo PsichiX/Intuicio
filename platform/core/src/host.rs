@@ -9,7 +9,7 @@ use std::{cell::RefCell, marker::PhantomData, sync::Arc};
 use typid::ID;
 
 thread_local! {
-    static GLOBAL_HOST_STACK: RefCell<Vec<(HostId, Host)>> = RefCell::new(vec![]);
+    static GLOBAL_HOST_STACK: RefCell<Vec<(HostId, Host)>> = const{ RefCell::new(vec![]) };
 }
 
 pub type HostId = ID<Host>;

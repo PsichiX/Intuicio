@@ -15,9 +15,11 @@ test:
 miri:
   cargo +nightly miri test --manifest-path ./platform/data/Cargo.toml
   cargo +nightly miri test --manifest-path ./platform/core/Cargo.toml
+  cargo +nightly miri test --manifest-path ./frameworks/ecs/Cargo.toml
 
-bench:
-  cargo test --manifest-path ./tests/Cargo.toml --features=bench --release -- --nocapture
+bench NAME="all":
+  cargo run --manifest-path ./benches/Cargo.toml --no-default-features --features=bench_{{NAME}} --release
+  # cargo build --manifest-path ./benches/Cargo.toml --no-default-features --features=bench_{{NAME}}
 
 clippy:
   cargo clippy --all --all-features
@@ -57,6 +59,8 @@ update:
   cargo update --manifest-path ./frameworks/dynamic/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/pointer/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/value/Cargo.toml --aggressive
+  cargo update --manifest-path ./frameworks/ecs/Cargo.toml --aggressive
+  cargo update --manifest-path ./frameworks/text/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/serde/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/assembler/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/simpleton/Cargo.toml --aggressive
@@ -73,6 +77,7 @@ update:
   cargo update --manifest-path ./demos/emu/Cargo.toml --aggressive
   cargo update --manifest-path ./demos/custom/Cargo.toml --aggressive
   cargo update --manifest-path ./tests/Cargo.toml --aggressive
+  cargo update --manifest-path ./benches/Cargo.toml --aggressive
 
 install:
   cargo install --path ./runners/simpleton
@@ -96,6 +101,10 @@ publish:
   cargo publish --no-verify --manifest-path ./frameworks/pointer/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./frameworks/value/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./frameworks/ecs/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./frameworks/text/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./frontends/serde/Cargo.toml
   sleep 1

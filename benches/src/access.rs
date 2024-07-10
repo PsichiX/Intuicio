@@ -1,7 +1,4 @@
-use crate::{
-    benches::{COMPARISON_FORMAT, DURATION},
-    black_box, Benchmark,
-};
+use crate::{black_box, Benchmark, COMPARISON_FORMAT, DURATION};
 use intuicio_data::prelude::*;
 use std::time::Duration;
 

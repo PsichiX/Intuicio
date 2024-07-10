@@ -1,7 +1,4 @@
-use crate::{
-    benches::{COMPARISON_FORMAT, DURATION},
-    black_box, Benchmark,
-};
+use crate::{black_box, Benchmark, COMPARISON_FORMAT, DURATION};
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_frontend_vault::*;
@@ -129,7 +126,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
             }
         });
         let mut content_provider = FileContentProvider::new("vault", VaultContentParser);
-        VaultPackage::new("../resources/package.vault", &mut content_provider)
+        VaultPackage::new("./resources/package.vault", &mut content_provider)
             .unwrap()
             .compile()
             .install::<VmScope<VaultScriptExpression>>(&mut registry, None);

@@ -1,4 +1,4 @@
-use crate::{benches::DURATION, Benchmark};
+use crate::{Benchmark, DURATION};
 use intuicio_backend_vm::scope::VmScope;
 use intuicio_core::{
     define_function, function::FunctionQuery, registry::Registry, script::FileContentProvider,
@@ -54,7 +54,7 @@ pub fn bench() {
         println!();
         let mut registry = Registry::default().with_basic_types();
         let mut content_provider = FileContentProvider::new("vault", VaultContentParser);
-        VaultPackage::new("../resources/package.vault", &mut content_provider)
+        VaultPackage::new("./resources/package.vault", &mut content_provider)
             .unwrap()
             .compile()
             .install::<VmScope<VaultScriptExpression>>(&mut registry, None);
@@ -96,7 +96,7 @@ pub fn bench() {
             }
         });
         let mut content_provider = FileContentProvider::new("vault", VaultContentParser);
-        VaultPackage::new("../resources/package.vault", &mut content_provider)
+        VaultPackage::new("./resources/package.vault", &mut content_provider)
             .unwrap()
             .compile()
             .install::<VmScope<VaultScriptExpression>>(&mut registry, None);

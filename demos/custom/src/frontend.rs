@@ -32,9 +32,17 @@ impl Error for CustomOperationError {}
 pub type CustomScript = Vec<CustomOperation>;
 
 pub enum CustomOperation {
-    Comment { content: String },
-    Push { value: i32 },
-    Call { name: String, module_name: String },
+    Comment {
+        #[allow(dead_code)]
+        content: String,
+    },
+    Push {
+        value: i32,
+    },
+    Call {
+        name: String,
+        module_name: String,
+    },
 }
 
 impl FromStr for CustomOperation {

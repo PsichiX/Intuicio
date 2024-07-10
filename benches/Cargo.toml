@@ -1,0 +1,35 @@
+[package]
+name = "benches"
+version = "0.32.0"
+edition = "2021"
+publish = false
+
+[features]
+bench_access = []
+bench_allocator = []
+bench_div = []
+bench_ecs = []
+bench_fib = []
+bench_misc = []
+bench_sqrt = []
+bench_all = [
+    "bench_access",
+    "bench_allocator",
+    "bench_div",
+    "bench_ecs",
+    "bench_fib",
+    "bench_misc",
+    "bench_sqrt",
+]
+default = ["bench_all"]
+
+[dependencies]
+intuicio-data = { version = "0.32", path = "../platform/data" }
+intuicio-core = { version = "0.32", path = "../platform/core" }
+intuicio-backend-vm = { version = "0.32", path = "../backends/vm" }
+intuicio-frontend-vault = { version = "0.32", path = "../frontends/vault" }
+intuicio-framework-ecs = { version = "0.32", path = "../frameworks/ecs" }
+rune = "*"
+rune-modules = "*"
+rhai = "*"
+hecs = "*"

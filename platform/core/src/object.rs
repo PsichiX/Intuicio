@@ -354,6 +354,10 @@ impl DynamicObject {
         self.properties.remove(name)
     }
 
+    pub fn drain(&mut self) -> impl Iterator<Item = (String, Object)> + '_ {
+        self.properties.drain()
+    }
+
     pub fn properties(&self) -> impl Iterator<Item = (&str, &Object)> + '_ {
         self.properties
             .iter()
@@ -368,6 +372,14 @@ impl DynamicObject {
 
     pub fn property_names(&self) -> impl Iterator<Item = &str> + '_ {
         self.properties.keys().map(|key| key.as_str())
+    }
+
+    pub fn property_values(&self) -> impl Iterator<Item = &Object> + '_ {
+        self.properties.values()
+    }
+
+    pub fn property_values_mut(&mut self) -> impl Iterator<Item = &mut Object> + '_ {
+        self.properties.values_mut()
     }
 }
 
@@ -393,6 +405,10 @@ impl TypedDynamicObject {
         self.properties.remove(&TypeHash::of::<T>())
     }
 
+    pub fn drain(&mut self) -> impl Iterator<Item = (TypeHash, Object)> + '_ {
+        self.properties.drain()
+    }
+
     pub fn properties(&self) -> impl Iterator<Item = (&TypeHash, &Object)> + '_ {
         self.properties.iter()
     }
@@ -403,6 +419,14 @@ impl TypedDynamicObject {
 
     pub fn property_types(&self) -> impl Iterator<Item = &TypeHash> + '_ {
         self.properties.keys()
+    }
+
+    pub fn property_values(&self) -> impl Iterator<Item = &Object> + '_ {
+        self.properties.values()
+    }
+
+    pub fn property_values_mut(&mut self) -> impl Iterator<Item = &mut Object> + '_ {
+        self.properties.values_mut()
     }
 }
 
