@@ -730,6 +730,9 @@ struct Column {
     unique_access: AtomicBool,
 }
 
+unsafe impl Send for Column {}
+unsafe impl Sync for Column {}
+
 impl Drop for Column {
     fn drop(&mut self) {
         unsafe {
@@ -759,8 +762,11 @@ impl Column {
 
     unsafe fn allocate_memory(mut item_layout: Layout, capacity: usize) -> (*mut u8, Layout) {
         item_layout = item_layout.pad_to_align();
-        let layout =
-            Layout::from_size_align_unchecked(item_layout.size() * capacity, item_layout.align());
+        let layout = if item_layout.size() == 0 {
+            Layout::from_size_align_unchecked(1, 1)
+        } else {
+            Layout::from_size_align_unchecked(item_layout.size() * capacity, item_layout.align())
+        };
         let memory = alloc(layout);
         (memory, layout)
     }

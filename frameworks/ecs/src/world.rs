@@ -1,5 +1,3 @@
-use intuicio_data::type_hash::TypeHash;
-
 use crate::{
     archetype::{
         Archetype, ArchetypeColumnInfo, ArchetypeDynamicEntityColumnAccess,
@@ -10,7 +8,11 @@ use crate::{
     query::{DynamicQueryFilter, DynamicQueryIter, TypedQueryFetch, TypedQueryIter},
     Component,
 };
-use std::error::Error;
+use intuicio_data::type_hash::TypeHash;
+use std::{
+    collections::{HashSet, VecDeque},
+    error::Error,
+};
 
 #[derive(Debug)]
 pub enum WorldError {
@@ -105,6 +107,9 @@ impl EntityMap {
             let id = self.id_generator;
             self.id_generator += 1;
             while self.table.len() < self.id_generator as usize {
+                if self.table.len() == self.table.capacity() {
+                    self.table.reserve_exact(self.table.capacity());
+                }
                 self.table.push((0, None));
             }
             let (_, archetype) = &mut self.table[id as usize];
@@ -195,6 +200,9 @@ impl ArchetypeMap {
             let id = self.id_generator;
             self.id_generator += 1;
             while self.table.len() < self.id_generator as usize {
+                if self.table.len() == self.table.capacity() {
+                    self.table.reserve_exact(self.table.capacity());
+                }
                 self.table.push(None);
             }
             let archetype = &mut self.table[id as usize];
@@ -259,10 +267,138 @@ impl ArchetypeMap {
     }
 }
 
+#[derive(Default)]
+struct RelationsGraph {
+    graph: Vec<(TypeHash, Entity, Entity)>,
+}
+
+impl RelationsGraph {
+    fn connect(&mut self, type_hash: TypeHash, from: Entity, to: Entity) {
+        if from != to
+            && !self
+                .graph
+                .iter()
+                .any(|(ty, f, t)| *ty == type_hash && *f == from && *t == to)
+        {
+            if self.graph.len() == self.graph.capacity() {
+                self.graph.reserve_exact(self.graph.capacity());
+            }
+            self.graph.push((type_hash, from, to));
+        }
+    }
+
+    fn disconnect(&mut self, type_hash: TypeHash, from: Entity, to: Entity) {
+        if let Some(index) = self
+            .graph
+            .iter()
+            .position(|(ty, f, t)| *ty == type_hash && *f == from && *t == to)
+        {
+            self.graph.swap_remove(index);
+        }
+    }
+
+    fn disconnect_from(&mut self, type_hash: TypeHash, from: Entity) {
+        self.graph
+            .retain(|(ty, f, _)| *ty != type_hash || *f != from);
+    }
+
+    fn disconnect_to(&mut self, type_hash: TypeHash, to: Entity) {
+        self.graph.retain(|(ty, _, t)| *ty != type_hash || *t != to);
+    }
+
+    fn disconnect_all(&mut self, type_hash: TypeHash, entity: Entity) {
+        self.graph
+            .retain(|(ty, f, t)| *ty != type_hash || (*f != entity && *t != entity));
+    }
+
+    fn disconnect_any(&mut self, entity: Entity) {
+        self.graph.retain(|(_, f, t)| *f != entity && *t != entity);
+    }
+
+    fn connections(
+        &self,
+        type_hash: TypeHash,
+        entity: Entity,
+    ) -> impl Iterator<Item = Entity> + '_ {
+        self.graph.iter().filter_map(move |(ty, f, t)| {
+            if *ty == type_hash {
+                if *f == entity {
+                    Some(*t)
+                } else if *t == entity {
+                    Some(*f)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+    }
+
+    fn outgoing(&self, type_hash: TypeHash, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
+        self.graph.iter().filter_map(move |(ty, f, t)| {
+            if *ty == type_hash && *f == entity {
+                Some(*t)
+            } else {
+                None
+            }
+        })
+    }
+
+    fn incoming(&self, type_hash: TypeHash, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
+        self.graph.iter().filter_map(move |(ty, f, t)| {
+            if *ty == type_hash && *t == entity {
+                Some(*f)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+pub struct RelationsTraverseIter<'a> {
+    relations: &'a RelationsGraph,
+    type_hash: TypeHash,
+    incoming: bool,
+    stack: VecDeque<Entity>,
+    visited: HashSet<Entity>,
+}
+
+impl<'a> Iterator for RelationsTraverseIter<'a> {
+    type Item = Entity;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(entity) = self.stack.pop_front() {
+            if self.visited.contains(&entity) {
+                continue;
+            }
+            self.visited.insert(entity);
+            if self.incoming {
+                for entity in self.relations.incoming(self.type_hash, entity) {
+                    if self.stack.len() == self.stack.capacity() {
+                        self.stack.reserve_exact(self.stack.capacity());
+                    }
+                    self.stack.push_back(entity);
+                }
+            } else {
+                for entity in self.relations.outgoing(self.type_hash, entity) {
+                    if self.stack.len() == self.stack.capacity() {
+                        self.stack.reserve_exact(self.stack.capacity());
+                    }
+                    self.stack.push_back(entity);
+                }
+            }
+            return Some(entity);
+        }
+        None
+    }
+}
+
 pub struct World {
     pub new_archetype_capacity: usize,
     entities: EntityMap,
     archetypes: ArchetypeMap,
+    relations: RelationsGraph,
 }
 
 impl Default for World {
@@ -271,6 +407,7 @@ impl Default for World {
             new_archetype_capacity: 128,
             entities: Default::default(),
             archetypes: Default::default(),
+            relations: Default::default(),
         }
     }
 }
@@ -410,7 +547,10 @@ impl World {
     pub fn despawn(&mut self, entity: Entity) -> Result<(), WorldError> {
         let id = self.entities.release(entity)?;
         match self.archetypes.get_mut(id).unwrap().remove(entity) {
-            Ok(result) => Ok(result),
+            Ok(_) => {
+                self.relations.disconnect_any(entity);
+                Ok(())
+            }
             Err(error) => {
                 self.entities.acquire()?;
                 Err(error.into())
@@ -481,6 +621,7 @@ impl World {
             .columns()
             .cloned()
             .collect::<Vec<_>>();
+        let despawn = new_columns.is_empty();
         for column in columns {
             if let Some(index) = new_columns
                 .iter()
@@ -505,6 +646,10 @@ impl World {
             let (new_id, archetype_slot) = self.archetypes.acquire()?;
             *archetype_slot = Some(archetype);
             self.entities.set(entity, new_id)?;
+        }
+        if despawn {
+            let _ = self.entities.release(entity);
+            self.relations.disconnect_any(entity);
         }
         Ok(())
     }
@@ -544,12 +689,139 @@ impl World {
     ) -> DynamicQueryIter<'a, LOCKING> {
         DynamicQueryIter::new(filter, self)
     }
+
+    pub fn relate<T>(&mut self, from: Entity, to: Entity) {
+        self.relate_raw(TypeHash::of::<T>(), from, to);
+    }
+
+    pub fn relate_raw(&mut self, type_hash: TypeHash, from: Entity, to: Entity) {
+        self.relations.connect(type_hash, from, to);
+    }
+
+    pub fn unrelate<T>(&mut self, from: Entity, to: Entity) {
+        self.unrelate_raw(TypeHash::of::<T>(), from, to);
+    }
+
+    pub fn unrelate_raw(&mut self, type_hash: TypeHash, from: Entity, to: Entity) {
+        self.relations.disconnect(type_hash, from, to);
+    }
+
+    pub fn unrelate_from<T>(&mut self, from: Entity) {
+        self.unrelate_from_raw(TypeHash::of::<T>(), from);
+    }
+
+    pub fn unrelate_from_raw(&mut self, type_hash: TypeHash, from: Entity) {
+        self.relations.disconnect_from(type_hash, from);
+    }
+
+    pub fn unrelate_to<T>(&mut self, to: Entity) {
+        self.unrelate_to_raw(TypeHash::of::<T>(), to);
+    }
+
+    pub fn unrelate_to_raw(&mut self, type_hash: TypeHash, to: Entity) {
+        self.relations.disconnect_to(type_hash, to);
+    }
+
+    pub fn unrelate_all<T>(&mut self, entity: Entity) {
+        self.unrelate_all_raw(TypeHash::of::<T>(), entity);
+    }
+
+    pub fn unrelate_all_raw(&mut self, type_hash: TypeHash, entity: Entity) {
+        self.relations.disconnect_all(type_hash, entity);
+    }
+
+    pub fn unrelate_any(&mut self, entity: Entity) {
+        self.relations.disconnect_any(entity);
+    }
+
+    pub fn relations<T>(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
+        self.relations_raw(TypeHash::of::<T>(), entity)
+    }
+
+    pub fn relations_raw(
+        &self,
+        type_hash: TypeHash,
+        entity: Entity,
+    ) -> impl Iterator<Item = Entity> + '_ {
+        self.relations.connections(type_hash, entity)
+    }
+
+    pub fn outgoing_relations<T>(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
+        self.outgoing_relations_raw(TypeHash::of::<T>(), entity)
+    }
+
+    pub fn outgoing_relations_raw(
+        &self,
+        type_hash: TypeHash,
+        entity: Entity,
+    ) -> impl Iterator<Item = Entity> + '_ {
+        self.relations.outgoing(type_hash, entity)
+    }
+
+    pub fn incoming_relations<T>(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
+        self.incoming_relations_raw(TypeHash::of::<T>(), entity)
+    }
+
+    pub fn incoming_relations_raw(
+        &self,
+        type_hash: TypeHash,
+        entity: Entity,
+    ) -> impl Iterator<Item = Entity> + '_ {
+        self.relations.incoming(type_hash, entity)
+    }
+
+    pub fn traverse_outgoing<T>(
+        &self,
+        entities: impl IntoIterator<Item = Entity>,
+    ) -> RelationsTraverseIter {
+        self.traverse_outgoing_raw(TypeHash::of::<T>(), entities)
+    }
+
+    pub fn traverse_outgoing_raw(
+        &self,
+        type_hash: TypeHash,
+        entities: impl IntoIterator<Item = Entity>,
+    ) -> RelationsTraverseIter {
+        RelationsTraverseIter {
+            relations: &self.relations,
+            type_hash,
+            incoming: false,
+            stack: entities.into_iter().collect(),
+            visited: Default::default(),
+        }
+    }
+
+    pub fn traverse_incoming<T>(
+        &self,
+        entities: impl IntoIterator<Item = Entity>,
+    ) -> RelationsTraverseIter {
+        self.traverse_incoming_raw(TypeHash::of::<T>(), entities)
+    }
+
+    pub fn traverse_incoming_raw(
+        &self,
+        type_hash: TypeHash,
+        entities: impl IntoIterator<Item = Entity>,
+    ) -> RelationsTraverseIter {
+        RelationsTraverseIter {
+            relations: &self.relations,
+            type_hash,
+            incoming: true,
+            stack: entities.into_iter().collect(),
+            visited: Default::default(),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::query::{Exclude, Include};
+    use std::{
+        sync::{Arc, RwLock},
+        thread::spawn,
+        time::{Duration, Instant},
+    };
 
     #[test]
     fn test_world_changes() {
@@ -750,42 +1022,109 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_world_async() {
-    //     const N: usize = if cfg!(miri) { 10 } else { 1000 };
+    #[test]
+    fn test_world_relations() {
+        struct Parent;
+        struct Root;
 
-    //     fn is_async<T: Send + Sync>() {}
+        let mut world = World::default();
+        let a = world.spawn((0u8, false, Root)).unwrap();
+        let b = world.spawn((1u8, false)).unwrap();
+        let c = world.spawn((2u8, false)).unwrap();
+        let d = world.spawn((3u8, false)).unwrap();
+        world.relate::<Parent>(b, a);
+        world.relate::<Parent>(c, a);
+        world.relate::<Parent>(d, c);
 
-    //     is_async::<World>();
+        assert_eq!(
+            world.incoming_relations::<Parent>(a).collect::<Vec<_>>(),
+            vec![b, c]
+        );
+        assert_eq!(
+            world.incoming_relations::<Parent>(b).collect::<Vec<_>>(),
+            vec![]
+        );
+        assert_eq!(
+            world.incoming_relations::<Parent>(c).collect::<Vec<_>>(),
+            vec![d]
+        );
+        assert_eq!(
+            world.incoming_relations::<Parent>(d).collect::<Vec<_>>(),
+            vec![]
+        );
 
-    //     let world = Arc::new(RwLock::new(World::default().with_new_archetype_capacity(N)));
-    //     let world2 = world.clone();
+        assert_eq!(
+            world.outgoing_relations::<Parent>(a).collect::<Vec<_>>(),
+            vec![]
+        );
+        assert_eq!(
+            world.outgoing_relations::<Parent>(b).collect::<Vec<_>>(),
+            vec![a]
+        );
+        assert_eq!(
+            world.outgoing_relations::<Parent>(c).collect::<Vec<_>>(),
+            vec![a]
+        );
+        assert_eq!(
+            world.outgoing_relations::<Parent>(d).collect::<Vec<_>>(),
+            vec![c]
+        );
 
-    //     {
-    //         let mut world = world.write().unwrap();
-    //         for index in 0..N {
-    //             world.spawn((index as u8, index as u16)).unwrap();
-    //         }
-    //     }
+        assert_eq!(
+            world.traverse_incoming::<Parent>([a]).collect::<Vec<_>>(),
+            vec![a, b, c, d]
+        );
 
-    //     let handle = spawn(move || {
-    //         let timer = Instant::now();
-    //         while timer.elapsed() < Duration::from_secs(1) {
-    //             let world = world2.read().unwrap();
-    //             for mut v in world.query::<true, &mut u16>() {
-    //                 *v = v.wrapping_add(1);
-    //             }
-    //         }
-    //     });
+        for (entity, _) in world.query::<true, (Entity, Include<Root>)>() {
+            for other in world.incoming_relations::<Parent>(entity) {
+                let mut v = world.get::<true, bool>(other, true).unwrap();
+                let v = v.write().unwrap();
+                *v = !*v;
+            }
+        }
 
-    //     let timer = Instant::now();
-    //     while timer.elapsed() < Duration::from_secs(1) {
-    //         let world = world.read().unwrap();
-    //         for mut v in world.query::<true, &mut u8>() {
-    //             *v = v.wrapping_add(1);
-    //         }
-    //     }
+        assert!(!*world.get::<true, bool>(a, false).unwrap().read().unwrap());
+        assert!(*world.get::<true, bool>(b, false).unwrap().read().unwrap());
+        assert!(*world.get::<true, bool>(c, false).unwrap().read().unwrap());
+        assert!(!*world.get::<true, bool>(d, false).unwrap().read().unwrap());
+    }
 
-    //     let _ = handle.join();
-    // }
+    #[test]
+    fn test_world_async() {
+        const N: usize = if cfg!(miri) { 10 } else { 1000 };
+
+        fn is_async<T: Send + Sync>() {}
+
+        is_async::<World>();
+
+        let world = Arc::new(RwLock::new(World::default().with_new_archetype_capacity(N)));
+        let world2 = world.clone();
+
+        {
+            let mut world = world.write().unwrap();
+            for index in 0..N {
+                world.spawn((index as u8, index as u16)).unwrap();
+            }
+        }
+
+        let handle = spawn(move || {
+            let timer = Instant::now();
+            while timer.elapsed() < Duration::from_secs(1) {
+                let world = world2.read().unwrap();
+                for v in world.query::<true, &mut u16>() {
+                    *v = v.wrapping_add(1);
+                }
+            }
+        });
+
+        let timer = Instant::now();
+        while timer.elapsed() < Duration::from_secs(1) {
+            let world = world.read().unwrap();
+            for v in world.query::<true, &mut u8>() {
+                *v = v.wrapping_add(1);
+            }
+        }
+
+        let _ = handle.join();
+    }
 }
