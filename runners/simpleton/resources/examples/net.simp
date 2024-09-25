@@ -15,8 +15,8 @@ mod example_net {
         var bytes = bytes::new();
         bytes::serialize(bytes, value);
 
-        var server = net_server::new("127.0.0.1:8080");
-        var client = net_channel::connect("127.0.0.1:8080");
+        var server = net_server::new("127.0.0.1:12345");
+        var client = net_channel::connect("127.0.0.1:12345");
         net_channel::set_no_delay(client, true);
         net_channel::write(client, bytes);
 

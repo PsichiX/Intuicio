@@ -1,6 +1,6 @@
 [package]
 name = "simpleton-window"
-version = "0.32.1"
+version = "0.33.0"
 edition = "2021"
 publish = false
 
@@ -8,9 +8,9 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-intuicio-data = { version = "0.32", path = "../../platform/data" }
-intuicio-core = { version = "0.32", path = "../../platform/core" }
-intuicio-derive = { version = "0.32", path = "../../platform/derive" }
-intuicio-frontend-simpleton = { version = "0.32", path = "../../frontends/simpleton" }
+intuicio-data = { version = "0.33", path = "../../platform/data" }
+intuicio-core = { version = "0.33", path = "../../platform/core" }
+intuicio-derive = { version = "0.33", path = "../../platform/derive" }
+intuicio-frontend-simpleton = { version = "0.33", path = "../../frontends/simpleton" }
 glow = { version = "0.13", features = ["debug_automatic_glGetError"] }
 glutin = "0.28"

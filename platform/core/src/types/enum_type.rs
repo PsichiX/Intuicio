@@ -1,13 +1,12 @@
 //! NOTE: For now only acceptable enums are ones with `repr(u8)`,
 //! because those have stable discriminant offset and size.
 use crate::{
-    is_copy, is_send, is_sync,
     meta::Meta,
     object::RuntimeObject,
     types::{struct_type::StructField, EnumVariantQuery, MetaQuery, StructFieldQuery, Type},
     Visibility,
 };
-use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
+use intuicio_data::{is_copy, is_send, is_sync, type_hash::TypeHash, Finalize, Initialize};
 use rustc_hash::FxHasher;
 use std::{
     alloc::Layout,

@@ -5,7 +5,7 @@ use glow::{
     TEXTURE_2D, TEXTURE_MAG_FILTER, TEXTURE_MIN_FILTER, TEXTURE_WRAP_S, TEXTURE_WRAP_T, TRIANGLES,
     UNSIGNED_BYTE, UNSIGNED_INT, VERTEX_SHADER,
 };
-use image::io::Reader;
+use image::ImageReader;
 use intuicio_core::{core_version, prelude::*};
 use intuicio_data::prelude::*;
 use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
@@ -630,7 +630,7 @@ impl Image {
     pub fn decode(registry: &Registry, bytes: Reference) -> Reference {
         let bytes = bytes.read::<Bytes>().expect("`bytes` is not Bytes!");
         let bytes = Cursor::new(bytes.get_ref());
-        let reader = Reader::new(bytes).with_guessed_format().unwrap();
+        let reader = ImageReader::new(bytes).with_guessed_format().unwrap();
         let buffer = reader
             .decode()
             .expect("Could not decode image from `bytes`!")

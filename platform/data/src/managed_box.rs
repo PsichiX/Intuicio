@@ -1,6 +1,9 @@
 use crate::{
     lifetime::{Lifetime, ValueReadAccess, ValueWriteAccess},
-    managed::{ManagedLazy, ManagedRef, ManagedRefMut},
+    managed::{
+        DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut, ManagedLazy, ManagedRef,
+        ManagedRefMut,
+    },
     pointer_alignment_padding,
     type_hash::TypeHash,
     Finalize,
@@ -549,12 +552,13 @@ impl ManagedStorage {
         }
     }
 
-    fn access_object_lifetime<T>(
+    fn access_object_lifetime_type<T>(
         &self,
         pointer: *mut u8,
         object_id: usize,
         page_id: usize,
-    ) -> Option<(*mut T, *mut Lifetime)> {
+        type_check: bool,
+    ) -> Option<(*mut T, *mut Lifetime, TypeHash)> {
         if let Some(page) = self.pages.get(&page_id) {
             if page.owns_pointer(pointer) {
                 let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
@@ -568,11 +572,14 @@ impl ManagedStorage {
                     ..
                 } = header
                 {
-                    if object_id == *id && *instances_count > 0 && *type_hash == TypeHash::of::<T>()
+                    if object_id == *id
+                        && *instances_count > 0
+                        && (!type_check || *type_hash == TypeHash::of::<T>())
                     {
                         return Some((
                             unsafe { pointer.add(header_size + *padding as usize).cast::<T>() },
                             lifetime,
+                            *type_hash,
                         ));
                     }
                 }
@@ -721,40 +728,60 @@ impl<T> ManagedBox<T> {
 
     pub fn borrow(&self) -> Option<ManagedRef<T>> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
             unsafe { ManagedRef::new_raw(pointer, lifetime.as_ref()?.borrow()?) }
         })
     }
 
     pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
             unsafe { ManagedRefMut::new_raw(pointer, lifetime.as_mut()?.borrow_mut()?) }
         })
     }
 
     pub fn lazy(&self) -> Option<ManagedLazy<T>> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
             unsafe { ManagedLazy::new_raw(pointer, lifetime.as_mut().unwrap().lazy()) }
         })
     }
 
     pub fn read(&self) -> Option<ValueReadAccess<T>> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
             unsafe { lifetime.as_ref()?.read_ptr(pointer) }
         })
     }
 
     pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
             unsafe { lifetime.as_mut()?.write_ptr(pointer) }
         })
     }
@@ -762,8 +789,12 @@ impl<T> ManagedBox<T> {
     /// # Safety
     pub unsafe fn as_ptr(&self) -> Option<*const T> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, _) =
-                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            let (pointer, _, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
             Some(pointer.cast_const())
         })
     }
@@ -771,8 +802,12 @@ impl<T> ManagedBox<T> {
     /// # Safety
     pub unsafe fn as_ptr_mut(&mut self) -> Option<*mut T> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, _) =
-                storage.access_object_lifetime::<T>(self.memory.cast(), self.id, self.page)?;
+            let (pointer, _, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
             Some(pointer)
         })
     }
@@ -859,47 +894,63 @@ impl DynamicManagedBox {
     pub fn is<T>(&self) -> bool {
         STORAGE.with_borrow(|storage| {
             storage
-                .access_object_lifetime::<T>(self.memory, self.id, self.page)
+                .access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)
                 .is_some()
         })
     }
 
-    pub fn borrow<T>(&self) -> Option<ManagedRef<T>> {
+    pub fn borrow(&self) -> Option<DynamicManagedRef> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
-            unsafe { ManagedRef::new_raw(pointer, lifetime.as_ref()?.borrow()?) }
+            let (pointer, lifetime, type_hash) = storage.access_object_lifetime_type::<u8>(
+                self.memory,
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe { DynamicManagedRef::new_raw(type_hash, lifetime.as_ref()?.borrow()?, pointer) }
         })
     }
 
-    pub fn borrow_mut<T>(&mut self) -> Option<ManagedRefMut<T>> {
+    pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
-            unsafe { ManagedRefMut::new_raw(pointer, lifetime.as_mut()?.borrow_mut()?) }
+            let (pointer, lifetime, type_hash) = storage.access_object_lifetime_type::<u8>(
+                self.memory,
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe {
+                DynamicManagedRefMut::new_raw(type_hash, lifetime.as_mut()?.borrow_mut()?, pointer)
+            }
         })
     }
 
-    pub fn lazy<T>(&self) -> Option<ManagedLazy<T>> {
+    pub fn lazy(&self) -> Option<DynamicManagedLazy> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
-            unsafe { ManagedLazy::new_raw(pointer, lifetime.as_mut().unwrap().lazy()) }
+            let (pointer, lifetime, type_hash) = storage.access_object_lifetime_type::<u8>(
+                self.memory,
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe {
+                DynamicManagedLazy::new_raw(type_hash, lifetime.as_mut().unwrap().lazy(), pointer)
+            }
         })
     }
 
     pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            let (pointer, lifetime, _) =
+                storage.access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)?;
             unsafe { lifetime.as_ref()?.read_ptr(pointer) }
         })
     }
 
     pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime) =
-                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            let (pointer, lifetime, _) =
+                storage.access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)?;
             unsafe { lifetime.as_mut()?.write_ptr(pointer) }
         })
     }
@@ -929,8 +980,8 @@ impl DynamicManagedBox {
     /// # Safety
     pub unsafe fn as_ptr<T>(&self) -> Option<*const T> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, _) =
-                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            let (pointer, _, _) =
+                storage.access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)?;
             Some(pointer.cast_const().cast())
         })
     }
@@ -938,8 +989,8 @@ impl DynamicManagedBox {
     /// # Safety
     pub unsafe fn as_ptr_mut<T>(&mut self) -> Option<*mut T> {
         STORAGE.with_borrow(|storage| {
-            let (pointer, _) =
-                storage.access_object_lifetime::<T>(self.memory, self.id, self.page)?;
+            let (pointer, _, _) =
+                storage.access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)?;
             Some(pointer.cast())
         })
     }

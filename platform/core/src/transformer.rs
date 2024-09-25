@@ -1,5 +1,5 @@
 use crate::registry::Registry;
-use intuicio_data::{lifetime::*, managed::*, shared::*};
+use intuicio_data::{lifetime::*, managed::*, managed_box::*, shared::*};
 use std::{
     cell::{Ref, RefMut},
     marker::PhantomData,
@@ -67,7 +67,7 @@ impl<T: Default + Clone + 'static> ValueTransformer for SharedValueTransformer<T
     }
 
     fn into_owned(value: Self::Owned) -> Self::Type {
-        value.try_consume().ok().unwrap()
+        value.read().unwrap().clone()
     }
 
     fn into_ref(value: &Self::Ref) -> Self::Borrow<'_> {
@@ -135,6 +135,62 @@ impl<T> ValueTransformer for ManagedValueTransformer<T> {
     }
 }
 
+pub struct ManagedBoxValueTransformer<T: Clone>(PhantomData<fn() -> T>);
+
+impl<T: Clone> ValueTransformer for ManagedBoxValueTransformer<T> {
+    type Type = T;
+    type Borrow<'r> = ValueReadAccess<'r, T> where Self::Type: 'r;
+    type BorrowMut<'r> = ValueWriteAccess<'r, T> where Self::Type: 'r;
+    type Dependency = ManagedValueDependency;
+    type Owned = ManagedBox<T>;
+    type Ref = ManagedRef<T>;
+    type RefMut = ManagedRefMut<T>;
+
+    fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
+        ManagedBox::new(value)
+    }
+
+    fn from_ref(
+        _: &Registry,
+        value: &Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::Ref {
+        if let ManagedValueDependency::Ref(lifetime) =
+            dependency.expect("`ManagedRef` require dependency for lifetime bound!")
+        {
+            ManagedRef::new(value, lifetime)
+        } else {
+            panic!("Could not borrow lifetime to create `ManagedRef`!")
+        }
+    }
+
+    fn from_ref_mut(
+        _: &Registry,
+        value: &mut Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::RefMut {
+        if let ManagedValueDependency::RefMut(lifetime) =
+            dependency.expect("`ManagedRefMut` require dependency for lifetime bound!")
+        {
+            ManagedRefMut::new(value, lifetime)
+        } else {
+            panic!("Could not borrow lifetime mutably to create `ManagedRefMut`!")
+        }
+    }
+
+    fn into_owned(value: Self::Owned) -> Self::Type {
+        value.read().unwrap().clone()
+    }
+
+    fn into_ref(value: &Self::Ref) -> Self::Borrow<'_> {
+        value.read().unwrap()
+    }
+
+    fn into_ref_mut(value: &mut Self::RefMut) -> Self::BorrowMut<'_> {
+        value.write().unwrap()
+    }
+}
+
 pub struct DynamicManagedValueTransformer<T: 'static>(PhantomData<fn() -> T>);
 
 impl<T: 'static> ValueTransformer for DynamicManagedValueTransformer<T> {
@@ -188,6 +244,62 @@ impl<T: 'static> ValueTransformer for DynamicManagedValueTransformer<T> {
 
     fn into_ref_mut(value: &mut Self::RefMut) -> Self::BorrowMut<'_> {
         value.write().unwrap()
+    }
+}
+
+pub struct DynamicManagedBoxValueTransformer<T: Clone + 'static>(PhantomData<fn() -> T>);
+
+impl<T: Clone + 'static> ValueTransformer for DynamicManagedBoxValueTransformer<T> {
+    type Type = T;
+    type Borrow<'r> = ValueReadAccess<'r, T> where Self::Type: 'r;
+    type BorrowMut<'r> = ValueWriteAccess<'r, T> where Self::Type: 'r;
+    type Dependency = ManagedValueDependency;
+    type Owned = DynamicManagedBox;
+    type Ref = DynamicManagedRef;
+    type RefMut = DynamicManagedRefMut;
+
+    fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
+        DynamicManagedBox::new(value)
+    }
+
+    fn from_ref(
+        _: &Registry,
+        value: &Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::Ref {
+        if let ManagedValueDependency::Ref(lifetime) =
+            dependency.expect("`DynamicManagedRef` require dependency for lifetime bound!")
+        {
+            DynamicManagedRef::new(value, lifetime)
+        } else {
+            panic!("Could not borrow lifetime to create `DynamicManagedRef`!")
+        }
+    }
+
+    fn from_ref_mut(
+        _: &Registry,
+        value: &mut Self::Type,
+        dependency: Option<Self::Dependency>,
+    ) -> Self::RefMut {
+        if let ManagedValueDependency::RefMut(lifetime) =
+            dependency.expect("`DynamicManagedRefMut` require dependency for lifetime bound!")
+        {
+            DynamicManagedRefMut::new(value, lifetime)
+        } else {
+            panic!("Could not borrow lifetime mutably to create `DynamicManagedRefMut`!")
+        }
+    }
+
+    fn into_owned(value: Self::Owned) -> Self::Type {
+        value.read::<T>().unwrap().clone()
+    }
+
+    fn into_ref(value: &Self::Ref) -> Self::Borrow<'_> {
+        value.read::<T>().unwrap()
+    }
+
+    fn into_ref_mut(value: &mut Self::RefMut) -> Self::BorrowMut<'_> {
+        value.write::<T>().unwrap()
     }
 }
 
@@ -273,22 +385,32 @@ mod tests {
         *a - *b
     }
 
+    #[intuicio_function(transformer = "ManagedBoxValueTransformer")]
+    fn mul(a: &i32, b: &mut i32) -> i32 {
+        *a * *b
+    }
+
+    #[intuicio_function(transformer = "DynamicManagedBoxValueTransformer")]
+    fn div(a: &i32, b: &mut i32) -> i32 {
+        *a / *b
+    }
+
     #[derive(IntuicioStruct, Default, Clone)]
     #[intuicio(name = "Foo")]
     struct Foo {
         bar: i32,
     }
 
-    #[intuicio_methods()]
+    #[intuicio_methods(transformer = "ManagedValueTransformer")]
     impl Foo {
-        #[intuicio_method(transformer = "ManagedValueTransformer")]
+        #[intuicio_method()]
         fn new(bar: i32) -> Foo {
             Foo { bar }
         }
 
-        #[intuicio_method(transformer = "ManagedValueTransformer", dependency = "foo")]
-        fn get(foo: &Foo) -> &i32 {
-            &foo.bar
+        #[intuicio_method(dependency = "this")]
+        fn get(&self) -> &i32 {
+            &self.bar
         }
     }
 
@@ -298,16 +420,16 @@ mod tests {
         foo: i32,
     }
 
-    #[intuicio_methods()]
+    #[intuicio_methods(transformer = "DynamicManagedValueTransformer")]
     impl Bar {
-        #[intuicio_method(transformer = "DynamicManagedValueTransformer")]
+        #[intuicio_method()]
         fn new(foo: i32) -> Bar {
             Bar { foo }
         }
 
-        #[intuicio_method(transformer = "DynamicManagedValueTransformer", dependency = "bar")]
-        fn get(bar: &Bar) -> &i32 {
-            &bar.foo
+        #[intuicio_method(dependency = "this")]
+        fn get(&self) -> &i32 {
+            &self.foo
         }
     }
 
@@ -315,10 +437,44 @@ mod tests {
     fn test_derive() {
         let mut registry = Registry::default().with_basic_types();
         registry.add_type(define_native_struct! {
+            registry => struct (Managed<Foo>) {}
+        });
+        registry.add_type(define_native_struct! {
+            registry => struct (ManagedRef<Foo>) {}
+            [uninitialized]
+        });
+        registry.add_type(define_native_struct! {
+            registry => struct (ManagedRefMut<Foo>) {}
+            [uninitialized]
+        });
+        registry.add_type(define_native_struct! {
             registry => struct (Managed<i32>) {}
         });
         registry.add_type(define_native_struct! {
             registry => struct (DynamicManaged) {}
+            [uninitialized]
+        });
+        registry.add_type(define_native_struct! {
+            registry => struct (ManagedRef<i32>) {}
+            [uninitialized]
+        });
+        registry.add_type(define_native_struct! {
+            registry => struct (DynamicManagedRef) {}
+            [uninitialized]
+        });
+        registry.add_type(define_native_struct! {
+            registry => struct (ManagedRefMut<i32>) {}
+            [uninitialized]
+        });
+        registry.add_type(define_native_struct! {
+            registry => struct (DynamicManagedRefMut) {}
+            [uninitialized]
+        });
+        registry.add_type(define_native_struct! {
+            registry => struct (ManagedBox<i32>) {}
+        });
+        registry.add_type(define_native_struct! {
+            registry => struct (DynamicManagedBox) {}
             [uninitialized]
         });
         registry.add_type(Foo::define_struct(&registry));
@@ -342,6 +498,21 @@ mod tests {
                 .unwrap(),
             42
         );
+        assert_eq!(
+            add::define_function(&registry)
+                .call::<(Managed<i32>,), _>(
+                    &mut context,
+                    &registry,
+                    (a.borrow().unwrap(), b.borrow_mut().unwrap()),
+                    true
+                )
+                .0
+                .consume()
+                .ok()
+                .unwrap(),
+            42
+        );
+        assert_eq!(add(&40, &mut 2), 42);
 
         let a = DynamicManaged::new(40).unwrap();
         let mut b = DynamicManaged::new(2).unwrap();
@@ -358,6 +529,79 @@ mod tests {
                 .unwrap(),
             38
         );
+        assert_eq!(
+            sub::define_function(&registry)
+                .call::<(DynamicManaged,), _>(
+                    &mut context,
+                    &registry,
+                    (a.borrow().unwrap(), b.borrow_mut().unwrap()),
+                    true
+                )
+                .0
+                .consume::<i32>()
+                .ok()
+                .unwrap(),
+            38
+        );
+        assert_eq!(sub(&40, &mut 2), 38);
+
+        let a = ManagedBox::new(40);
+        let mut b = ManagedBox::new(2);
+        context.stack().push(b.borrow_mut().unwrap());
+        context.stack().push(a.borrow().unwrap());
+        mul::intuicio_function(&mut context, &registry);
+        assert_eq!(
+            *context
+                .stack()
+                .pop::<ManagedBox<i32>>()
+                .unwrap()
+                .read()
+                .unwrap(),
+            80
+        );
+        assert_eq!(
+            *mul::define_function(&registry)
+                .call::<(ManagedBox<i32>,), _>(
+                    &mut context,
+                    &registry,
+                    (a.borrow().unwrap(), b.borrow_mut().unwrap()),
+                    true
+                )
+                .0
+                .read()
+                .unwrap(),
+            80
+        );
+        assert_eq!(mul(&40, &mut 2), 80);
+
+        let a = DynamicManagedBox::new(40);
+        let mut b = DynamicManagedBox::new(2);
+        context.stack().push(b.borrow_mut().unwrap());
+        context.stack().push(a.borrow().unwrap());
+        div::intuicio_function(&mut context, &registry);
+        assert_eq!(
+            *context
+                .stack()
+                .pop::<DynamicManagedBox>()
+                .unwrap()
+                .read::<i32>()
+                .unwrap(),
+            20
+        );
+        assert_eq!(
+            *div::define_function(&registry)
+                .call::<(DynamicManagedBox,), _>(
+                    &mut context,
+                    &registry,
+                    (a.borrow().unwrap(), b.borrow_mut().unwrap()),
+                    true
+                )
+                .0
+                .read::<i32>()
+                .unwrap(),
+            20
+        );
+        assert_eq!(div(&40, &mut 2), 20);
 
         let foo = Managed::new(Foo::new(42));
         context.stack().push(foo.borrow().unwrap());
@@ -371,6 +615,20 @@ mod tests {
                 .unwrap(),
             42
         );
+        assert_eq!(
+            *Foo::get__define_function(&registry)
+                .call::<(ManagedRef<i32>,), _>(
+                    &mut context,
+                    &registry,
+                    (foo.borrow().unwrap(),),
+                    true
+                )
+                .0
+                .read()
+                .unwrap(),
+            42
+        );
+        assert_eq!(*Foo::new(42).get(), 42);
 
         let bar = DynamicManaged::new(Bar::new(42)).unwrap();
         context.stack().push(bar.borrow().unwrap());
@@ -384,6 +642,20 @@ mod tests {
                 .unwrap(),
             42
         );
+        assert_eq!(
+            *Bar::get__define_function(&registry)
+                .call::<(DynamicManagedRef,), _>(
+                    &mut context,
+                    &registry,
+                    (bar.borrow().unwrap(),),
+                    true
+                )
+                .0
+                .read::<i32>()
+                .unwrap(),
+            42
+        );
+        assert_eq!(*Bar::new(42).get(), 42);
     }
 
     #[test]

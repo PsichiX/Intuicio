@@ -139,6 +139,17 @@ impl<T: ?Sized> ManagedRef<T> {
         }
     }
 
+    pub fn make(data: &T) -> (Self, Lifetime) {
+        let result = Lifetime::default();
+        (Self::new(data, result.borrow().unwrap()), result)
+    }
+
+    /// # Safety
+    pub unsafe fn make_raw(data: *const T) -> Option<(Self, Lifetime)> {
+        let result = Lifetime::default();
+        Some((Self::new_raw(data, result.borrow().unwrap())?, result))
+    }
+
     pub fn into_inner(self) -> (LifetimeRef, *const T) {
         (self.lifetime, self.data)
     }
@@ -230,6 +241,17 @@ impl<T: ?Sized> ManagedRefMut<T> {
         } else {
             Some(Self { lifetime, data })
         }
+    }
+
+    pub fn make(data: &mut T) -> (Self, Lifetime) {
+        let result = Lifetime::default();
+        (Self::new(data, result.borrow_mut().unwrap()), result)
+    }
+
+    /// # Safety
+    pub unsafe fn make_raw(data: *mut T) -> Option<(Self, Lifetime)> {
+        let result = Lifetime::default();
+        Some((Self::new_raw(data, result.borrow_mut().unwrap())?, result))
     }
 
     pub fn into_inner(self) -> (LifetimeRefMut, *mut T) {
@@ -355,6 +377,17 @@ impl<T: ?Sized> ManagedLazy<T> {
         } else {
             Some(Self { lifetime, data })
         }
+    }
+
+    pub fn make(data: &mut T) -> (Self, Lifetime) {
+        let result = Lifetime::default();
+        (Self::new(data, result.lazy()), result)
+    }
+
+    /// # Safety
+    pub unsafe fn make_raw(data: *mut T) -> Option<(Self, Lifetime)> {
+        let result = Lifetime::default();
+        Some((Self::new_raw(data, result.lazy())?, result))
     }
 
     pub fn into_inner(self) -> (LifetimeLazy, *mut T) {
@@ -832,6 +865,11 @@ impl DynamicManagedRef {
         }
     }
 
+    pub fn make<T: ?Sized>(data: &T) -> (Self, Lifetime) {
+        let result = Lifetime::default();
+        (Self::new(data, result.borrow().unwrap()), result)
+    }
+
     pub fn into_inner(self) -> (TypeHash, LifetimeRef, *const u8) {
         (self.type_hash, self.lifetime, self.data)
     }
@@ -958,6 +996,11 @@ impl DynamicManagedRefMut {
                 data,
             })
         }
+    }
+
+    pub fn make<T: ?Sized>(data: &mut T) -> (Self, Lifetime) {
+        let result = Lifetime::default();
+        (Self::new(data, result.borrow_mut().unwrap()), result)
     }
 
     pub fn into_inner(self) -> (TypeHash, LifetimeRefMut, *mut u8) {
@@ -1121,6 +1164,11 @@ impl DynamicManagedLazy {
                 data,
             })
         }
+    }
+
+    pub fn make<T: ?Sized>(data: &mut T) -> (Self, Lifetime) {
+        let result = Lifetime::default();
+        (Self::new(data, result.lazy()), result)
     }
 
     pub fn into_inner(self) -> (TypeHash, LifetimeLazy, *mut u8) {

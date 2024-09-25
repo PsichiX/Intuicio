@@ -1,4 +1,5 @@
 use intuicio_data::{
+    is_copy,
     lifetime::{ValueReadAccess, ValueWriteAccess},
     managed_box::DynamicManagedBox,
     type_hash::TypeHash,
@@ -22,6 +23,17 @@ enum ValueContent {
 }
 
 impl ValueContent {
+    fn type_hash(&self) -> Option<TypeHash> {
+        match self {
+            Self::Null => None,
+            Self::Object(data) => data.type_hash(),
+            Self::Primitive { type_hash, .. } => Some(*type_hash),
+            Self::String(_) => Some(TypeHash::of::<String>()),
+            Self::Array(_) => Some(TypeHash::of::<Vec<Value>>()),
+            Self::Map(_) => Some(TypeHash::of::<BTreeMap<Value, Value>>()),
+        }
+    }
+
     fn order(&self) -> u8 {
         match self {
             Self::Null => 0,
@@ -116,54 +128,38 @@ pub struct Value {
 }
 
 impl Value {
+    pub fn type_hash(&self) -> Option<TypeHash> {
+        self.inner.type_hash()
+    }
+
     pub fn null() -> Self {
         Self {
             inner: ValueContent::Null,
         }
     }
 
-    pub fn object<T>(value: T) -> Self {
-        Self {
-            inner: ValueContent::Object(DynamicManagedBox::new(value)),
+    pub fn primitive_or_object<T>(value: T) -> Self {
+        if is_copy::<T>() && std::mem::size_of::<T>() <= SIZE {
+            let mut data = [0; SIZE];
+            unsafe {
+                data.as_mut_ptr().cast::<T>().write(value);
+            }
+            Self {
+                inner: ValueContent::Primitive {
+                    type_hash: TypeHash::of::<T>(),
+                    data,
+                },
+            }
+        } else {
+            Self {
+                inner: ValueContent::Object(DynamicManagedBox::new(value)),
+            }
         }
     }
 
     pub fn object_raw(value: DynamicManagedBox) -> Self {
         Self {
             inner: ValueContent::Object(value),
-        }
-    }
-
-    pub fn primitive<T: Copy>(value: T) -> Option<Self> {
-        if std::mem::size_of::<T>() <= SIZE {
-            let mut data = [0; SIZE];
-            unsafe {
-                data.as_mut_ptr().cast::<T>().write(value);
-            }
-            Some(Self {
-                inner: ValueContent::Primitive {
-                    type_hash: TypeHash::of::<T>(),
-                    data,
-                },
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn primitive_or_object<T: Copy>(value: T) -> Self {
-        if let Some(result) = Self::primitive(value) {
-            result
-        } else {
-            Self::object(value)
-        }
-    }
-
-    pub fn primitive_or_null<T: Copy>(value: T) -> Self {
-        if let Some(result) = Self::primitive(value) {
-            result
-        } else {
-            Self::null()
         }
     }
 
@@ -199,6 +195,12 @@ impl Value {
 
     pub fn is_null(&self) -> bool {
         matches!(self.inner, ValueContent::Null)
+    }
+
+    pub fn is<T>(&self) -> bool {
+        self.type_hash()
+            .map(|type_hash| type_hash == TypeHash::of::<T>())
+            .unwrap_or_default()
     }
 
     pub fn as_object<T>(&self) -> Option<ValueReadAccess<T>> {
@@ -276,11 +278,13 @@ mod tests {
 
     #[test]
     fn test_value() {
-        let a = Value::primitive(42u8).unwrap();
-        let b = Value::primitive(10u16).unwrap();
-        let c = Value::primitive(4.2f32).unwrap();
+        assert_eq!(std::mem::size_of::<Value>(), 48);
+        assert_eq!(SIZE, 32);
+        let a = Value::primitive_or_object(42u8);
+        let b = Value::primitive_or_object(10u16);
+        let c = Value::primitive_or_object(4.2f32);
         let d = Value::array([a.clone(), b.clone(), c.clone()]);
-        let mut e = Value::object([42u64; 10000]);
+        let mut e = Value::primitive_or_object([42u64; 10000]);
         let k1 = Value::string("foo");
         let k2 = Value::string("bar");
         let f = Value::map([(k1.clone(), d.clone()), (k2.clone(), e.clone())]);

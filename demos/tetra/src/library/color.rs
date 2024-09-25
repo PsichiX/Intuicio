@@ -32,6 +32,7 @@ impl Color {
             a: *self.a.read::<Real>().unwrap() as f32,
         }
     }
+
     #[intuicio_method(use_registry)]
     pub fn transparent(registry: &Registry) -> Reference {
         Reference::new(Color::from_tetra(TetraColor::default(), registry), registry)

@@ -303,9 +303,18 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
         ReturnType::Type(_, ref ty) => vec![transformer
             .as_ref()
             .map(|_| match unpack_type(ty) {
-                UnpackedType::Owned(ty) => ty,
-                UnpackedType::Ref(ty) => ty,
-                UnpackedType::RefMut(ty) => ty,
+                UnpackedType::Owned(ty) => syn::parse2::<Type>(quote! {
+                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Owned
+                })
+                .unwrap(),
+                UnpackedType::Ref(ty) => syn::parse2::<Type>(quote! {
+                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Ref
+                })
+                .unwrap(),
+                UnpackedType::RefMut(ty) => syn::parse2::<Type>(quote! {
+                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::RefMut
+                })
+                .unwrap(),
             })
             .unwrap_or_else(|| *ty.clone())],
     };

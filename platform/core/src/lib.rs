@@ -17,6 +17,7 @@ macro_rules! __internal__offset_of_enum__ {
     ($type:tt :: $variant:ident [ $( $field:ident ),* ] => $used_field:ident => $discriminant:literal) => {{
         let mut data = std::mem::MaybeUninit::<$type>::uninit();
         let ptr = data.as_mut_ptr().cast::<u8>();
+        #[allow(clippy::macro_metavars_in_unsafe)]
         unsafe {
             ptr.write($discriminant);
             #[allow(unused_variables)]
@@ -31,6 +32,7 @@ macro_rules! __internal__offset_of_enum__ {
     ($type:tt :: $variant:ident ( $index:tt ) => $discriminant:literal) => {{
         let mut data = std::mem::MaybeUninit::<$type>::uninit();
         let ptr = data.as_mut_ptr().cast::<u8>();
+        #[allow(clippy::macro_metavars_in_unsafe)]
         unsafe {
             ptr.write($discriminant);
             #[allow(unused_variables)]
@@ -45,6 +47,7 @@ macro_rules! __internal__offset_of_enum__ {
     ($type:tt :: $variant:ident { $field:ident } => $discriminant:literal) => {{
         let mut data = std::mem::MaybeUninit::<$type>::uninit();
         let ptr = data.as_mut_ptr().cast::<u8>();
+        #[allow(clippy::macro_metavars_in_unsafe)]
         unsafe {
             ptr.write($discriminant);
             #[allow(unused_variables)]
@@ -81,7 +84,6 @@ use crate::{
     types::{enum_type::Enum, struct_type::Struct},
 };
 use serde::{Deserialize, Serialize};
-use std::{cell::Cell, marker::PhantomData};
 
 #[derive(
     Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
@@ -188,46 +190,6 @@ macro_rules! crate_version {
 pub fn core_version() -> IntuicioVersion {
     crate_version!()
 }
-
-macro_rules! does_implement_trait {
-    ($trait:path => $identifier:ident < $type:ident >) => {
-        pub fn $identifier<$type>() -> bool {
-            struct ImplementsTrait<'a, $type> {
-                implements: &'a Cell<bool>,
-                _marker: PhantomData<$type>,
-            }
-
-            #[allow(clippy::non_canonical_clone_impl)]
-            impl<$type> Clone for ImplementsTrait<'_, $type> {
-                fn clone(&self) -> Self {
-                    self.implements.set(false);
-                    ImplementsTrait {
-                        implements: self.implements,
-                        _marker: PhantomData,
-                    }
-                }
-            }
-
-            impl<$type: $trait> Copy for ImplementsTrait<'_, $type> {}
-
-            let implements = Cell::new(true);
-            let _ = [ImplementsTrait::<$type> {
-                implements: &implements,
-                _marker: PhantomData,
-            }]
-            .clone();
-            implements.get()
-        }
-    };
-}
-
-does_implement_trait!(Send => is_send<T>);
-does_implement_trait!(Sync => is_sync<T>);
-does_implement_trait!(Copy => is_copy<T>);
-does_implement_trait!(Clone => is_clone<T>);
-does_implement_trait!(Sized => is_sized<T>);
-does_implement_trait!(Unpin => is_unpin<T>);
-does_implement_trait!(ToString => is_to_string<T>);
 
 #[cfg(test)]
 mod tests {

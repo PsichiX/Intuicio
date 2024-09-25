@@ -8,6 +8,7 @@ use syn::{
 #[derive(Default)]
 struct ImplAttributes {
     pub module_name: Option<Ident>,
+    pub transformer: Option<Ident>,
 }
 
 #[derive(Default)]
@@ -32,6 +33,14 @@ macro_rules! parse_impl_attributes {
                         match name_value.lit {
                             Lit::Str(content) => {
                                 result.module_name =
+                                    Some(Ident::new(&content.value(), Span::call_site().into()))
+                            }
+                            _ => {}
+                        }
+                    } else if name_value.path.is_ident("transformer") {
+                        match &name_value.lit {
+                            Lit::Str(content) => {
+                                result.transformer =
                                     Some(Ident::new(&content.value(), Span::call_site().into()))
                             }
                             _ => {}
@@ -125,7 +134,11 @@ macro_rules! parse_method_attributes {
 }
 
 pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStream {
-    let ImplAttributes { module_name } = parse_impl_attributes!(attributes);
+    let ImplAttributes {
+        module_name,
+        transformer,
+    } = parse_impl_attributes!(attributes);
+    let impl_transformer = transformer;
     let item = parse_macro_input!(input as ItemImpl);
     if item.trait_.is_some() {
         panic!("Intuicio methods must be applied only for non-trait implementations!");
@@ -159,12 +172,15 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 use_registry,
                 use_context,
                 debug,
-                transformer,
+                mut transformer,
                 dependency,
                 meta,
             },
             found,
         ) = parse_method_attributes!(&item.attrs);
+        if transformer.is_none() {
+            transformer = impl_transformer.clone();
+        }
         if !found {
             continue;
         }
@@ -238,7 +254,34 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
             .inputs
             .iter()
             .filter_map(|arg| match arg {
-                FnArg::Receiver(_) => Some(*type_path.clone()),
+                FnArg::Receiver(meta) => {
+                    Some(transformer
+                        .as_ref()
+                        .map(|transformer| if meta.reference.is_some() {
+                            if meta.mutability.is_some() {
+                                syn::parse2::<Type>(quote!{
+                                    <#transformer<#type_path> as intuicio_core::transformer::ValueTransformer>::RefMut
+                                }).unwrap()
+                            }else {
+                                syn::parse2::<Type>(quote!{
+                                    <#transformer<#type_path> as intuicio_core::transformer::ValueTransformer>::Ref
+                                }).unwrap()
+                            }
+                        } else {
+                            syn::parse2::<Type>(quote!{
+                                <#transformer<#type_path> as intuicio_core::transformer::ValueTransformer>::Owned
+                            }).unwrap()
+                        })
+                        .unwrap_or_else(|| if meta.reference.is_some() {
+                            if meta.mutability.is_some() {
+                                syn::parse2::<Type>(quote!{&mut #type_path}).unwrap()
+                            }else {
+                                syn::parse2::<Type>(quote!{& #type_path}).unwrap()
+                            }
+                        } else {
+                            *type_path.clone()
+                        }))
+                },
                 FnArg::Typed(meta) => {
                     let ident = match &*meta.pat {
                         Pat::Ident(ident) => &ident.ident,
@@ -278,7 +321,18 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                     .inputs
                     .iter()
                     .filter_map(|arg| match arg {
-                        FnArg::Receiver(_) => panic!("`self` arguments are not accepted!"),
+                        FnArg::Receiver(meta) => Some((
+                            Ident::new("this", Span::call_site().into()),
+                            if meta.reference.is_some() {
+                                if meta.mutability.is_some() {
+                                    quote! {#transformer::into_ref_mut(&mut this)}
+                                } else {
+                                    quote! {#transformer::into_ref(&this)}
+                                }
+                            } else {
+                                quote! {#transformer::into_owned(this)}
+                            },
+                        )),
                         FnArg::Typed(meta) => {
                             let ident = match &*meta.pat {
                                 Pat::Ident(ident) => &ident.ident,
@@ -290,7 +344,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                                 None
                             } else {
                                 Some((
-                                    ident,
+                                    ident.clone(),
                                     match unpack_type(&meta.ty) {
                                         UnpackedType::Owned(_) => {
                                             quote! {#transformer::into_owned(#ident)}
@@ -315,7 +369,17 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 .inputs
                 .iter()
                 .filter_map(|arg| match arg {
-                    FnArg::Receiver(_) => panic!("`self` arguments are not accepted!"),
+                    FnArg::Receiver(meta) => {
+                        if meta.reference.is_some() {
+                            if meta.mutability.is_some() {
+                                Some(quote! {let this = &mut this;})
+                            } else {
+                                Some(quote! {let this = &this;})
+                            }
+                        } else {
+                            None
+                        }
+                    }
                     FnArg::Typed(meta) => {
                         let ident = match &*meta.pat {
                             Pat::Ident(ident) => &ident.ident,
@@ -347,9 +411,18 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
             ReturnType::Type(_, ref ty) => vec![transformer
                 .as_ref()
                 .map(|_| match unpack_type(ty) {
-                    UnpackedType::Owned(ty) => ty,
-                    UnpackedType::Ref(ty) => ty,
-                    UnpackedType::RefMut(ty) => ty,
+                    UnpackedType::Owned(ty) => syn::parse2::<Type>(quote! {
+                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Owned
+                    })
+                    .unwrap(),
+                    UnpackedType::Ref(ty) => syn::parse2::<Type>(quote! {
+                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Ref
+                    })
+                    .unwrap(),
+                    UnpackedType::RefMut(ty) => syn::parse2::<Type>(quote! {
+                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::RefMut
+                    })
+                    .unwrap(),
                 })
                 .unwrap_or_else(|| *ty.clone())],
         };

@@ -1,11 +1,10 @@
 use crate::{
-    is_copy, is_send, is_sync,
     meta::Meta,
     object::RuntimeObject,
     types::{MetaQuery, StructFieldQuery, Type, TypeHandle},
     Visibility,
 };
-use intuicio_data::{type_hash::TypeHash, Finalize, Initialize};
+use intuicio_data::{is_copy, is_send, is_sync, type_hash::TypeHash, Finalize, Initialize};
 use rustc_hash::FxHasher;
 use std::{
     alloc::Layout,
