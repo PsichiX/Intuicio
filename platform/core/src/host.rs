@@ -71,7 +71,7 @@ impl Host {
         })
     }
 
-    pub fn with_global<T>(mut f: impl FnMut(&mut Self) -> T) -> Option<T> {
+    pub fn with_global<T>(f: impl FnOnce(&mut Self) -> T) -> Option<T> {
         GLOBAL_HOST_STACK.with(move |stack| {
             let mut stack = stack.try_borrow_mut().ok()?;
             let host = &mut stack.last_mut()?.1;
