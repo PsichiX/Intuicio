@@ -87,3 +87,34 @@ does_implement_trait!(Clone => is_clone<T>);
 does_implement_trait!(Sized => is_sized<T>);
 does_implement_trait!(Unpin => is_unpin<T>);
 does_implement_trait!(ToString => is_to_string<T>);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{marker::PhantomPinned, rc::Rc};
+
+    struct Foo;
+
+    #[test]
+    fn test_does_implement_trait() {
+        assert!(is_send::<i32>());
+        assert!(!is_send::<Rc<i32>>());
+
+        assert!(is_sync::<i32>());
+        assert!(!is_sync::<Rc<i32>>());
+
+        assert!(is_copy::<i32>());
+        assert!(!is_copy::<Foo>());
+
+        assert!(is_clone::<i32>());
+        assert!(!is_clone::<Foo>());
+
+        assert!(is_sized::<[i32; 1]>());
+
+        assert!(is_unpin::<&i32>());
+        assert!(!is_unpin::<PhantomPinned>());
+
+        assert!(is_to_string::<i32>());
+        assert!(!is_to_string::<Foo>());
+    }
+}
