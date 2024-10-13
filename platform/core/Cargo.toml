@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-core"
-version = "0.33.1"
+version = "0.33.2"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Core module for Intuicio scripting platform"
@@ -17,7 +17,6 @@ memoffset = "0.9"
 typid = "1"
 pest = "2.5"
 pest_derive = "2.5"
-snailquote = "0.3"
 rustc-hash = "2"
 
 [dev-dependencies]
