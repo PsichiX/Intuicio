@@ -758,11 +758,13 @@ impl DynamicManaged {
         }
     }
 
-    pub fn consume<T>(self) -> Result<T, Self> {
+    pub fn consume<T>(mut self) -> Result<T, Self> {
         if self.type_hash == TypeHash::of::<T>() && !self.lifetime.state().is_in_use() {
+            self.drop = false;
             let mut result = MaybeUninit::<T>::uninit();
             unsafe {
                 result.as_mut_ptr().copy_from(self.memory.cast::<T>(), 1);
+                dealloc(self.memory, self.layout);
                 Ok(result.assume_init())
             }
         } else {
@@ -1488,6 +1490,9 @@ mod tests {
         assert!(value_ref.read::<i32>().is_none());
         assert!(value_ref2.read::<i32>().is_none());
         assert!(value_lazy.read::<i32>().is_none());
+        let value = DynamicManaged::new("hello".to_owned()).unwrap();
+        let value = value.consume::<String>().ok().unwrap();
+        assert_eq!(value.as_str(), "hello");
     }
 
     #[test]
