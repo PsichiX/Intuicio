@@ -811,6 +811,32 @@ impl<T> ManagedBox<T> {
             Some(pointer)
         })
     }
+
+    /// # Safety
+    pub unsafe fn as_ptr_raw(&self) -> Option<*const u8> {
+        STORAGE.with_borrow(|storage| {
+            let (pointer, _, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                false,
+            )?;
+            Some(pointer.cast_const().cast())
+        })
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr_mut_raw(&mut self) -> Option<*mut u8> {
+        STORAGE.with_borrow(|storage| {
+            let (pointer, _, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                false,
+            )?;
+            Some(pointer.cast())
+        })
+    }
 }
 
 impl<T> Clone for ManagedBox<T> {
@@ -992,6 +1018,32 @@ impl DynamicManagedBox {
             let (pointer, _, _) =
                 storage.access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)?;
             Some(pointer.cast())
+        })
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr_raw(&self) -> Option<*const u8> {
+        STORAGE.with_borrow(|storage| {
+            let (pointer, _, _) = storage.access_object_lifetime_type::<u8>(
+                self.memory,
+                self.id,
+                self.page,
+                false,
+            )?;
+            Some(pointer.cast_const())
+        })
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr_mut_raw(&mut self) -> Option<*mut u8> {
+        STORAGE.with_borrow(|storage| {
+            let (pointer, _, _) = storage.access_object_lifetime_type::<u8>(
+                self.memory,
+                self.id,
+                self.page,
+                false,
+            )?;
+            Some(pointer)
         })
     }
 }

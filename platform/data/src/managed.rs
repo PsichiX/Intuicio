@@ -819,6 +819,16 @@ impl DynamicManaged {
             None
         }
     }
+
+    /// # Safety
+    pub unsafe fn as_ptr_raw(&self) -> *const u8 {
+        self.memory
+    }
+
+    /// # Safety
+    pub unsafe fn as_mut_ptr_raw(&mut self) -> *mut u8 {
+        self.memory
+    }
 }
 
 impl TryFrom<DynamicManagedValue> for DynamicManaged {
@@ -948,6 +958,15 @@ impl DynamicManagedRef {
     pub unsafe fn as_ptr<T>(&self) -> Option<*const T> {
         if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
             Some(self.data.cast::<T>())
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr_raw(&self) -> Option<*const u8> {
+        if self.lifetime.exists() {
+            Some(self.data)
         } else {
             None
         }
@@ -1110,6 +1129,24 @@ impl DynamicManagedRefMut {
             None
         }
     }
+
+    /// # Safety
+    pub unsafe fn as_ptr_raw(&self) -> Option<*const u8> {
+        if self.lifetime.exists() {
+            Some(self.data)
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn as_mut_ptr_raw(&mut self) -> Option<*mut u8> {
+        if self.lifetime.exists() {
+            Some(self.data)
+        } else {
+            None
+        }
+    }
 }
 
 impl TryFrom<DynamicManagedValue> for DynamicManagedRefMut {
@@ -1258,6 +1295,24 @@ impl DynamicManagedLazy {
     pub unsafe fn as_mut_ptr<T>(&self) -> Option<*mut T> {
         if self.type_hash == TypeHash::of::<T>() && self.lifetime.exists() {
             Some(self.data.cast::<T>())
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn as_ptr_raw(&self) -> Option<*const u8> {
+        if self.lifetime.exists() {
+            Some(self.data)
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn as_mut_ptr_raw(&mut self) -> Option<*mut u8> {
+        if self.lifetime.exists() {
+            Some(self.data)
         } else {
             None
         }
