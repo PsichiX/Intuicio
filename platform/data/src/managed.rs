@@ -61,6 +61,16 @@ impl<T> Managed<T> {
         }
     }
 
+    pub fn move_into_ref(self, mut target: ManagedRefMut<T>) -> Result<(), Self> {
+        *target.write().unwrap() = self.consume()?;
+        Ok(())
+    }
+
+    pub fn move_into_lazy(self, target: ManagedLazy<T>) -> Result<(), Self> {
+        *target.write().unwrap() = self.consume()?;
+        Ok(())
+    }
+
     pub fn borrow(&self) -> Option<ManagedRef<T>> {
         Some(ManagedRef::new(&self.data, self.lifetime.borrow()?))
     }
@@ -767,6 +777,32 @@ impl DynamicManaged {
                 dealloc(self.memory, self.layout);
                 Ok(result.assume_init())
             }
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn move_into_ref(self, target: DynamicManagedRefMut) -> Result<(), Self> {
+        if self.type_hash == target.type_hash && self.memory != target.data {
+            let (_, _, memory, layout, _) = self.into_inner();
+            unsafe {
+                target.data.copy_from(memory, layout.size());
+                dealloc(memory, layout);
+            }
+            Ok(())
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn move_into_lazy(self, target: DynamicManagedLazy) -> Result<(), Self> {
+        if self.type_hash == target.type_hash && self.memory != target.data {
+            let (_, _, memory, layout, _) = self.into_inner();
+            unsafe {
+                target.data.copy_from(memory, layout.size());
+                dealloc(memory, layout);
+            }
+            Ok(())
         } else {
             Err(self)
         }
@@ -1618,6 +1654,43 @@ mod tests {
         {
             let foo = ManagedLazy::<[i32]>::new(&mut data, lifetime.lazy());
             assert_eq!(*foo.read().unwrap(), [3, 2, 1, 0]);
+        }
+    }
+
+    #[test]
+    fn test_moves() {
+        let mut value = Managed::new(42);
+        assert_eq!(*value.read().unwrap(), 42);
+        {
+            let value_ref = value.borrow_mut().unwrap();
+            Managed::new(1).move_into_ref(value_ref).ok().unwrap();
+            assert_eq!(*value.read().unwrap(), 1);
+        }
+        {
+            let value_lazy = value.lazy();
+            Managed::new(2).move_into_lazy(value_lazy).ok().unwrap();
+            assert_eq!(*value.read().unwrap(), 2);
+        }
+
+        let mut value = DynamicManaged::new(42).unwrap();
+        assert_eq!(*value.read::<i32>().unwrap(), 42);
+        {
+            let value_ref = value.borrow_mut().unwrap();
+            DynamicManaged::new(1)
+                .unwrap()
+                .move_into_ref(value_ref)
+                .ok()
+                .unwrap();
+            assert_eq!(*value.read::<i32>().unwrap(), 1);
+        }
+        {
+            let value_lazy = value.lazy();
+            DynamicManaged::new(2)
+                .unwrap()
+                .move_into_lazy(value_lazy)
+                .ok()
+                .unwrap();
+            assert_eq!(*value.read::<i32>().unwrap(), 2);
         }
     }
 }

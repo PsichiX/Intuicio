@@ -1,6 +1,6 @@
 [package]
 name = "tetra-integration"
-version = "0.33.4"
+version = "0.33.5"
 edition = "2021"
 publish = false
 

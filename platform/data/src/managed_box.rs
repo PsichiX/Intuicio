@@ -726,6 +726,30 @@ impl<T> ManagedBox<T> {
         self.id == other.id && self.page == other.page && self.memory == other.memory
     }
 
+    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
+            unsafe { lifetime.as_ref()?.read_ptr(pointer) }
+        })
+    }
+
+    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
+        STORAGE.with_borrow(|storage| {
+            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                true,
+            )?;
+            unsafe { lifetime.as_mut()?.write_ptr(pointer) }
+        })
+    }
+
     pub fn borrow(&self) -> Option<ManagedRef<T>> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
@@ -759,30 +783,6 @@ impl<T> ManagedBox<T> {
                 true,
             )?;
             unsafe { ManagedLazy::new_raw(pointer, lifetime.as_mut().unwrap().lazy()) }
-        })
-    }
-
-    pub fn read(&self) -> Option<ValueReadAccess<T>> {
-        STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
-                self.memory.cast(),
-                self.id,
-                self.page,
-                true,
-            )?;
-            unsafe { lifetime.as_ref()?.read_ptr(pointer) }
-        })
-    }
-
-    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
-        STORAGE.with_borrow(|storage| {
-            let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
-                self.memory.cast(),
-                self.id,
-                self.page,
-                true,
-            )?;
-            unsafe { lifetime.as_mut()?.write_ptr(pointer) }
         })
     }
 
