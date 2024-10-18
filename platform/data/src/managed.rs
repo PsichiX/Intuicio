@@ -286,7 +286,7 @@ impl<T: ?Sized> ManagedRefMut<T> {
         })
     }
 
-    pub fn borrow_mut(&self) -> Option<ManagedRefMut<T>> {
+    pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
         Some(ManagedRefMut {
             lifetime: self.lifetime.borrow_mut()?,
             data: self.data,
@@ -422,7 +422,7 @@ impl<T: ?Sized> ManagedLazy<T> {
         })
     }
 
-    pub fn borrow_mut(&self) -> Option<ManagedRefMut<T>> {
+    pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
         Some(ManagedRefMut {
             lifetime: self.lifetime.borrow_mut()?,
             data: self.data,
@@ -1088,7 +1088,7 @@ impl DynamicManagedRefMut {
         })
     }
 
-    pub fn borrow_mut(&self) -> Option<DynamicManagedRefMut> {
+    pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
         Some(DynamicManagedRefMut {
             type_hash: self.type_hash,
             lifetime: self.lifetime.borrow_mut()?,

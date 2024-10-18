@@ -1,5 +1,7 @@
 use crate::{
-    lifetime::{Lifetime, ValueReadAccess, ValueWriteAccess},
+    lifetime::{
+        Lifetime, LifetimeLazy, LifetimeRef, LifetimeRefMut, ValueReadAccess, ValueWriteAccess,
+    },
     managed::{
         DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut, ManagedLazy, ManagedRef,
         ManagedRefMut,
@@ -714,16 +716,49 @@ impl<T> ManagedBox<T> {
         })
     }
 
-    pub fn type_hash(&self) -> TypeHash {
+    pub fn does_share_reference(&self, other: &Self) -> bool {
+        self.id == other.id && self.page == other.page && self.memory == other.memory
+    }
+
+    pub fn type_hash(&self) -> Option<TypeHash> {
+        STORAGE
+            .with_borrow(|storage| storage.object_type_hash(self.memory.cast(), self.id, self.page))
+    }
+
+    pub fn lifetime_borrow(&self) -> Option<LifetimeRef> {
         STORAGE.with_borrow(|storage| {
-            storage
-                .object_type_hash(self.memory.cast(), self.id, self.page)
-                .unwrap()
+            let (_, lifetime, _) = storage.access_object_lifetime_type::<u8>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe { lifetime.as_ref()?.borrow() }
         })
     }
 
-    pub fn does_share_reference(&self, other: &Self) -> bool {
-        self.id == other.id && self.page == other.page && self.memory == other.memory
+    pub fn lifetime_borrow_mut(&self) -> Option<LifetimeRefMut> {
+        STORAGE.with_borrow(|storage| {
+            let (_, lifetime, _) = storage.access_object_lifetime_type::<u8>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe { lifetime.as_ref()?.borrow_mut() }
+        })
+    }
+
+    pub fn lifetime_lazy(&self) -> Option<LifetimeLazy> {
+        STORAGE.with_borrow(|storage| {
+            let (_, lifetime, _) = storage.access_object_lifetime_type::<u8>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe { Some(lifetime.as_ref()?.lazy()) }
+        })
     }
 
     pub fn read(&self) -> Option<ValueReadAccess<T>> {
@@ -826,7 +861,7 @@ impl<T> ManagedBox<T> {
     }
 
     /// # Safety
-    pub unsafe fn as_ptr_mut_raw(&mut self) -> Option<*mut u8> {
+    pub unsafe fn as_mut_ptr_raw(&mut self) -> Option<*mut u8> {
         STORAGE.with_borrow(|storage| {
             let (pointer, _, _) = storage.access_object_lifetime_type::<T>(
                 self.memory.cast(),
@@ -909,12 +944,48 @@ impl DynamicManagedBox {
             .with_borrow(|storage| storage.object_instances_count(self.memory, self.id, self.page))
     }
 
+    pub fn does_share_reference(&self, other: &Self) -> bool {
+        self.id == other.id && self.page == other.page && self.memory == other.memory
+    }
+
     pub fn type_hash(&self) -> Option<TypeHash> {
         STORAGE.with_borrow(|storage| storage.object_type_hash(self.memory, self.id, self.page))
     }
 
-    pub fn does_share_reference(&self, other: &Self) -> bool {
-        self.id == other.id && self.page == other.page && self.memory == other.memory
+    pub fn lifetime_borrow(&self) -> Option<LifetimeRef> {
+        STORAGE.with_borrow(|storage| {
+            let (_, lifetime, _) = storage.access_object_lifetime_type::<u8>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe { lifetime.as_ref()?.borrow() }
+        })
+    }
+
+    pub fn lifetime_borrow_mut(&self) -> Option<LifetimeRefMut> {
+        STORAGE.with_borrow(|storage| {
+            let (_, lifetime, _) = storage.access_object_lifetime_type::<u8>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe { lifetime.as_ref()?.borrow_mut() }
+        })
+    }
+
+    pub fn lifetime_lazy(&self) -> Option<LifetimeLazy> {
+        STORAGE.with_borrow(|storage| {
+            let (_, lifetime, _) = storage.access_object_lifetime_type::<u8>(
+                self.memory.cast(),
+                self.id,
+                self.page,
+                false,
+            )?;
+            unsafe { Some(lifetime.as_ref()?.lazy()) }
+        })
     }
 
     pub fn is<T>(&self) -> bool {
@@ -1035,7 +1106,7 @@ impl DynamicManagedBox {
     }
 
     /// # Safety
-    pub unsafe fn as_ptr_mut_raw(&mut self) -> Option<*mut u8> {
+    pub unsafe fn as_mut_ptr_raw(&mut self) -> Option<*mut u8> {
         STORAGE.with_borrow(|storage| {
             let (pointer, _, _) = storage.access_object_lifetime_type::<u8>(
                 self.memory,
