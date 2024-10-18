@@ -1286,6 +1286,22 @@ impl DynamicManagedLazy {
         }
     }
 
+    pub fn borrow(&self) -> Option<DynamicManagedRef> {
+        Some(DynamicManagedRef {
+            type_hash: self.type_hash,
+            lifetime: self.lifetime.borrow()?,
+            data: self.data,
+        })
+    }
+
+    pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
+        Some(DynamicManagedRefMut {
+            type_hash: self.type_hash,
+            lifetime: self.lifetime.borrow_mut()?,
+            data: self.data,
+        })
+    }
+
     /// # Safety
     pub unsafe fn map<T, U>(self, f: impl FnOnce(&mut T) -> &mut U) -> Option<Self> {
         if self.type_hash == TypeHash::of::<T>() {
