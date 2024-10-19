@@ -196,6 +196,31 @@ impl PrintDebugger {
         self
     }
 
+    pub fn printable_custom<T: 'static>(
+        mut self,
+        f: impl Fn(&T) -> String + Send + Sync + 'static,
+    ) -> Self {
+        self.printable.insert(
+            TypeHash::of::<T>(),
+            (
+                std::any::type_name::<T>(),
+                Box::new(move |bytes| unsafe { f(bytes.as_ptr().cast::<T>().as_ref().unwrap()) }),
+            ),
+        );
+        self
+    }
+
+    pub fn printable_raw<T: 'static>(
+        mut self,
+        f: impl Fn(&[u8]) -> String + Send + Sync + 'static,
+    ) -> Self {
+        self.printable.insert(
+            TypeHash::of::<T>(),
+            (std::any::type_name::<T>(), Box::new(f)),
+        );
+        self
+    }
+
     pub fn basic_printables(self) -> Self {
         self.printable::<()>()
             .printable::<bool>()
