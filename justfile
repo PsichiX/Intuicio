@@ -56,6 +56,7 @@ update:
   cargo update --manifest-path ./platform/parser/Cargo.toml --aggressive
   cargo update --manifest-path ./platform/plugins/Cargo.toml --aggressive
   cargo update --manifest-path ./platform/nodes/Cargo.toml --aggressive
+  cargo update --manifest-path ./platform/ffi/Cargo.toml --aggressive
   cargo update --manifest-path ./backends/vm/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/dynamic/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/pointer/Cargo.toml --aggressive
@@ -96,6 +97,8 @@ publish:
   cargo publish --no-verify --manifest-path ./platform/plugins/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./platform/nodes/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./platform/ffi/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./backends/vm/Cargo.toml
   sleep 1
