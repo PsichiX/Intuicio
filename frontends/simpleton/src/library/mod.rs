@@ -5,6 +5,8 @@ pub mod closure;
 pub mod console;
 pub mod debug;
 pub mod event;
+#[cfg(feature = "ffi")]
+pub mod ffi;
 #[cfg(feature = "fs")]
 pub mod fs;
 pub mod iter;
@@ -71,6 +73,8 @@ pub fn install(registry: &mut Registry) {
     console::install(registry);
     #[cfg(feature = "fs")]
     fs::install(registry);
+    #[cfg(feature = "ffi")]
+    ffi::install(registry);
     #[cfg(feature = "process")]
     process::install(registry);
     #[cfg(feature = "net")]

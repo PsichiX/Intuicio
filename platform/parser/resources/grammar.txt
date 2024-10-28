@@ -1,0 +1,50 @@
+debug => @`test`"foo"
+source => =number_int
+ext_exchange => #exchange{"foo"}
+ext_depth => #depth{"foo"}
+ext_variants => #variants{}
+ext_wrap => #wrapper{"foo" "bar"}
+inspect => %inspect{any "callback"}
+map => %map{any "callback"}
+map_err => %maperr{any "callback"}
+pratt => %pratt{any -> [<infix op "+" "add" left> <infix op "-" "sub" left>] [<infix op "*" "mul" left> <infix op "/" "div" left>] [<prefix op "#" "hash">] [<postfix op "!" "bang">]}
+alt => ["foo" "bar"]
+seq => ("foo" "bar")
+seq_del => |"zee"|("foo" "bar")
+zom => *"foo"
+oom => +"foo"
+not => !"foo"
+opt => ?"foo"
+pred => ^"foo"
+slot => <"foo">
+slot_empty => <>
+rep => 3"foo"
+inject => $`foo`
+lit => "foo"
+regex => ~~~(\w+)~~~
+template_value => template{=number_int value ```value:@{}@```}
+template_add => template{|ws|(=$template_value =$template_value) add ```@{value:}[+]{}@```}
+template_mul => template{|ws|(=$template_value =$template_value) mul ```value:@{}[]{}[0]@*value:@{}[]{}[1]@```}
+oc => oc{"foo" "a" "b"}
+prefix => prefix{"foo" "a"}
+suffix => suffix{"foo" "b"}
+string => string{"(" ")"}
+list => {"foo" ws false}
+any => any
+nl => nl
+digit => digit
+digit_hex => digit_hex
+number_int_pos => number_int_pos
+number_int => number_int
+number_float => number_float
+alphanum => alphanum
+alpha_low => alpha_low
+alpha_up => alpha_up
+alpha => alpha
+word => word
+id_start => id_start
+id_continue => id_continue
+id => id
+ows => ows
+ws => ws
+ignore => ignore

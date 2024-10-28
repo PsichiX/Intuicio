@@ -1,0 +1,19 @@
+mod example_ffi {
+    func main(args) {
+        var lib = ffi::load("../../target/debug/ffi");
+        var add = ffi::function(lib, "add", "int", ["int", "int"]);
+        var ensure_42 = ffi::function(lib, "ensure_42", "void", ["int"]);
+        
+        console::log_line(
+            debug::debug(add, false),
+        );
+        console::log_line(
+            debug::debug(ensure_42, false),
+        );
+        var result = reflect::call(add, [40, 2]);
+        console::log_line(
+            debug::debug(result, false),
+        );
+        reflect::call(ensure_42, [result]);
+    }
+}

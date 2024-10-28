@@ -52,8 +52,9 @@ list-outdated:
 update:
   cargo update --manifest-path ./platform/data/Cargo.toml --aggressive
   cargo update --manifest-path ./platform/core/Cargo.toml --aggressive
-  cargo update --manifest-path ./platform/plugins/Cargo.toml --aggressive
   cargo update --manifest-path ./platform/derive/Cargo.toml --aggressive
+  cargo update --manifest-path ./platform/parser/Cargo.toml --aggressive
+  cargo update --manifest-path ./platform/plugins/Cargo.toml --aggressive
   cargo update --manifest-path ./platform/nodes/Cargo.toml --aggressive
   cargo update --manifest-path ./backends/vm/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/dynamic/Cargo.toml --aggressive
@@ -88,9 +89,11 @@ publish:
   sleep 1
   cargo publish --no-verify --manifest-path ./platform/core/Cargo.toml
   sleep 1
-  cargo publish --no-verify --manifest-path ./platform/plugins/Cargo.toml
-  sleep 1
   cargo publish --no-verify --manifest-path ./platform/derive/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./platform/parser/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./platform/plugins/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./platform/nodes/Cargo.toml
   sleep 1

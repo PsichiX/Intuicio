@@ -81,6 +81,11 @@ impl Registry {
         self
     }
 
+    pub fn with_install(mut self, f: impl FnOnce(&mut Self)) -> Self {
+        self.install(f);
+        self
+    }
+
     pub fn with_function(mut self, function: Function) -> Self {
         self.add_function(function);
         self
@@ -89,6 +94,10 @@ impl Registry {
     pub fn with_type(mut self, type_: impl Into<Type>) -> Self {
         self.add_type(type_);
         self
+    }
+
+    pub fn install(&mut self, f: impl FnOnce(&mut Self)) {
+        f(self);
     }
 
     pub fn add_function_handle(&mut self, function_handle: FunctionHandle) {

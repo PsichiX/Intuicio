@@ -1,0 +1,7 @@
+value => %maperr{%map{number_float "map_value"} "map_value_error"}
+op_add => %map{|ws|("+" $expr $expr) "map_op_add"}
+op_sub => %map{|ws|("-" $expr $expr) "map_op_sub"}
+op_mul => %map{|ws|("*" $expr $expr) "map_op_mul"}
+op_div => %map{|ws|("/" $expr $expr) "map_op_div"}
+op => oc{[$op_add $op_sub $op_mul $op_div] "(" ")"}
+expr => [$value $op]

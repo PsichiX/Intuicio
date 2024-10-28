@@ -10,6 +10,7 @@ mod main {
     import "json";
     import "toml";
     import "fs";
+    import "ffi";
     import "bytes";
     import "process";
     import "net";
@@ -30,6 +31,7 @@ mod main {
         example_json::main(args);
         example_toml::main(args);
         example_fs::main(args);
+        example_ffi::main(args);
         example_bytes::main(args);
         example_process::main(args);
         example_net::main(args);

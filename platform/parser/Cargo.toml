@@ -1,0 +1,20 @@
+[package]
+name = "intuicio-parser"
+version = "0.35.0"
+edition = "2021"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Parser module for Intuicio scripting platform"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/Intuicio"
+repository = "https://github.com/PsichiX/Intuicio"
+documentation = "https://docs.rs/intuicio-parser"
+readme = "../../README.md"
+
+[dependencies]
+intuicio-data = { version = "0.35", path = "../data" }
+intuicio-core = { version = "0.35", path = "../core" }
+regex = "1.10"
+snailquote = "0.3"
+
+[dev-dependencies]
+intuicio-derive = { version = "0.35", path = "../derive" }
