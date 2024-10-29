@@ -35,14 +35,15 @@ impl Parser for TemplateParser {
         let content = if let Some(value) = result.read::<String>() {
             self.content.replace("@{}@", &value)
         } else if let Some(list) = result.read::<Vec<ParserOutput>>() {
-            Regex::new(r"@\{([^\}]*)\}\[([^\]@]*)\]\{([^\}]*)\}(\[(\d+)\])?@")
+            Regex::new(r"@(>|<)\{([^\}]*)\}\[([^\]@]*)\]\{([^\}]*)\}(\[(\d+)\])?@")
                 .expect("Expected valid regex")
                 .replace_all(&self.content, |caps: &Captures| -> String {
-                    let prefix = caps.get(1).unwrap().as_str();
-                    let delimiter = caps.get(2).unwrap().as_str();
-                    let suffix = caps.get(3).unwrap().as_str();
+                    let ordering = caps.get(1).unwrap().as_str();
+                    let prefix = caps.get(2).unwrap().as_str();
+                    let delimiter = caps.get(3).unwrap().as_str();
+                    let suffix = caps.get(4).unwrap().as_str();
                     let mut result = String::default();
-                    if let Some(index) = caps.get(5) {
+                    if let Some(index) = caps.get(6) {
                         let index = index.as_str().parse::<usize>().unwrap();
                         result.push_str(prefix);
                         let item = list
@@ -59,8 +60,20 @@ impl Parser for TemplateParser {
                             });
                         result.push_str(item.as_str());
                         result.push_str(suffix);
-                    } else {
+                    } else if ordering == ">" {
                         for (index, item) in list.iter().enumerate() {
+                            if index > 0 {
+                                result.push_str(delimiter);
+                            }
+                            result.push_str(prefix);
+                            let item = item.read::<String>().unwrap_or_else(|| {
+                                panic!("Template parsing result list item {} is not String!", index)
+                            });
+                            result.push_str(item.as_str());
+                            result.push_str(suffix);
+                        }
+                    } else if ordering == "<" {
+                        for (index, item) in list.iter().rev().enumerate() {
                             if index > 0 {
                                 result.push_str(delimiter);
                             }
@@ -120,6 +133,17 @@ mod tests {
                 ),
             )
             .with_parser(
+                "sub",
+                map(
+                    seq_del(lit("-"), [inject("value"), inject("value")]),
+                    |mut values: Vec<ParserOutput>| {
+                        let b = values.remove(1).consume::<i32>().ok().unwrap();
+                        let a = values.remove(0).consume::<i32>().ok().unwrap();
+                        a - b
+                    },
+                ),
+            )
+            .with_parser(
                 "mul",
                 map(
                     seq_del(lit("*"), [inject("value"), inject("value")]),
@@ -145,7 +169,21 @@ mod tests {
                         ],
                     ),
                     "add",
-                    "@{value:}[+]{}@",
+                    "@>{value:}[+]{}@",
+                ),
+            )
+            .with_parser(
+                "template_sub",
+                template(
+                    seq_del(
+                        ws(),
+                        [
+                            source(inject("template_value")),
+                            source(inject("template_value")),
+                        ],
+                    ),
+                    "sub",
+                    "@<{value:}[-]{}@",
                 ),
             )
             .with_parser(
@@ -159,7 +197,7 @@ mod tests {
                         ],
                     ),
                     "mul",
-                    "value:@{}[]{}[0]@*value:@{}[]{}[1]@",
+                    "value:@>{}[]{}[0]@*value:@>{}[]{}[1]@",
                 ),
             );
 
@@ -170,6 +208,10 @@ mod tests {
         let (rest, result) = registry.parse("add", "value:40+value:2").unwrap();
         assert_eq!(rest, "");
         assert_eq!(result.consume::<i32>().ok().unwrap(), 42);
+
+        let (rest, result) = registry.parse("sub", "value:40-value:2").unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(result.consume::<i32>().ok().unwrap(), 38);
 
         let (rest, result) = registry.parse("mul", "value:6*value:4").unwrap();
         assert_eq!(rest, "");
@@ -182,6 +224,10 @@ mod tests {
         let (rest, result) = registry.parse("template_add", "40 2").unwrap();
         assert_eq!(rest, "");
         assert_eq!(result.consume::<i32>().ok().unwrap(), 42);
+
+        let (rest, result) = registry.parse("template_sub", "2 40").unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(result.consume::<i32>().ok().unwrap(), 38);
 
         let (rest, result) = registry.parse("template_mul", "6 4").unwrap();
         assert_eq!(rest, "");
