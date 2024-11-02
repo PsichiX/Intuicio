@@ -1,0 +1,3 @@
+main => #variants{}
+main2 -> main => "foo"
+main3 -> main => "bar"

@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-dynamic"
-version = "0.35.1"
+version = "0.36.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Dynamic type framework module for Intuicio scripting platform"
@@ -11,8 +11,8 @@ documentation = "https://docs.rs/intuicio-framework-dynamic"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-data = { version = "0.35", path = "../../platform/data" }
-intuicio-core = { version = "0.35", path = "../../platform/core" }
+intuicio-data = { version = "0.36", path = "../../platform/data" }
+intuicio-core = { version = "0.36", path = "../../platform/core" }
 
 [dev-dependencies]
-intuicio-derive = { version = "0.35", path = "../../platform/derive" }
+intuicio-derive = { version = "0.36", path = "../../platform/derive" }

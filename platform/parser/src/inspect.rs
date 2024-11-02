@@ -38,6 +38,10 @@ impl Parser for InspectParser {
         }
         Ok((input, result))
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.parser.extend(parser);
+    }
 }
 
 #[cfg(test)]

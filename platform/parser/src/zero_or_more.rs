@@ -26,6 +26,10 @@ impl Parser for ZeroOrMoreParser {
         }
         Ok((input, ParserOutput::new(result).ok().unwrap()))
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.0.extend(parser);
+    }
 }
 
 #[cfg(test)]

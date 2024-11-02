@@ -18,8 +18,8 @@ pub mod shorthand {
         ExtendableParser::variants().into_handle()
     }
 
-    pub fn ext_wrap(parser: ParserHandle, extendable_slot: ParserHandle) -> ParserHandle {
-        ExtendableWrapperParser::new(parser, extendable_slot).into_handle()
+    pub fn ext_wrap(parser: ParserHandle, extendable: ParserHandle) -> ParserHandle {
+        ExtendableWrapperParser::new(parser, extendable).into_handle()
     }
 }
 
@@ -88,15 +88,12 @@ impl Parser for ExtendableParser {
 #[derive(Clone)]
 pub struct ExtendableWrapperParser {
     parser: ParserHandle,
-    extendable_slot: ParserHandle,
+    extendable: ParserHandle,
 }
 
 impl ExtendableWrapperParser {
-    pub fn new(parser: ParserHandle, extendable_slot: ParserHandle) -> Self {
-        Self {
-            parser,
-            extendable_slot,
-        }
+    pub fn new(parser: ParserHandle, extendable: ParserHandle) -> Self {
+        Self { parser, extendable }
     }
 }
 
@@ -106,9 +103,7 @@ impl Parser for ExtendableWrapperParser {
     }
 
     fn extend(&self, parser: ParserHandle) {
-        if let Some(slot) = self.extendable_slot.as_slot() {
-            slot.set(parser);
-        }
+        self.extendable.extend(parser);
     }
 }
 
@@ -116,7 +111,9 @@ impl Parser for ExtendableWrapperParser {
 mod tests {
     use crate::{
         extendable::{ExtendableParser, ExtendableWrapperParser},
-        shorthand::{ext_depth, ext_exchange, ext_variants, ext_wrap, lit, seq, slot_empty, ws},
+        shorthand::{
+            ext_depth, ext_exchange, ext_variants, ext_wrap, lit, oc, seq, slot_empty, ws,
+        },
         ParserRegistry,
     };
 
@@ -172,5 +169,17 @@ mod tests {
         async_signature.parse(&registry, "async ").unwrap();
         depth.extend(async_signature);
         depth.parse(&registry, "async fn foo()").unwrap();
+
+        let signature = {
+            let slot = slot_empty();
+            ext_wrap(oc(slot.clone(), lit("("), lit(")")), slot)
+        };
+        assert!(signature.parse(&registry, "(foo)").is_err());
+        signature.extend(lit("foo"));
+        assert!(signature
+            .parse(&registry, "(foo)")
+            .unwrap()
+            .1
+            .is::<String>());
     }
 }

@@ -49,6 +49,10 @@ impl Parser for ListParser {
         }
         Ok((input, ParserOutput::new(result).ok().unwrap()))
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.item.extend(parser);
+    }
 }
 
 #[cfg(test)]

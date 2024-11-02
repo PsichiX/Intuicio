@@ -79,8 +79,8 @@ impl Parser for SlotParser {
         }
     }
 
-    fn as_slot(&self) -> Option<&SlotParser> {
-        Some(self)
+    fn extend(&self, parser: ParserHandle) {
+        self.set(parser);
     }
 }
 
@@ -104,7 +104,7 @@ mod tests {
         let (rest, value) = slot.parse(&registry, "foobar").unwrap();
         assert_eq!(rest, "foobar");
         value.consume::<ParserNoValue>().ok().unwrap();
-        slot.as_slot().unwrap().set(keyword_foo);
+        slot.extend(keyword_foo);
         let (rest, value) = slot.parse(&registry, "foobar").unwrap();
         assert_eq!(rest, "bar");
         assert!(value.consume::<String>().is_ok());

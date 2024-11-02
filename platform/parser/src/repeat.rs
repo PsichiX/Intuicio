@@ -33,6 +33,10 @@ impl Parser for RepeatParser {
         }
         Ok((input, ParserOutput::new(result).ok().unwrap()))
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.parser.extend(parser);
+    }
 }
 
 #[cfg(test)]

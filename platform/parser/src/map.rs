@@ -119,6 +119,10 @@ impl Parser for MapErrorParser {
             },
         }
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.parser.extend(parser);
+    }
 }
 
 #[cfg(test)]

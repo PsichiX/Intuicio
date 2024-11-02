@@ -1,6 +1,6 @@
 [package]
 name = "benches"
-version = "0.35.1"
+version = "0.36.0"
 edition = "2021"
 publish = false
 
@@ -24,11 +24,11 @@ bench_all = [
 default = ["bench_all"]
 
 [dependencies]
-intuicio-data = { version = "0.35", path = "../platform/data" }
-intuicio-core = { version = "0.35", path = "../platform/core" }
-intuicio-backend-vm = { version = "0.35", path = "../backends/vm" }
-intuicio-frontend-vault = { version = "0.35", path = "../frontends/vault" }
-intuicio-framework-ecs = { version = "0.35", path = "../frameworks/ecs" }
+intuicio-data = { version = "0.36", path = "../platform/data" }
+intuicio-core = { version = "0.36", path = "../platform/core" }
+intuicio-backend-vm = { version = "0.36", path = "../backends/vm" }
+intuicio-frontend-vault = { version = "0.36", path = "../frontends/vault" }
+intuicio-framework-ecs = { version = "0.36", path = "../frameworks/ecs" }
 rune = "*"
 rune-modules = "*"
 rhai = "*"

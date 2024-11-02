@@ -5,14 +5,72 @@ use crate::{
         dyn_map, dyn_map_err, dyn_pratt, ext_depth, ext_exchange, ext_variants, ext_wrap, id,
         id_continue, id_start, ignore, inject, list, lit, map, map_err, nl, not, number_float,
         number_int, number_int_pos, oc, omap, oom, opt, pred, prefix, regex, rep, seq, seq_del,
-        slot, slot_empty, source, string, suffix, template, word, zom, DynamicPrattParserRule,
+        slot_empty, source, string, suffix, template, word, zom, DynamicPrattParserRule,
     },
-    ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
+    ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
-use std::error::Error;
+use std::{collections::HashMap, error::Error, sync::RwLock};
+
+#[derive(Default)]
+struct SlotsExtension {
+    slots: RwLock<HashMap<String, ParserHandle>>,
+}
+
+impl SlotsExtension {
+    fn make(&self, name: impl ToString) -> Option<ParserHandle> {
+        let parser = slot_empty();
+        self.slots
+            .write()
+            .ok()?
+            .insert(name.to_string(), parser.clone());
+        Some(parser)
+    }
+
+    fn take(&self, name: &str) -> Option<ParserHandle> {
+        self.slots.write().ok()?.remove(name)
+    }
+}
+
+struct SlotExtensionSlotParser(ParserHandle);
+
+impl Parser for SlotExtensionSlotParser {
+    fn parse<'a>(&self, registry: &ParserRegistry, input: &'a str) -> ParseResult<'a> {
+        let (input, value) = self.0.parse(registry, input)?;
+        let name = value.consume::<String>().ok().unwrap();
+        if let Some(result) = registry
+            .extension::<SlotsExtension>()
+            .expect("Could not access SlotExtension")
+            .make(&name)
+        {
+            Ok((input, ParserOutput::new(result).ok().unwrap()))
+        } else {
+            Err(format!("Could not make `{}` slot parser", name).into())
+        }
+    }
+}
+
+struct SlotExtensionExtWrapParser(ParserHandle);
+
+impl Parser for SlotExtensionExtWrapParser {
+    fn parse<'a>(&self, registry: &ParserRegistry, input: &'a str) -> ParseResult<'a> {
+        let (input, value) = self.0.parse(registry, input)?;
+        let mut values = value.consume::<Vec<ParserOutput>>().ok().unwrap();
+        let item = values.remove(1).consume::<ParserHandle>().ok().unwrap();
+        let name = values.remove(0).consume::<String>().ok().unwrap();
+        if let Some(slot) = registry
+            .extension::<SlotsExtension>()
+            .expect("Could not access SlotExtension")
+            .take(&name)
+        {
+            Ok((input, ParserOutput::new(ext_wrap(item, slot)).ok().unwrap()))
+        } else {
+            Err(format!("Could not take `{}` slot parser", name).into())
+        }
+    }
+}
 
 pub struct Generator {
-    parsers: Vec<(String, ParserHandle)>,
+    parsers: Vec<(String, ParserHandle, Option<String>)>,
 }
 
 impl Generator {
@@ -22,26 +80,31 @@ impl Generator {
             parsers: main()
                 .parse(&registry, grammar)?
                 .1
-                .consume::<Vec<(String, ParserHandle)>>()
+                .consume::<Vec<(String, ParserHandle, Option<String>)>>()
                 .ok()
                 .unwrap(),
         })
     }
 
-    pub fn install(&self, registry: &mut ParserRegistry) {
-        for (id, parser) in &self.parsers {
+    pub fn install(&self, registry: &mut ParserRegistry) -> Result<(), Box<dyn Error>> {
+        for (id, parser, extender) in &self.parsers {
             registry.add_parser(id, parser.clone());
+            if let Some(id) = extender.as_ref() {
+                registry.extend(id, parser.clone())?;
+            }
         }
+        Ok(())
     }
 
     pub fn parser(&self, id: &str) -> Option<ParserHandle> {
         self.parsers
             .iter()
-            .find_map(|(k, v)| if k == id { Some(v.clone()) } else { None })
+            .find_map(|(k, v, _)| if k == id { Some(v.clone()) } else { None })
     }
 
     fn registry() -> ParserRegistry {
         ParserRegistry::default()
+            .with_extension(SlotsExtension::default())
             .with_parser("item", item())
             .with_parser("debug", parser_debug())
             .with_parser("source", parser_source())
@@ -99,7 +162,12 @@ fn main() -> ParserHandle {
         |values: Vec<ParserOutput>| {
             values
                 .into_iter()
-                .map(|value| value.consume::<(String, ParserHandle)>().ok().unwrap())
+                .map(|value| {
+                    value
+                        .consume::<(String, ParserHandle, Option<String>)>()
+                        .ok()
+                        .unwrap()
+                })
                 .collect::<Vec<_>>()
         },
     )
@@ -109,7 +177,7 @@ fn identifier() -> ParserHandle {
     alt([string("`", "`"), id()])
 }
 
-pub fn boolean() -> ParserHandle {
+fn boolean() -> ParserHandle {
     map(alt([lit("true"), lit("false")]), |value: String| {
         value.parse::<bool>().unwrap()
     })
@@ -117,11 +185,20 @@ pub fn boolean() -> ParserHandle {
 
 fn rule() -> ParserHandle {
     map(
-        seq_del(ows(), [identifier(), lit("=>"), inject("item")]),
+        seq_del(
+            ows(),
+            [
+                identifier(),
+                opt(prefix(prefix(identifier(), ows()), lit("->"))),
+                lit("=>"),
+                inject("item"),
+            ],
+        ),
         |mut values: Vec<ParserOutput>| {
-            let parser = values.remove(2).consume::<ParserHandle>().ok().unwrap();
+            let parser = values.remove(3).consume::<ParserHandle>().ok().unwrap();
+            let extends = values.remove(1).consume::<String>().ok();
             let id = values.remove(0).consume::<String>().ok().unwrap();
-            (id, parser)
+            (id, parser, extends)
         },
     )
 }
@@ -275,18 +352,12 @@ fn parser_ext_variants() -> ParserHandle {
 
 fn parser_ext_wrap() -> ParserHandle {
     map_err(
-        map(
-            oc(
-                seq_del(ws(), [inject("item"), inject("item")]),
-                seq_del(ows(), [lit("#"), lit("wrapper"), suffix(lit("{"), ows())]),
-                prefix(lit("}"), ows()),
-            ),
-            |mut values: Vec<ParserOutput>| {
-                let slot = values.remove(1).consume::<ParserHandle>().ok().unwrap();
-                let item = values.remove(0).consume::<ParserHandle>().ok().unwrap();
-                ext_wrap(item, slot)
-            },
-        ),
+        SlotExtensionExtWrapParser(oc(
+            seq_del(ws(), [identifier(), inject("item")]),
+            seq_del(ows(), [lit("#"), lit("wrapper"), suffix(lit("{"), ows())]),
+            prefix(lit("}"), ows()),
+        ))
+        .into_handle(),
         |_| "Expected extendable wrapper".into(),
     )
 }
@@ -708,18 +779,7 @@ fn parser_pred() -> ParserHandle {
 
 fn parser_slot() -> ParserHandle {
     map_err(
-        omap(
-            alt([oc(inject("item"), lit("<"), lit(">")), lit("<>")]),
-            |value| {
-                ParserOutput::new(if let Ok(value) = value.consume::<ParserHandle>() {
-                    slot(value)
-                } else {
-                    slot_empty()
-                })
-                .ok()
-                .unwrap()
-            },
-        ),
+        SlotExtensionSlotParser(oc(identifier(), lit("<"), lit(">"))).into_handle(),
         |_| "Expected slot".into(),
     )
 }
@@ -984,7 +1044,7 @@ mod tests {
             .unwrap();
         assert_eq!(rest, "");
         let result = result
-            .consume::<Vec<(String, ParserHandle)>>()
+            .consume::<Vec<(String, ParserHandle, Option<String>)>>()
             .ok()
             .unwrap();
         assert_eq!(result.len(), 1);
@@ -1007,6 +1067,20 @@ mod tests {
                 .0,
             ""
         );
+
+        let (rest, result) = parser_ext_wrap()
+            .parse(&registry, "#wrapper{inner <inner>}")
+            .unwrap();
+        assert_eq!(rest, "");
+        let parser = result.consume::<ParserHandle>().ok().unwrap();
+        let registry = ParserRegistry::default();
+        assert!(parser
+            .parse(&registry, "foo")
+            .unwrap()
+            .1
+            .is::<ParserNoValue>());
+        parser.extend(lit("foo"));
+        assert!(parser.parse(&registry, "foo").unwrap().1.is::<String>());
     }
 
     #[test]
@@ -1017,7 +1091,7 @@ mod tests {
             generator
                 .parsers
                 .iter()
-                .map(|(k, _)| k.as_str())
+                .map(|(k, _, _)| k.as_str())
                 .collect::<Vec<_>>(),
             vec![
                 "debug",
@@ -1039,7 +1113,6 @@ mod tests {
                 "opt",
                 "pred",
                 "slot",
-                "slot_empty",
                 "rep",
                 "inject",
                 "lit",
@@ -1070,6 +1143,7 @@ mod tests {
                 "ows",
                 "ws",
                 "ignore",
+                "bar",
             ]
         );
 
@@ -1102,7 +1176,7 @@ mod tests {
                     },
                 ),
             );
-        generator.install(&mut registry);
+        generator.install(&mut registry).unwrap();
 
         let (rest, result) = registry.parse("template_value", "42").unwrap();
         assert_eq!(rest, "");
@@ -1163,7 +1237,7 @@ mod tests {
             generator
                 .parsers
                 .iter()
-                .map(|(k, _)| k.as_str())
+                .map(|(k, _, _)| k.as_str())
                 .collect::<Vec<_>>(),
             vec!["value", "op_add", "op_sub", "op_mul", "op_div", "op", "expr"]
         );
@@ -1178,7 +1252,7 @@ mod tests {
                 .with(map_op_div::define_function)
                 .build(),
         );
-        generator.install(&mut registry);
+        generator.install(&mut registry).unwrap();
 
         let (rest, result) = registry.parse("value", "42").unwrap();
         assert_eq!(rest, "");
@@ -1221,5 +1295,26 @@ mod tests {
             .unwrap();
         assert_eq!(rest, "");
         assert_eq!(result.consume::<f32>().ok().unwrap(), 42.0);
+    }
+
+    #[test]
+    fn test_extending() {
+        let grammar = std::fs::read_to_string("./resources/extending.txt").unwrap();
+        let generator = Generator::new(&grammar).unwrap();
+        assert_eq!(
+            generator
+                .parsers
+                .iter()
+                .map(|(k, _, _)| k.as_str())
+                .collect::<Vec<_>>(),
+            vec!["main", "main2", "main3"]
+        );
+
+        let mut registry = ParserRegistry::default();
+        generator.install(&mut registry).unwrap();
+
+        let (rest, result) = registry.parse("main", "bar").unwrap();
+        assert_eq!(rest, "");
+        assert!(result.is::<String>());
     }
 }

@@ -51,7 +51,6 @@ pub mod shorthand {
 }
 
 use intuicio_data::managed::DynamicManaged;
-use slot::SlotParser;
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
@@ -67,10 +66,6 @@ pub struct ParserNoValue;
 
 pub trait Parser: Send + Sync {
     fn parse<'a>(&self, registry: &ParserRegistry, input: &'a str) -> ParseResult<'a>;
-
-    fn as_slot(&self) -> Option<&SlotParser> {
-        None
-    }
 
     #[allow(unused_variables)]
     fn extend(&self, parser: ParserHandle) {}

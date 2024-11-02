@@ -22,6 +22,10 @@ impl Parser for PredictParser {
         let (_, result) = self.0.parse(registry, input)?;
         Ok((input, result))
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.0.extend(parser);
+    }
 }
 
 #[cfg(test)]

@@ -26,6 +26,10 @@ impl Parser for NotParser {
             Err(_) => Ok((input, ParserOutput::new(ParserNoValue).ok().unwrap())),
         }
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.0.extend(parser);
+    }
 }
 
 #[cfg(test)]

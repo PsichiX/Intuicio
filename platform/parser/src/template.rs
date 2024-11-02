@@ -98,6 +98,10 @@ impl Parser for TemplateParser {
             Err("Templating content parsing did not consumed all source!".into())
         }
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.parser.extend(parser);
+    }
 }
 
 #[cfg(test)]

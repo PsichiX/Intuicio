@@ -44,6 +44,10 @@ impl Parser for OpenCloseParser {
         input = new_input;
         Ok((input, result))
     }
+
+    fn extend(&self, parser: ParserHandle) {
+        self.parser.extend(parser);
+    }
 }
 
 #[cfg(test)]
