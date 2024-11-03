@@ -116,7 +116,13 @@ pub struct PrintDebugger {
     pub step_through: bool,
     pub mode: PrintDebuggerMode,
     #[allow(clippy::type_complexity)]
-    printable: HashMap<TypeHash, (&'static str, Box<dyn Fn(&[u8]) -> String + Send + Sync>)>,
+    printable: HashMap<
+        TypeHash,
+        (
+            &'static str,
+            Box<dyn Fn(&Self, *const ()) -> String + Send + Sync>,
+        ),
+    >,
     step: usize,
 }
 
@@ -188,8 +194,8 @@ impl PrintDebugger {
             TypeHash::of::<T>(),
             (
                 std::any::type_name::<T>(),
-                Box::new(|bytes| unsafe {
-                    format!("{:#?}", bytes.as_ptr().cast::<T>().as_ref().unwrap())
+                Box::new(|_, pointer| unsafe {
+                    format!("{:#?}", pointer.cast::<T>().as_ref().unwrap())
                 }),
             ),
         );
@@ -198,13 +204,15 @@ impl PrintDebugger {
 
     pub fn printable_custom<T: 'static>(
         mut self,
-        f: impl Fn(&T) -> String + Send + Sync + 'static,
+        f: impl Fn(&Self, &T) -> String + Send + Sync + 'static,
     ) -> Self {
         self.printable.insert(
             TypeHash::of::<T>(),
             (
                 std::any::type_name::<T>(),
-                Box::new(move |bytes| unsafe { f(bytes.as_ptr().cast::<T>().as_ref().unwrap()) }),
+                Box::new(move |debugger, pointer| unsafe {
+                    f(debugger, pointer.cast::<T>().as_ref().unwrap())
+                }),
             ),
         );
         self
@@ -212,7 +220,7 @@ impl PrintDebugger {
 
     pub fn printable_raw<T: 'static>(
         mut self,
-        f: impl Fn(&[u8]) -> String + Send + Sync + 'static,
+        f: impl Fn(&Self, *const ()) -> String + Send + Sync + 'static,
     ) -> Self {
         self.printable.insert(
             TypeHash::of::<T>(),
@@ -249,6 +257,21 @@ impl PrintDebugger {
             .unwrap_or_else(|| format!("{:?}", location))
     }
 
+    pub fn display<T>(&self, data: &T) -> Option<(&'static str, String)> {
+        let pointer = data as *const T as *const ();
+        self.display_raw(TypeHash::of::<T>(), pointer)
+    }
+
+    pub fn display_raw(
+        &self,
+        type_hash: TypeHash,
+        pointer: *const (),
+    ) -> Option<(&'static str, String)> {
+        let (type_name, callback) = self.printable.get(&type_hash)?;
+        let result = callback(self, pointer);
+        Some((type_name, result))
+    }
+
     fn print_extra(&self, context: &mut Context) {
         if self.stack {
             println!("- stack position: {}", context.stack().position());
@@ -265,7 +288,7 @@ impl PrintDebugger {
                         "- stack value #{} of type {}:\n{}",
                         index,
                         type_name,
-                        callback(bytes)
+                        callback(self, bytes.as_ptr().cast::<()>())
                     );
                 } else {
                     println!(
@@ -303,7 +326,7 @@ impl PrintDebugger {
                                 "- register value #{} of type {}:\n{}",
                                 registers_count - index - 1,
                                 type_name,
-                                callback(bytes)
+                                callback(self, bytes.as_ptr().cast::<()>())
                             );
                         } else {
                             println!(
