@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-parser"
-version = "0.37.0"
+version = "0.37.1"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Parser module for Intuicio scripting platform"

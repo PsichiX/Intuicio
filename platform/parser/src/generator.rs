@@ -205,7 +205,7 @@ fn rule() -> ParserHandle {
 
 fn comment() -> ParserHandle {
     map(
-        regex(r"(\s*\/\*.*\*\/\s*|\s*\/\/[^\r\n]+[\r\n]+)+"),
+        regex(r"(\s*/\*[^\*/]+\*/\s*|\s*//[^\r\n]+[\r\n]\s*)+"),
         |_: String| ParserNoValue,
     )
 }
