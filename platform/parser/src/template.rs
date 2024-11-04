@@ -6,7 +6,7 @@ pub mod shorthand {
 
     pub fn template(
         parser: ParserHandle,
-        rule: impl ToString,
+        rule: Option<String>,
         content: impl ToString,
     ) -> ParserHandle {
         TemplateParser::new(parser, rule, content).into_handle()
@@ -15,15 +15,15 @@ pub mod shorthand {
 
 pub struct TemplateParser {
     parser: ParserHandle,
-    rule: String,
+    rule: Option<String>,
     content: String,
 }
 
 impl TemplateParser {
-    pub fn new(parser: ParserHandle, rule: impl ToString, content: impl ToString) -> Self {
+    pub fn new(parser: ParserHandle, rule: Option<String>, content: impl ToString) -> Self {
         Self {
             parser,
-            rule: rule.to_string(),
+            rule,
             content: content.to_string(),
         }
     }
@@ -91,11 +91,15 @@ impl Parser for TemplateParser {
         } else {
             return Err("Template parsing result is not String or Vec<ParserOutput>!".into());
         };
-        let (rest, result) = registry.parse(&self.rule, &content)?;
-        if rest.is_empty() {
-            Ok((input, result))
+        if let Some(rule) = self.rule.as_ref() {
+            let (rest, result) = registry.parse(rule, &content)?;
+            if rest.is_empty() {
+                Ok((input, result))
+            } else {
+                Err("Templating content parsing did not consumed all source!".into())
+            }
         } else {
-            Err("Templating content parsing did not consumed all source!".into())
+            Ok((input, ParserOutput::new(content).ok().unwrap()))
         }
     }
 
@@ -160,7 +164,7 @@ mod tests {
             )
             .with_parser(
                 "template_value",
-                template(source(number_int()), "value", "value:@{}@"),
+                template(source(number_int()), Some("value".to_owned()), "value:@{}@"),
             )
             .with_parser(
                 "template_add",
@@ -172,7 +176,7 @@ mod tests {
                             source(inject("template_value")),
                         ],
                     ),
-                    "add",
+                    Some("add".to_owned()),
                     "@>{value:}[+]{}@",
                 ),
             )
@@ -186,7 +190,7 @@ mod tests {
                             source(inject("template_value")),
                         ],
                     ),
-                    "sub",
+                    Some("sub".to_owned()),
                     "@<{value:}[-]{}@",
                 ),
             )
@@ -200,9 +204,13 @@ mod tests {
                             source(inject("template_value")),
                         ],
                     ),
-                    "mul",
+                    Some("mul".to_owned()),
                     "value:@>{}[]{}[0]@*value:@>{}[]{}[1]@",
                 ),
+            )
+            .with_parser(
+                "template_output",
+                template(source(inject("template_value")), None, "#@{}@"),
             );
 
         let (rest, result) = registry.parse("value", "value:42").unwrap();
@@ -236,5 +244,9 @@ mod tests {
         let (rest, result) = registry.parse("template_mul", "6 4").unwrap();
         assert_eq!(rest, "");
         assert_eq!(result.consume::<i32>().ok().unwrap(), 24);
+
+        let (rest, result) = registry.parse("template_output", "42").unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(result.consume::<String>().ok().unwrap(), "#42");
     }
 }

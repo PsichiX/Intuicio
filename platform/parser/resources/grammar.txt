@@ -21,9 +21,10 @@ rep => 3"foo"
 inject => $`foo`
 lit => "foo"
 regex => ~~~(\w+)~~~
-template_value => template{=number_int value ```value:@{}@```}
-template_add => template{|ws|(=$template_value /* comment */ =$template_value) add ```@>{value:}[+]{}@```}
-template_mul => template{|ws|(=$template_value =$template_value) mul ```value:@>{}[]{}[0]@*value:@>{}[]{}[1]@```}
+template_value => template{=number_int "value" ```value:@{}@```}
+template_add => template{|ws|(=$template_value /* comment */ =$template_value) "add" ```@>{value:}[+]{}@```}
+template_mul => template{|ws|(=$template_value =$template_value) "mul" ```value:@>{}[]{}[0]@*value:@>{}[]{}[1]@```}
+template_output => template{=$template_value ```@{}@```}
 oc => oc{"foo" "a" "b"}
 prefix => prefix{"foo" "a"}
 suffix => suffix{"foo" "b"}

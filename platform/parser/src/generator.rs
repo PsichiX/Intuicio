@@ -830,13 +830,17 @@ fn parser_template() -> ParserHandle {
     map_err(
         map(
             oc(
-                seq_del(ws(), [inject("item"), identifier(), string("```", "```")]),
+                seq([
+                    inject("item"),
+                    opt(prefix(string("\"", "\""), ws())),
+                    prefix(string("```", "```"), ws()),
+                ]),
                 seq_del(ows(), [lit("template"), suffix(lit("{"), ows())]),
                 prefix(lit("}"), ows()),
             ),
             |mut values: Vec<ParserOutput>| {
                 let content = values.remove(2).consume::<String>().ok().unwrap();
-                let rule = values.remove(1).consume::<String>().ok().unwrap();
+                let rule = values.remove(1).consume::<String>().ok();
                 let item = values.remove(0).consume::<ParserHandle>().ok().unwrap();
                 template(item, rule, content)
             },
@@ -1068,6 +1072,25 @@ mod tests {
             ""
         );
 
+        let (rest, result) = parser_template()
+            .parse(&registry, "template{\"foo\" ```@{}@```}")
+            .unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            result
+                .consume::<ParserHandle>()
+                .ok()
+                .unwrap()
+                .parse(&registry, "foo")
+                .unwrap()
+                .1
+                .consume::<String>()
+                .ok()
+                .unwrap()
+                .as_str(),
+            "foo"
+        );
+
         let (rest, result) = parser_ext_wrap()
             .parse(&registry, "#wrapper{inner <inner>}")
             .unwrap();
@@ -1120,6 +1143,7 @@ mod tests {
                 "template_value",
                 "template_add",
                 "template_mul",
+                "template_output",
                 "oc",
                 "prefix",
                 "suffix",

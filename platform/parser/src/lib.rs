@@ -153,7 +153,10 @@ impl Parser for DebugParser {
                 Ok((input, result))
             }
             Err(error) => {
-                println!("{}> DEBUG `{}` | ERR After: {:?}", ident, self.id, input);
+                println!(
+                    "{}> DEBUG `{}` | ERR After: {:?} | ERROR: {:?}",
+                    ident, self.id, input, error
+                );
                 unsafe {
                     IDENT -= 1;
                 }
