@@ -201,6 +201,57 @@ impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Exc
     }
 }
 
+pub struct Update<T: Component>(PhantomData<fn() -> T>);
+
+pub struct UpdatedAccess<'a, T>(Entity, &'a mut T);
+
+impl<'a, T> UpdatedAccess<'a, T> {
+    pub fn entity(&self) -> Entity {
+        self.0
+    }
+
+    pub fn read(&'a self) -> &'a T {
+        self.1
+    }
+
+    pub fn write(&'a mut self) -> &'a mut T {
+        self.1
+    }
+
+    pub fn notify(&self, world: &World) {
+        world.update::<T>(self.0);
+    }
+
+    pub fn write_notified(&'a mut self, world: &World) -> &'a mut T {
+        self.notify(world);
+        self.write()
+    }
+}
+
+impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Update<T> {
+    type Value = UpdatedAccess<'a, T>;
+    type Access = Box<dyn Iterator<Item = (Entity, &'a mut T)> + 'a>;
+
+    fn does_accept_archetype(archetype: &Archetype) -> bool {
+        archetype.has_type(TypeHash::of::<T>())
+    }
+
+    fn access(archetype: &'a Archetype) -> Result<Self::Access, QueryError> {
+        Ok(Box::new(
+            archetype
+                .entities()
+                .iter()
+                .zip(archetype.column_write_iter::<LOCKING, T>()?),
+        ))
+    }
+
+    fn fetch(access: &mut Self::Access) -> Option<Self::Value> {
+        access
+            .next()
+            .map(|(entity, data)| UpdatedAccess(entity, data))
+    }
+}
+
 macro_rules! impl_typed_query_fetch_tuple {
     ($($type:ident),+) => {
         impl<'a, const LOCKING: bool, $($type: TypedQueryFetch<'a, LOCKING>),+> TypedQueryFetch<'a, LOCKING> for ($($type,)+) {

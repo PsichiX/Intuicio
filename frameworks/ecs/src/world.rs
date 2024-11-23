@@ -10,8 +10,9 @@ use crate::{
 };
 use intuicio_data::type_hash::TypeHash;
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     error::Error,
+    sync::{Arc, RwLock, RwLockReadGuard},
 };
 
 #[derive(Debug)]
@@ -394,11 +395,56 @@ impl<'a> Iterator for RelationsTraverseIter<'a> {
     }
 }
 
+#[derive(Default)]
+pub struct WorldChanges {
+    table: HashMap<Entity, Vec<TypeHash>>,
+}
+
+impl WorldChanges {
+    pub fn clear(&mut self) {
+        self.table.clear();
+    }
+
+    pub fn has_entity(&self, entity: Entity) -> bool {
+        self.table.contains_key(&entity)
+    }
+
+    pub fn has_entity_component<T>(&self, entity: Entity) -> bool {
+        self.has_entity_component_raw(entity, TypeHash::of::<T>())
+    }
+
+    pub fn has_entity_component_raw(&self, entity: Entity, type_hash: TypeHash) -> bool {
+        self.table
+            .get(&entity)
+            .map(|components| components.contains(&type_hash))
+            .unwrap_or_default()
+    }
+
+    pub fn has_component<T>(&self) -> bool {
+        self.has_component_raw(TypeHash::of::<T>())
+    }
+
+    pub fn has_component_raw(&self, type_hash: TypeHash) -> bool {
+        self.table
+            .values()
+            .any(|components| components.contains(&type_hash))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (Entity, &[TypeHash])> {
+        self.table
+            .iter()
+            .map(|(entity, components)| (*entity, components.as_slice()))
+    }
+}
+
 pub struct World {
     pub new_archetype_capacity: usize,
     entities: EntityMap,
     archetypes: ArchetypeMap,
     relations: RelationsGraph,
+    added: WorldChanges,
+    removed: WorldChanges,
+    updated: Arc<RwLock<WorldChanges>>,
 }
 
 impl Default for World {
@@ -408,6 +454,9 @@ impl Default for World {
             entities: Default::default(),
             archetypes: Default::default(),
             relations: Default::default(),
+            added: Default::default(),
+            removed: Default::default(),
+            updated: Default::default(),
         }
     }
 }
@@ -439,8 +488,42 @@ impl World {
         self.archetypes.iter()
     }
 
+    pub fn added(&self) -> &WorldChanges {
+        &self.added
+    }
+
+    pub fn removed(&self) -> &WorldChanges {
+        &self.removed
+    }
+
+    pub fn updated(&self) -> Option<RwLockReadGuard<WorldChanges>> {
+        self.updated.try_read().ok()
+    }
+
+    pub fn update<T>(&self, entity: Entity) {
+        self.update_raw(entity, TypeHash::of::<T>());
+    }
+
+    pub fn update_raw(&self, entity: Entity, type_hash: TypeHash) {
+        if let Ok(mut updated) = self.updated.try_write() {
+            let components = updated.table.entry(entity).or_default();
+            if !components.contains(&type_hash) {
+                components.push(type_hash);
+            }
+        }
+    }
+
+    pub fn clear_changes(&mut self) {
+        self.added.clear();
+        self.removed.clear();
+        if let Ok(mut updated) = self.updated.try_write() {
+            updated.clear();
+        }
+    }
+
     #[inline]
     pub fn clear(&mut self) {
+        self.clear_changes();
         self.archetypes.clear();
         self.entities.clear();
     }
@@ -450,6 +533,10 @@ impl World {
         if bundle_columns.is_empty() {
             return Err(WorldError::EmptyColumnSet);
         }
+        let bundle_types = bundle_columns
+            .iter()
+            .map(|column| column.type_hash())
+            .collect::<Vec<_>>();
         let (entity, id) = self.entities.acquire()?;
         let id = if let Some(archetype_id) = self.archetypes.find_by_columns_exact(&bundle_columns)
         {
@@ -482,7 +569,14 @@ impl World {
             }
         };
         match archetype.insert(entity, bundle) {
-            Ok(_) => Ok(entity),
+            Ok(_) => {
+                self.added
+                    .table
+                    .entry(entity)
+                    .or_default()
+                    .extend(bundle_types);
+                Ok(entity)
+            }
             Err(error) => {
                 self.entities.release(entity)?;
                 Err(error.into())
@@ -505,6 +599,10 @@ impl World {
         if columns.is_empty() {
             return Err(WorldError::EmptyColumnSet);
         }
+        let bundle_types = columns
+            .iter()
+            .map(|column| column.type_hash())
+            .collect::<Vec<_>>();
         let (entity, id) = self.entities.acquire()?;
         let id = if let Some(archetype_id) = self.archetypes.find_by_columns_exact(&columns) {
             *id = Some(archetype_id);
@@ -536,7 +634,14 @@ impl World {
             }
         };
         match archetype.add(entity) {
-            Ok(result) => Ok((entity, result)),
+            Ok(result) => {
+                self.added
+                    .table
+                    .entry(entity)
+                    .or_default()
+                    .extend(bundle_types);
+                Ok((entity, result))
+            }
             Err(error) => {
                 self.entities.release(entity)?;
                 Err(error.into())
@@ -546,9 +651,15 @@ impl World {
 
     pub fn despawn(&mut self, entity: Entity) -> Result<(), WorldError> {
         let id = self.entities.release(entity)?;
-        match self.archetypes.get_mut(id).unwrap().remove(entity) {
+        let archetype = self.archetypes.get_mut(id).unwrap();
+        match archetype.remove(entity) {
             Ok(_) => {
                 self.relations.disconnect_any(entity);
+                self.removed
+                    .table
+                    .entry(entity)
+                    .or_default()
+                    .extend(archetype.columns().map(|column| column.type_hash()));
                 Ok(())
             }
             Err(error) => {
@@ -563,6 +674,10 @@ impl World {
         if bundle_columns.is_empty() {
             return Err(WorldError::EmptyColumnSet);
         }
+        let bundle_types = bundle_columns
+            .iter()
+            .map(|column| column.type_hash())
+            .collect::<Vec<_>>();
         let old_id = self.entities.get(entity)?;
         let mut new_columns = self
             .archetypes
@@ -599,6 +714,11 @@ impl World {
             *archetype_slot = Some(archetype);
             self.entities.set(entity, new_id)?;
         }
+        self.added
+            .table
+            .entry(entity)
+            .or_default()
+            .extend(bundle_types);
         Ok(())
     }
 
@@ -614,6 +734,10 @@ impl World {
         if columns.is_empty() {
             return Err(WorldError::EmptyColumnSet);
         }
+        let bundle_types = columns
+            .iter()
+            .map(|column| column.type_hash())
+            .collect::<Vec<_>>();
         let old_id = self.entities.get(entity)?;
         let mut new_columns = self
             .archetypes
@@ -651,6 +775,11 @@ impl World {
             let _ = self.entities.release(entity);
             self.relations.disconnect_any(entity);
         }
+        self.removed
+            .table
+            .entry(entity)
+            .or_default()
+            .extend(bundle_types);
         Ok(())
     }
 
@@ -816,7 +945,7 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::{Exclude, Include};
+    use crate::query::{Exclude, Include, Update};
     use std::{
         sync::{Arc, RwLock},
         thread::spawn,
@@ -1019,6 +1148,49 @@ mod tests {
             .dynamic_query::<true>(&DynamicQueryFilter::default().read::<u8>().exclude::<u16>())
         {
             assert!((item.entity().id() as usize) < N);
+        }
+    }
+
+    #[test]
+    fn test_updating_queries() {
+        let mut world = World::default();
+        for index in 0..10usize {
+            world.spawn((index,)).unwrap();
+        }
+        for mut v in world.query::<true, Update<usize>>() {
+            *v.write_notified(&world) *= 2;
+        }
+        for (entity, v) in world.query::<true, (Entity, &usize)>() {
+            assert_eq!(entity.id() as usize * 2, *v);
+        }
+    }
+
+    #[test]
+    fn test_zst_components() {
+        #[derive(Debug, PartialEq, Eq)]
+        struct Foo;
+
+        #[derive(Debug, PartialEq, Eq)]
+        struct Bar(bool);
+
+        let mut world = World::default();
+        world.spawn((Foo,)).unwrap();
+        assert_eq!(world.query::<true, &Foo>().count(), 1);
+        for v in world.query::<true, &Foo>() {
+            assert_eq!(v, &Foo);
+        }
+        world.spawn((Bar(true),)).unwrap();
+        assert_eq!(world.query::<true, &Bar>().count(), 1);
+        for v in world.query::<true, &Bar>() {
+            assert_eq!(v, &Bar(true));
+        }
+        world.spawn((Foo, Bar(false))).unwrap();
+        assert_eq!(world.query::<true, &Foo>().count(), 2);
+        assert_eq!(world.query::<true, &Bar>().count(), 2);
+        assert_eq!(world.query::<true, (&Bar, &Foo)>().count(), 1);
+        for (a, b) in world.query::<true, (&Bar, &Foo)>() {
+            assert_eq!(a, &Bar(false));
+            assert_eq!(b, &Foo);
         }
     }
 
