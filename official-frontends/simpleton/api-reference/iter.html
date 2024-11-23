@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="en" class="light" dir="ltr">
+<html lang="en" class="light sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -7,7 +7,7 @@
 
 
         <!-- Custom HTML head -->
-        
+
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
@@ -30,15 +30,17 @@
 
         <!-- Custom theme stylesheets -->
 
-    </head>
-    <body class="sidebar-visible no-js">
-    <div id="body-container">
+
         <!-- Provide site root to javascript -->
         <script>
             var path_to_root = "../../../";
             var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
         </script>
-
+        <!-- Start loading toc.js asap -->
+        <script src="../../../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
@@ -60,19 +62,16 @@
             var theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
-            var html = document.querySelector('html');
+            const html = document.documentElement;
             html.classList.remove('light')
             html.classList.add(theme);
-            var body = document.querySelector('body');
-            body.classList.remove('no-js')
-            body.classList.add('js');
+            html.classList.add("js");
         </script>
 
         <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var body = document.querySelector('body');
             var sidebar = null;
             var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
@@ -82,45 +81,25 @@
                 sidebar = 'hidden';
             }
             sidebar_toggle.checked = sidebar === 'visible';
-            body.classList.remove('sidebar-visible');
-            body.classList.add("sidebar-" + sidebar);
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../../../index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../../../scripting-pipeline-explained.html"><strong aria-hidden="true">2.</strong> Scripting pipeline explained</a></li><li class="chapter-item expanded "><a href="../../../anatomy-of-a-host.html"><strong aria-hidden="true">3.</strong> Anatomy of a Host</a></li><li class="chapter-item expanded "><a href="../../../anatomy-of-a-script.html"><strong aria-hidden="true">4.</strong> Anatomy of a Script</a></li><li class="chapter-item expanded "><a href="../../../tutorial/index.html"><strong aria-hidden="true">5.</strong> Tutorial</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../tutorial/frontend.html"><strong aria-hidden="true">5.1.</strong> Building custom frontend</a></li><li class="chapter-item expanded "><a href="../../../tutorial/backend.html"><strong aria-hidden="true">5.2.</strong> Building custom backend</a></li><li class="chapter-item expanded "><a href="../../../tutorial/runner.html"><strong aria-hidden="true">5.3.</strong> Building custom runner</a></li></ol></li><li class="chapter-item expanded "><a href="../../../official-frontends/index.html"><strong aria-hidden="true">6.</strong> Official frontends</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../official-frontends/assembler/index.html"><strong aria-hidden="true">6.1.</strong> Assembler</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/serde/index.html"><strong aria-hidden="true">6.2.</strong> Serde</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/vault/index.html"><strong aria-hidden="true">6.3.</strong> Vault</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/index.html"><strong aria-hidden="true">6.4.</strong> Simpleton</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/language-reference.html"><strong aria-hidden="true">6.4.1.</strong> Language reference</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/index.html"><strong aria-hidden="true">6.4.2.</strong> API reference</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/reflect.html"><strong aria-hidden="true">6.4.2.1.</strong> Reflect</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/closure.html"><strong aria-hidden="true">6.4.2.2.</strong> Closure</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/debug.html"><strong aria-hidden="true">6.4.2.3.</strong> Debug</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/console.html"><strong aria-hidden="true">6.4.2.4.</strong> Console</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/math.html"><strong aria-hidden="true">6.4.2.5.</strong> Math</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/array.html"><strong aria-hidden="true">6.4.2.6.</strong> Array</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/map.html"><strong aria-hidden="true">6.4.2.7.</strong> Map</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/text.html"><strong aria-hidden="true">6.4.2.8.</strong> Text</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/bytes.html"><strong aria-hidden="true">6.4.2.9.</strong> Bytes</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/json.html"><strong aria-hidden="true">6.4.2.10.</strong> JSON</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/toml.html"><strong aria-hidden="true">6.4.2.11.</strong> TOML</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/iter.html" class="active"><strong aria-hidden="true">6.4.2.12.</strong> Iterators</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/event.html"><strong aria-hidden="true">6.4.2.13.</strong> Event</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/promise.html"><strong aria-hidden="true">6.4.2.14.</strong> Promise</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/fs.html"><strong aria-hidden="true">6.4.2.15.</strong> File system</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/process.html"><strong aria-hidden="true">6.4.2.16.</strong> Process</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/net.html"><strong aria-hidden="true">6.4.2.17.</strong> Network</a></li><li class="chapter-item expanded "><a href="../../../official-frontends/simpleton/api-reference/jobs.html"><strong aria-hidden="true">6.4.2.18.</strong> Jobs (multithreading)</a></li></ol></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../../../official-runners/index.html"><strong aria-hidden="true">7.</strong> Official runners</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../official-runners/simpleton/index.html"><strong aria-hidden="true">7.1.</strong> Simpleton</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../official-runners/simpleton/api-reference/index.html"><strong aria-hidden="true">7.1.1.</strong> API reference</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../official-runners/simpleton/api-reference/script.html"><strong aria-hidden="true">7.1.1.1.</strong> Script</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../../../official-runners/alchemyst/index.html"><strong aria-hidden="true">7.2.</strong> Alchemyst</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../official-runners/alchemyst/api-reference/index.html"><strong aria-hidden="true">7.2.1.</strong> API reference</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../official-runners/alchemyst/api-reference/color.html"><strong aria-hidden="true">7.2.1.1.</strong> Color</a></li><li class="chapter-item expanded "><a href="../../../official-runners/alchemyst/api-reference/vec2.html"><strong aria-hidden="true">7.2.1.2.</strong> Vec2</a></li><li class="chapter-item expanded "><a href="../../../official-runners/alchemyst/api-reference/image.html"><strong aria-hidden="true">7.2.1.3.</strong> Image</a></li><li class="chapter-item expanded "><a href="../../../official-runners/alchemyst/api-reference/image-pipeline.html"><strong aria-hidden="true">7.2.1.4.</strong> Image Pipeline</a></li></ol></li></ol></li></ol></li></ol>
-            </div>
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../../../toc.html"></iframe>
+            </noscript>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
             </div>
         </nav>
 
-        <!-- Track and set sidebar scroll position -->
-        <script>
-            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
-            sidebarScrollbox.addEventListener('click', function(e) {
-                if (e.target.tagName === 'A') {
-                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
-                }
-            }, { passive: true });
-            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
-            sessionStorage.removeItem('sidebar-scroll');
-            if (sidebarScrollTop) {
-                // preserve sidebar scroll position when navigating via links within sidebar
-                sidebarScrollbox.scrollTop = sidebarScrollTop;
-            } else {
-                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
-                var activeSection = document.querySelector('#sidebar .active');
-                if (activeSection) {
-                    activeSection.scrollIntoView({ block: 'center' });
-                }
-            }
-        </script>
-
         <div id="page-wrapper" class="page-wrapper">
 
             <div class="page">
-                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
                         <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
