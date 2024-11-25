@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-simpleton"
-version = "0.38.1"
+version = "0.39.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Simpleton frontend module for Intuicio scripting platform"
@@ -21,13 +21,13 @@ plugins = []
 ffi = ["intuicio-ffi"]
 
 [dependencies]
-intuicio-data = { version = "0.38", path = "../../platform/data" }
-intuicio-core = { version = "0.38", path = "../../platform/core" }
-intuicio-nodes = { version = "0.38", path = "../../platform/nodes" }
-intuicio-plugins = { version = "0.38", path = "../../platform/plugins" }
-intuicio-derive = { version = "0.38", path = "../../platform/derive" }
-intuicio-ffi = { version = "0.38", path = "../../platform/ffi", optional = true }
-intuicio-framework-dynamic = { version = "0.38", path = "../../frameworks/dynamic" }
+intuicio-data = { version = "0.39", path = "../../platform/data" }
+intuicio-core = { version = "0.39", path = "../../platform/core" }
+intuicio-nodes = { version = "0.39", path = "../../platform/nodes" }
+intuicio-plugins = { version = "0.39", path = "../../platform/plugins" }
+intuicio-derive = { version = "0.39", path = "../../platform/derive" }
+intuicio-ffi = { version = "0.39", path = "../../platform/ffi", optional = true }
+intuicio-framework-dynamic = { version = "0.39", path = "../../frameworks/dynamic" }
 pest = "2.5"
 pest_derive = "2.5"
 regex = "1"
@@ -41,4 +41,4 @@ rand = "0.8"
 typid = "1"
 
 [dev-dependencies]
-intuicio-backend-vm = { version = "0.38", path = "../../backends/vm" }
+intuicio-backend-vm = { version = "0.39", path = "../../backends/vm" }

@@ -12,6 +12,7 @@ use intuicio_data::type_hash::TypeHash;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     error::Error,
+    marker::PhantomData,
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
@@ -235,25 +236,37 @@ impl ArchetypeMap {
         }
     }
 
-    fn get_mut_many<const N: usize>(
-        &mut self,
-        id: [u32; N],
-    ) -> Result<[&mut Archetype; N], WorldError> {
-        for (index_a, a) in id.iter().copied().enumerate() {
-            for (index_b, b) in id.iter().copied().enumerate() {
-                if index_a != index_b && a == b {
-                    return Err(WorldError::DuplicateMutableArchetypeAccess { id: a });
-                }
-            }
-            if let Some(archetype) = self.table.get(a as usize) {
-                if archetype.is_none() {
-                    return Err(WorldError::ArchetypeDoesNotExists { id: a });
-                }
-            }
+    fn get_mut_two(&mut self, [a, b]: [u32; 2]) -> Result<[&mut Archetype; 2], WorldError> {
+        if a == b {
+            return Err(WorldError::DuplicateMutableArchetypeAccess { id: a });
         }
-        Ok(std::array::from_fn(|index| unsafe {
-            &mut *(self.table[id[index] as usize].as_mut().unwrap() as *mut Archetype)
-        }))
+        if let Some(archetype) = self.table.get(a as usize) {
+            if archetype.is_none() {
+                return Err(WorldError::ArchetypeDoesNotExists { id: a });
+            }
+        } else {
+            return Err(WorldError::ArchetypeDoesNotExists { id: a });
+        }
+        if let Some(archetype) = self.table.get(b as usize) {
+            if archetype.is_none() {
+                return Err(WorldError::ArchetypeDoesNotExists { id: b });
+            }
+        } else {
+            return Err(WorldError::ArchetypeDoesNotExists { id: b });
+        }
+        if a < b {
+            let (left, right) = self.table.split_at_mut(b as usize);
+            Ok([
+                left[a as usize].as_mut().unwrap(),
+                right[0].as_mut().unwrap(),
+            ])
+        } else {
+            let (right, left) = self.table.split_at_mut(a as usize);
+            Ok([
+                left[0].as_mut().unwrap(),
+                right[b as usize].as_mut().unwrap(),
+            ])
+        }
     }
 
     fn find_by_columns_exact(&self, columns: &[ArchetypeColumnInfo]) -> Option<u32> {
@@ -268,104 +281,156 @@ impl ArchetypeMap {
     }
 }
 
-#[derive(Default)]
-struct RelationsGraph {
-    graph: Vec<(TypeHash, Entity, Entity)>,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum RelationConnections<T: Component> {
+    Zero([(T, Entity); 0]),
+    One([(T, Entity); 1]),
+    More(Vec<(T, Entity)>),
 }
 
-impl RelationsGraph {
-    fn connect(&mut self, type_hash: TypeHash, from: Entity, to: Entity) {
-        if from != to
-            && !self
-                .graph
-                .iter()
-                .any(|(ty, f, t)| *ty == type_hash && *f == from && *t == to)
-        {
-            if self.graph.len() == self.graph.capacity() {
-                self.graph.reserve_exact(self.graph.capacity());
+impl<T: Component> Default for RelationConnections<T> {
+    fn default() -> Self {
+        Self::Zero(Default::default())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Relation<T: Component> {
+    connections: RelationConnections<T>,
+}
+
+impl<T: Component> Default for Relation<T> {
+    fn default() -> Self {
+        Self {
+            connections: Default::default(),
+        }
+    }
+}
+
+impl<T: Component> Relation<T> {
+    pub fn with(mut self, payload: T, entity: Entity) -> Self {
+        self.add(payload, entity);
+        self
+    }
+
+    pub fn type_hash(&self) -> TypeHash {
+        TypeHash::of::<T>()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match &self.connections {
+            RelationConnections::Zero(_) => true,
+            RelationConnections::One(_) => false,
+            RelationConnections::More(vec) => vec.is_empty(),
+        }
+    }
+
+    pub fn add(&mut self, payload: T, entity: Entity) {
+        self.connections = match std::mem::take(&mut self.connections) {
+            RelationConnections::Zero(_) => RelationConnections::One([(payload, entity)]),
+            RelationConnections::One([a]) => RelationConnections::More(vec![a, (payload, entity)]),
+            RelationConnections::More(mut vec) => {
+                vec.push((payload, entity));
+                RelationConnections::More(vec)
             }
-            self.graph.push((type_hash, from, to));
+        };
+    }
+
+    pub fn remove(&mut self, entity: Entity) {
+        self.connections = match std::mem::take(&mut self.connections) {
+            RelationConnections::Zero(a) => RelationConnections::Zero(a),
+            RelationConnections::One([a]) => {
+                if a.1 == entity {
+                    RelationConnections::Zero([])
+                } else {
+                    RelationConnections::One([a])
+                }
+            }
+            RelationConnections::More(mut vec) => {
+                if let Some(index) = vec.iter().position(|a| a.1 == entity) {
+                    vec.swap_remove(index);
+                }
+                if vec.len() == 1 {
+                    RelationConnections::One([vec.remove(0)])
+                } else if vec.is_empty() {
+                    RelationConnections::Zero([])
+                } else {
+                    RelationConnections::More(vec)
+                }
+            }
         }
     }
 
-    fn disconnect(&mut self, type_hash: TypeHash, from: Entity, to: Entity) {
-        if let Some(index) = self
-            .graph
-            .iter()
-            .position(|(ty, f, t)| *ty == type_hash && *f == from && *t == to)
-        {
-            self.graph.swap_remove(index);
+    pub fn has(&self, entity: Entity) -> bool {
+        match &self.connections {
+            RelationConnections::Zero(_) => false,
+            RelationConnections::One([a]) => a.1 == entity,
+            RelationConnections::More(vec) => vec.iter().any(|(_, e)| *e == entity),
         }
     }
 
-    fn disconnect_from(&mut self, type_hash: TypeHash, from: Entity) {
-        self.graph
-            .retain(|(ty, f, _)| *ty != type_hash || *f != from);
-    }
-
-    fn disconnect_to(&mut self, type_hash: TypeHash, to: Entity) {
-        self.graph.retain(|(ty, _, t)| *ty != type_hash || *t != to);
-    }
-
-    fn disconnect_all(&mut self, type_hash: TypeHash, entity: Entity) {
-        self.graph
-            .retain(|(ty, f, t)| *ty != type_hash || (*f != entity && *t != entity));
-    }
-
-    fn disconnect_any(&mut self, entity: Entity) {
-        self.graph.retain(|(_, f, t)| *f != entity && *t != entity);
-    }
-
-    fn connections(
-        &self,
-        type_hash: TypeHash,
-        entity: Entity,
-    ) -> impl Iterator<Item = Entity> + '_ {
-        self.graph.iter().filter_map(move |(ty, f, t)| {
-            if *ty == type_hash {
-                if *f == entity {
-                    Some(*t)
-                } else if *t == entity {
-                    Some(*f)
+    pub fn payload(&self, entity: Entity) -> Option<&T> {
+        match &self.connections {
+            RelationConnections::Zero(_) => None,
+            RelationConnections::One([a]) => {
+                if a.1 == entity {
+                    Some(&a.0)
                 } else {
                     None
                 }
-            } else {
-                None
             }
-        })
+            RelationConnections::More(vec) => {
+                vec.iter()
+                    .find_map(|(p, e)| if *e == entity { Some(p) } else { None })
+            }
+        }
     }
 
-    fn outgoing(&self, type_hash: TypeHash, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
-        self.graph.iter().filter_map(move |(ty, f, t)| {
-            if *ty == type_hash && *f == entity {
-                Some(*t)
-            } else {
-                None
+    pub fn payload_mut(&mut self, entity: Entity) -> Option<&mut T> {
+        match &mut self.connections {
+            RelationConnections::Zero(_) => None,
+            RelationConnections::One([a]) => {
+                if a.1 == entity {
+                    Some(&mut a.0)
+                } else {
+                    None
+                }
             }
-        })
+            RelationConnections::More(vec) => {
+                vec.iter_mut()
+                    .find_map(|(p, e)| if *e == entity { Some(p) } else { None })
+            }
+        }
     }
 
-    fn incoming(&self, type_hash: TypeHash, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
-        self.graph.iter().filter_map(move |(ty, f, t)| {
-            if *ty == type_hash && *t == entity {
-                Some(*f)
-            } else {
-                None
-            }
-        })
+    pub fn iter(&self) -> impl Iterator<Item = (&T, Entity)> {
+        match &self.connections {
+            RelationConnections::Zero(a) => a.iter(),
+            RelationConnections::One(a) => a.iter(),
+            RelationConnections::More(vec) => vec.iter(),
+        }
+        .map(|(p, e)| (p, *e))
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&mut T, Entity)> {
+        match &mut self.connections {
+            RelationConnections::Zero(a) => a.iter_mut(),
+            RelationConnections::One(a) => a.iter_mut(),
+            RelationConnections::More(vec) => vec.iter_mut(),
+        }
+        .map(|(p, e)| (p, *e))
     }
 }
 
-pub struct RelationsTraverseIter<'a> {
-    relations: &'a RelationsGraph,
-    type_hash: TypeHash,
+pub struct RelationsTraverseIter<'a, const LOCKING: bool, T: Component> {
+    world: &'a World,
     incoming: bool,
     stack: VecDeque<Entity>,
     visited: HashSet<Entity>,
+    _phantom: PhantomData<fn() -> T>,
 }
 
-impl<'a> Iterator for RelationsTraverseIter<'a> {
+impl<'a, const LOCKING: bool, T: Component> Iterator for RelationsTraverseIter<'a, LOCKING, T> {
     type Item = Entity;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -375,14 +440,14 @@ impl<'a> Iterator for RelationsTraverseIter<'a> {
             }
             self.visited.insert(entity);
             if self.incoming {
-                for entity in self.relations.incoming(self.type_hash, entity) {
+                for (entity, _, _) in self.world.relations_incomming::<LOCKING, T>(entity) {
                     if self.stack.len() == self.stack.capacity() {
                         self.stack.reserve_exact(self.stack.capacity());
                     }
                     self.stack.push_back(entity);
                 }
             } else {
-                for entity in self.relations.outgoing(self.type_hash, entity) {
+                for (_, _, entity) in self.world.relations_outgoing::<LOCKING, T>(entity) {
                     if self.stack.len() == self.stack.capacity() {
                         self.stack.reserve_exact(self.stack.capacity());
                     }
@@ -435,13 +500,23 @@ impl WorldChanges {
             .iter()
             .map(|(entity, components)| (*entity, components.as_slice()))
     }
+
+    pub fn iter_of<T>(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.iter_of_raw(TypeHash::of::<T>())
+    }
+
+    pub fn iter_of_raw(&self, type_hash: TypeHash) -> impl Iterator<Item = Entity> + '_ {
+        self.table
+            .iter()
+            .filter(move |(_, components)| components.contains(&type_hash))
+            .map(|(entity, _)| *entity)
+    }
 }
 
 pub struct World {
     pub new_archetype_capacity: usize,
     entities: EntityMap,
     archetypes: ArchetypeMap,
-    relations: RelationsGraph,
     added: WorldChanges,
     removed: WorldChanges,
     updated: Arc<RwLock<WorldChanges>>,
@@ -453,7 +528,6 @@ impl Default for World {
             new_archetype_capacity: 128,
             entities: Default::default(),
             archetypes: Default::default(),
-            relations: Default::default(),
             added: Default::default(),
             removed: Default::default(),
             updated: Default::default(),
@@ -498,6 +572,47 @@ impl World {
 
     pub fn updated(&self) -> Option<RwLockReadGuard<WorldChanges>> {
         self.updated.try_read().ok()
+    }
+
+    pub fn entity_did_changed(&self, entity: Entity) -> bool {
+        self.added.has_entity(entity)
+            || self.removed.has_entity(entity)
+            || self
+                .updated
+                .try_read()
+                .ok()
+                .map(|updated| updated.has_entity(entity))
+                .unwrap_or_default()
+    }
+
+    pub fn component_did_changed<T>(&self) -> bool {
+        self.component_did_changed_raw(TypeHash::of::<T>())
+    }
+
+    pub fn component_did_changed_raw(&self, type_hash: TypeHash) -> bool {
+        self.added.has_component_raw(type_hash)
+            || self.removed.has_component_raw(type_hash)
+            || self
+                .updated
+                .try_read()
+                .ok()
+                .map(|updated| updated.has_component_raw(type_hash))
+                .unwrap_or_default()
+    }
+
+    pub fn entity_component_did_changed<T>(&self, entity: Entity) -> bool {
+        self.entity_component_did_changed_raw(entity, TypeHash::of::<T>())
+    }
+
+    pub fn entity_component_did_changed_raw(&self, entity: Entity, type_hash: TypeHash) -> bool {
+        self.added.has_entity_component_raw(entity, type_hash)
+            || self.removed.has_entity_component_raw(entity, type_hash)
+            || self
+                .updated
+                .try_read()
+                .ok()
+                .map(|updated| updated.has_entity_component_raw(entity, type_hash))
+                .unwrap_or_default()
     }
 
     pub fn update<T>(&self, entity: Entity) {
@@ -654,7 +769,6 @@ impl World {
         let archetype = self.archetypes.get_mut(id).unwrap();
         match archetype.remove(entity) {
             Ok(_) => {
-                self.relations.disconnect_any(entity);
                 self.removed
                     .table
                     .entry(entity)
@@ -697,7 +811,7 @@ impl World {
             if new_id == old_id {
                 return Ok(());
             }
-            let [old_archetype, new_archetype] = self.archetypes.get_mut_many([old_id, new_id])?;
+            let [old_archetype, new_archetype] = self.archetypes.get_mut_two([old_id, new_id])?;
             let access = old_archetype.transfer(new_archetype, entity)?;
             bundle.initialize_into(&access);
             self.entities.set(entity, new_id)?;
@@ -758,7 +872,7 @@ impl World {
             if new_id == old_id {
                 return Ok(());
             }
-            let [old_archetype, new_archetype] = self.archetypes.get_mut_many([old_id, new_id])?;
+            let [old_archetype, new_archetype] = self.archetypes.get_mut_two([old_id, new_id])?;
             old_archetype.transfer(new_archetype, entity)?;
             self.entities.set(entity, new_id)?;
         } else {
@@ -773,7 +887,6 @@ impl World {
         }
         if despawn {
             let _ = self.entities.release(entity);
-            self.relations.disconnect_any(entity);
         }
         self.removed
             .table
@@ -781,6 +894,22 @@ impl World {
             .or_default()
             .extend(bundle_types);
         Ok(())
+    }
+
+    pub fn has_entity(&self, entity: Entity) -> bool {
+        self.entities.get(entity).is_ok()
+    }
+
+    pub fn has_entity_component<T: Component>(&self, entity: Entity) -> bool {
+        self.has_entity_component_raw(entity, TypeHash::of::<T>())
+    }
+
+    pub fn has_entity_component_raw(&self, entity: Entity, component: TypeHash) -> bool {
+        self.entities
+            .get(entity)
+            .and_then(|index| self.archetypes.get(index))
+            .map(|archetype| archetype.has_type(component))
+            .unwrap_or_default()
     }
 
     pub fn get<const LOCKING: bool, T: Component>(
@@ -819,125 +948,160 @@ impl World {
         DynamicQueryIter::new(filter, self)
     }
 
-    pub fn relate<T>(&mut self, from: Entity, to: Entity) {
-        self.relate_raw(TypeHash::of::<T>(), from, to);
+    pub fn relate<const LOCKING: bool, T: Component>(
+        &mut self,
+        payload: T,
+        from: Entity,
+        to: Entity,
+    ) -> Result<(), WorldError> {
+        if let Ok(mut relation) = self.get::<LOCKING, Relation<T>>(from, true) {
+            if let Some(relation) = relation.write() {
+                relation.add(payload, to);
+            }
+            return Ok(());
+        }
+        self.insert(from, (Relation::<T>::default().with(payload, to),))
     }
 
-    pub fn relate_raw(&mut self, type_hash: TypeHash, from: Entity, to: Entity) {
-        self.relations.connect(type_hash, from, to);
+    pub fn unrelate<const LOCKING: bool, T: Component>(
+        &mut self,
+        from: Entity,
+        to: Entity,
+    ) -> Result<(), WorldError> {
+        let remove = if let Ok(mut relation) = self.get::<LOCKING, Relation<T>>(from, true) {
+            if let Some(relation) = relation.write() {
+                relation.remove(to);
+                relation.is_empty()
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        if remove {
+            self.remove::<(Relation<T>,)>(from)?;
+        }
+        Ok(())
     }
 
-    pub fn unrelate<T>(&mut self, from: Entity, to: Entity) {
-        self.unrelate_raw(TypeHash::of::<T>(), from, to);
-    }
-
-    pub fn unrelate_raw(&mut self, type_hash: TypeHash, from: Entity, to: Entity) {
-        self.relations.disconnect(type_hash, from, to);
-    }
-
-    pub fn unrelate_from<T>(&mut self, from: Entity) {
-        self.unrelate_from_raw(TypeHash::of::<T>(), from);
-    }
-
-    pub fn unrelate_from_raw(&mut self, type_hash: TypeHash, from: Entity) {
-        self.relations.disconnect_from(type_hash, from);
-    }
-
-    pub fn unrelate_to<T>(&mut self, to: Entity) {
-        self.unrelate_to_raw(TypeHash::of::<T>(), to);
-    }
-
-    pub fn unrelate_to_raw(&mut self, type_hash: TypeHash, to: Entity) {
-        self.relations.disconnect_to(type_hash, to);
-    }
-
-    pub fn unrelate_all<T>(&mut self, entity: Entity) {
-        self.unrelate_all_raw(TypeHash::of::<T>(), entity);
-    }
-
-    pub fn unrelate_all_raw(&mut self, type_hash: TypeHash, entity: Entity) {
-        self.relations.disconnect_all(type_hash, entity);
-    }
-
-    pub fn unrelate_any(&mut self, entity: Entity) {
-        self.relations.disconnect_any(entity);
-    }
-
-    pub fn relations<T>(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
-        self.relations_raw(TypeHash::of::<T>(), entity)
-    }
-
-    pub fn relations_raw(
-        &self,
-        type_hash: TypeHash,
+    pub fn unrelate_any<const LOCKING: bool, T: Component>(
+        &mut self,
         entity: Entity,
-    ) -> impl Iterator<Item = Entity> + '_ {
-        self.relations.connections(type_hash, entity)
+    ) -> Result<(), WorldError> {
+        let to_remove = self
+            .query::<LOCKING, (Entity, &mut Relation<T>)>()
+            .filter_map(|(e, relation)| {
+                relation.remove(entity);
+                if relation.is_empty() {
+                    Some(e)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        for entity in to_remove {
+            self.remove::<(Relation<T>,)>(entity)?;
+        }
+        Ok(())
     }
 
-    pub fn outgoing_relations<T>(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
-        self.outgoing_relations_raw(TypeHash::of::<T>(), entity)
-    }
-
-    pub fn outgoing_relations_raw(
+    pub fn relations<const LOCKING: bool, T: Component>(
         &self,
-        type_hash: TypeHash,
-        entity: Entity,
-    ) -> impl Iterator<Item = Entity> + '_ {
-        self.relations.outgoing(type_hash, entity)
+    ) -> impl Iterator<Item = (Entity, &T, Entity)> + '_ {
+        self.query::<LOCKING, (Entity, &Relation<T>)>()
+            .flat_map(|(from, relation)| {
+                relation
+                    .iter()
+                    .map(move |(payload, to)| (from, payload, to))
+            })
     }
 
-    pub fn incoming_relations<T>(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
-        self.incoming_relations_raw(TypeHash::of::<T>(), entity)
-    }
-
-    pub fn incoming_relations_raw(
+    pub fn relations_mut<const LOCKING: bool, T: Component>(
         &self,
-        type_hash: TypeHash,
-        entity: Entity,
-    ) -> impl Iterator<Item = Entity> + '_ {
-        self.relations.incoming(type_hash, entity)
+    ) -> impl Iterator<Item = (Entity, &mut T, Entity)> + '_ {
+        self.query::<LOCKING, (Entity, &mut Relation<T>)>()
+            .flat_map(|(from, relation)| {
+                relation
+                    .iter_mut()
+                    .map(move |(payload, to)| (from, payload, to))
+            })
     }
 
-    pub fn traverse_outgoing<T>(
+    pub fn relations_outgoing<const LOCKING: bool, T: Component>(
+        &self,
+        from: Entity,
+    ) -> impl Iterator<Item = (Entity, &T, Entity)> + '_ {
+        self.query::<LOCKING, (Entity, &Relation<T>)>()
+            .filter(move |(entity, _)| *entity == from)
+            .flat_map(|(from, relation)| {
+                relation
+                    .iter()
+                    .map(move |(payload, to)| (from, payload, to))
+            })
+    }
+
+    pub fn relations_outgoing_mut<const LOCKING: bool, T: Component>(
+        &self,
+        from: Entity,
+    ) -> impl Iterator<Item = (Entity, &mut T, Entity)> + '_ {
+        self.query::<LOCKING, (Entity, &mut Relation<T>)>()
+            .filter(move |(entity, _)| *entity == from)
+            .flat_map(|(from, relation)| {
+                relation
+                    .iter_mut()
+                    .map(move |(payload, to)| (from, payload, to))
+            })
+    }
+
+    pub fn relations_incomming<const LOCKING: bool, T: Component>(
+        &self,
+        to: Entity,
+    ) -> impl Iterator<Item = (Entity, &T, Entity)> + '_ {
+        self.query::<LOCKING, (Entity, &Relation<T>)>()
+            .flat_map(move |(from, relation)| {
+                relation
+                    .iter()
+                    .filter(move |(_, entity)| *entity == to)
+                    .map(move |(payload, to)| (from, payload, to))
+            })
+    }
+
+    pub fn relations_incomming_mut<const LOCKING: bool, T: Component>(
+        &self,
+        to: Entity,
+    ) -> impl Iterator<Item = (Entity, &mut T, Entity)> + '_ {
+        self.query::<LOCKING, (Entity, &mut Relation<T>)>()
+            .flat_map(move |(from, relation)| {
+                relation
+                    .iter_mut()
+                    .filter(move |(_, entity)| *entity == to)
+                    .map(move |(payload, to)| (from, payload, to))
+            })
+    }
+
+    pub fn traverse_outgoing<const LOCKING: bool, T: Component>(
         &self,
         entities: impl IntoIterator<Item = Entity>,
-    ) -> RelationsTraverseIter {
-        self.traverse_outgoing_raw(TypeHash::of::<T>(), entities)
-    }
-
-    pub fn traverse_outgoing_raw(
-        &self,
-        type_hash: TypeHash,
-        entities: impl IntoIterator<Item = Entity>,
-    ) -> RelationsTraverseIter {
+    ) -> RelationsTraverseIter<LOCKING, T> {
         RelationsTraverseIter {
-            relations: &self.relations,
-            type_hash,
+            world: self,
             incoming: false,
             stack: entities.into_iter().collect(),
             visited: Default::default(),
+            _phantom: Default::default(),
         }
     }
 
-    pub fn traverse_incoming<T>(
+    pub fn traverse_incoming<const LOCKING: bool, T: Component>(
         &self,
         entities: impl IntoIterator<Item = Entity>,
-    ) -> RelationsTraverseIter {
-        self.traverse_incoming_raw(TypeHash::of::<T>(), entities)
-    }
-
-    pub fn traverse_incoming_raw(
-        &self,
-        type_hash: TypeHash,
-        entities: impl IntoIterator<Item = Entity>,
-    ) -> RelationsTraverseIter {
+    ) -> RelationsTraverseIter<LOCKING, T> {
         RelationsTraverseIter {
-            relations: &self.relations,
-            type_hash,
+            world: self,
             incoming: true,
             stack: entities.into_iter().collect(),
             visited: Default::default(),
+            _phantom: Default::default(),
         }
     }
 }
@@ -1204,51 +1368,77 @@ mod tests {
         let b = world.spawn((1u8, false)).unwrap();
         let c = world.spawn((2u8, false)).unwrap();
         let d = world.spawn((3u8, false)).unwrap();
-        world.relate::<Parent>(b, a);
-        world.relate::<Parent>(c, a);
-        world.relate::<Parent>(d, c);
+        world.relate::<true, _>(Parent, b, a).unwrap();
+        world.relate::<true, _>(Parent, c, a).unwrap();
+        world.relate::<true, _>(Parent, d, c).unwrap();
 
         assert_eq!(
-            world.incoming_relations::<Parent>(a).collect::<Vec<_>>(),
+            world
+                .relations_incomming::<true, Parent>(a)
+                .map(|(entity, _, _)| entity)
+                .collect::<Vec<_>>(),
             vec![b, c]
         );
         assert_eq!(
-            world.incoming_relations::<Parent>(b).collect::<Vec<_>>(),
+            world
+                .relations_incomming::<true, Parent>(b)
+                .map(|(entity, _, _)| entity)
+                .collect::<Vec<_>>(),
             vec![]
         );
         assert_eq!(
-            world.incoming_relations::<Parent>(c).collect::<Vec<_>>(),
+            world
+                .relations_incomming::<true, Parent>(c)
+                .map(|(entity, _, _)| entity)
+                .collect::<Vec<_>>(),
             vec![d]
         );
         assert_eq!(
-            world.incoming_relations::<Parent>(d).collect::<Vec<_>>(),
+            world
+                .relations_incomming::<true, Parent>(d)
+                .map(|(entity, _, _)| entity)
+                .collect::<Vec<_>>(),
             vec![]
         );
 
         assert_eq!(
-            world.outgoing_relations::<Parent>(a).collect::<Vec<_>>(),
+            world
+                .relations_outgoing::<true, Parent>(a)
+                .map(|(_, _, entity)| entity)
+                .collect::<Vec<_>>(),
             vec![]
         );
         assert_eq!(
-            world.outgoing_relations::<Parent>(b).collect::<Vec<_>>(),
+            world
+                .relations_outgoing::<true, Parent>(b)
+                .map(|(_, _, entity)| entity)
+                .collect::<Vec<_>>(),
             vec![a]
         );
         assert_eq!(
-            world.outgoing_relations::<Parent>(c).collect::<Vec<_>>(),
+            world
+                .relations_outgoing::<true, Parent>(c)
+                .map(|(_, _, entity)| entity)
+                .collect::<Vec<_>>(),
             vec![a]
         );
         assert_eq!(
-            world.outgoing_relations::<Parent>(d).collect::<Vec<_>>(),
+            world
+                .relations_outgoing::<true, Parent>(d)
+                .map(|(_, _, entity)| entity)
+                .collect::<Vec<_>>(),
             vec![c]
         );
 
         assert_eq!(
-            world.traverse_incoming::<Parent>([a]).collect::<Vec<_>>(),
+            world
+                .traverse_incoming::<true, Parent>([a])
+                .collect::<Vec<_>>(),
             vec![a, b, c, d]
         );
 
         for (entity, _) in world.query::<true, (Entity, Include<Root>)>() {
-            for other in world.incoming_relations::<Parent>(entity) {
+            for (other, _, _) in world.relations_incomming::<true, Parent>(entity) {
                 let mut v = world.get::<true, bool>(other, true).unwrap();
                 let v = v.write().unwrap();
                 *v = !*v;
@@ -1259,6 +1449,11 @@ mod tests {
         assert!(*world.get::<true, bool>(b, false).unwrap().read().unwrap());
         assert!(*world.get::<true, bool>(c, false).unwrap().read().unwrap());
         assert!(!*world.get::<true, bool>(d, false).unwrap().read().unwrap());
+
+        world.unrelate::<true, Parent>(b, a).unwrap();
+        world.unrelate::<true, Parent>(c, a).unwrap();
+        world.unrelate::<true, Parent>(d, c).unwrap();
+        assert!(world.query::<true, &Relation<Parent>>().count() == 0);
     }
 
     #[test]

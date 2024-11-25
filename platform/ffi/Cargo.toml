@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-ffi"
-version = "0.38.1"
+version = "0.39.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "FFI module for Intuicio scripting platform"
@@ -11,6 +11,6 @@ documentation = "https://docs.rs/intuicio-ffi"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-core = { version = "0.38", path = "../core" }
+intuicio-core = { version = "0.39", path = "../core" }
 libffi = "3.2"
 libloading = "0.8"

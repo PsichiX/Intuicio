@@ -1,6 +1,6 @@
 use glow::{
-    Buffer, Context as GlowContext, HasContext, Program, Texture, UniformLocation, VertexArray,
-    ARRAY_BUFFER, BLEND, CLAMP_TO_EDGE, COLOR_BUFFER_BIT, ELEMENT_ARRAY_BUFFER, FLOAT,
+    Buffer, Context as GlowContext, HasContext, PixelUnpackData, Program, Texture, UniformLocation,
+    VertexArray, ARRAY_BUFFER, BLEND, CLAMP_TO_EDGE, COLOR_BUFFER_BIT, ELEMENT_ARRAY_BUFFER, FLOAT,
     FRAGMENT_SHADER, LINEAR, NEAREST, ONE_MINUS_SRC_ALPHA, RGBA, SRC_ALPHA, STATIC_DRAW, TEXTURE0,
     TEXTURE_2D, TEXTURE_MAG_FILTER, TEXTURE_MIN_FILTER, TEXTURE_WRAP_S, TEXTURE_WRAP_T, TRIANGLES,
     UNSIGNED_BYTE, UNSIGNED_INT, VERTEX_SHADER,
@@ -222,7 +222,7 @@ impl Renderer {
                 0,
                 RGBA,
                 UNSIGNED_BYTE,
-                Some(bytes.get_ref()),
+                PixelUnpackData::Slice(Some(bytes.get_ref())),
             );
             let filter = if interpolated { LINEAR } else { NEAREST };
             gl.tex_parameter_i32(TEXTURE_2D, TEXTURE_MIN_FILTER, filter as _);
