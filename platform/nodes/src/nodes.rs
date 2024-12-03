@@ -611,7 +611,7 @@ impl<T: NodeDefinition> NodeGraph<T> {
         &'a self,
         id: NodeId<T>,
         pin: Option<&'a str>,
-    ) -> impl Iterator<Item = &NodeConnection<T>> + 'a {
+    ) -> impl Iterator<Item = &'a NodeConnection<T>> + 'a {
         self.connections.iter().filter(move |connection| {
             connection.to_node == id && pin.map(|pin| connection.to_pin == pin).unwrap_or(true)
         })
@@ -621,7 +621,7 @@ impl<T: NodeDefinition> NodeGraph<T> {
         &'a self,
         id: NodeId<T>,
         pin: Option<&'a str>,
-    ) -> impl Iterator<Item = &NodeConnection<T>> + 'a {
+    ) -> impl Iterator<Item = &'a NodeConnection<T>> + 'a {
         self.connections.iter().filter(move |connection| {
             connection.from_node == id && pin.map(|pin| connection.from_pin == pin).unwrap_or(true)
         })

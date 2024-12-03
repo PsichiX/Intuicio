@@ -47,7 +47,7 @@ pub trait TypedQueryFetch<'a, const LOCKING: bool> {
     fn fetch(access: &mut Self::Access) -> Option<Self::Value>;
 }
 
-impl<'a, const LOCKING: bool> TypedQueryFetch<'a, LOCKING> for () {
+impl<const LOCKING: bool> TypedQueryFetch<'_, LOCKING> for () {
     type Value = ();
     type Access = ();
 
@@ -165,7 +165,7 @@ impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Opt
 
 pub struct Include<T: Component>(PhantomData<fn() -> T>);
 
-impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Include<T> {
+impl<const LOCKING: bool, T: Component> TypedQueryFetch<'_, LOCKING> for Include<T> {
     type Value = ();
     type Access = ();
 
@@ -184,7 +184,7 @@ impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Inc
 
 pub struct Exclude<T: Component>(PhantomData<fn() -> T>);
 
-impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Exclude<T> {
+impl<const LOCKING: bool, T: Component> TypedQueryFetch<'_, LOCKING> for Exclude<T> {
     type Value = ();
     type Access = ();
 

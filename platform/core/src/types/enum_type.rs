@@ -395,13 +395,13 @@ impl EnumVariant {
     pub fn find_fields<'a>(
         &'a self,
         query: StructFieldQuery<'a>,
-    ) -> impl Iterator<Item = &StructField> + '_ {
+    ) -> impl Iterator<Item = &'a StructField> + 'a {
         self.fields
             .iter()
             .filter(move |field| query.is_valid(field))
     }
 
-    pub fn find_field<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&StructField> {
+    pub fn find_field<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&'a StructField> {
         self.find_fields(query).next()
     }
 }
@@ -483,13 +483,13 @@ impl Enum {
     pub fn find_variants<'a>(
         &'a self,
         query: EnumVariantQuery<'a>,
-    ) -> impl Iterator<Item = &EnumVariant> + '_ {
+    ) -> impl Iterator<Item = &'a EnumVariant> + 'a {
         self.variants
             .iter()
             .filter(move |variant| query.is_valid(variant))
     }
 
-    pub fn find_variant<'a>(&'a self, query: EnumVariantQuery<'a>) -> Option<&EnumVariant> {
+    pub fn find_variant<'a>(&'a self, query: EnumVariantQuery<'a>) -> Option<&'a EnumVariant> {
         self.find_variants(query).next()
     }
 

@@ -151,7 +151,7 @@ impl Registry {
     pub fn find_functions<'a>(
         &'a self,
         query: FunctionQuery<'a>,
-    ) -> impl Iterator<Item = FunctionHandle> + '_ {
+    ) -> impl Iterator<Item = FunctionHandle> + 'a {
         self.functions
             .iter()
             .filter(move |handle| query.is_valid(handle.signature()))
@@ -218,7 +218,7 @@ impl Registry {
         self.types.iter()
     }
 
-    pub fn find_types<'a>(&'a self, query: TypeQuery<'a>) -> impl Iterator<Item = TypeHandle> + '_ {
+    pub fn find_types<'a>(&'a self, query: TypeQuery<'a>) -> impl Iterator<Item = TypeHandle> + 'a {
         self.types
             .iter()
             .filter(move |handle| query.is_valid(handle))

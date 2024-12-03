@@ -2,13 +2,19 @@ use intuicio_core::{registry::Registry, IntuicioStruct};
 use intuicio_derive::*;
 
 /// Entity ids start with 1, 0 is considered invalid.
-#[derive(IntuicioStruct, Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(IntuicioStruct, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[intuicio(module_name = "ecs_entity")]
 pub struct Entity {
     #[intuicio(ignore)]
-    pub(crate) generation: u32,
-    #[intuicio(ignore)]
     pub(crate) id: u32,
+    #[intuicio(ignore)]
+    pub(crate) generation: u32,
+}
+
+impl Default for Entity {
+    fn default() -> Self {
+        Self::INVALID
+    }
 }
 
 #[intuicio_methods(module_name = "ecs_entity")]
@@ -17,7 +23,7 @@ impl Entity {
 
     pub const fn new(id: u32, generation: u32) -> Option<Self> {
         if id < u32::MAX {
-            Some(Self { generation, id })
+            Some(Self { id, generation })
         } else {
             None
         }
@@ -25,7 +31,7 @@ impl Entity {
 
     /// # Safety
     pub const unsafe fn new_unchecked(id: u32, generation: u32) -> Self {
-        Self { generation, id }
+        Self { id, generation }
     }
 
     #[intuicio_method()]

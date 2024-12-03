@@ -116,7 +116,7 @@ pub struct LifetimeStateAccess<'a> {
     unlock: bool,
 }
 
-impl<'a> Drop for LifetimeStateAccess<'a> {
+impl Drop for LifetimeStateAccess<'_> {
     fn drop(&mut self) {
         if self.unlock {
             self.state.locked.store(false, Ordering::Release);
@@ -124,7 +124,7 @@ impl<'a> Drop for LifetimeStateAccess<'a> {
     }
 }
 
-impl<'a> LifetimeStateAccess<'a> {
+impl LifetimeStateAccess<'_> {
     pub fn state(&self) -> &LifetimeState {
         self.state
     }
@@ -714,7 +714,7 @@ pub struct ValueReadAccess<'a, T: 'a + ?Sized> {
     data: &'a T,
 }
 
-impl<'a, T: ?Sized> Drop for ValueReadAccess<'a, T> {
+impl<T: ?Sized> Drop for ValueReadAccess<'_, T> {
     fn drop(&mut self) {
         unsafe { self.lifetime.lock_unchecked().release_read_access() };
     }
@@ -727,7 +727,7 @@ impl<'a, T: ?Sized> ValueReadAccess<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> Deref for ValueReadAccess<'a, T> {
+impl<T: ?Sized> Deref for ValueReadAccess<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -756,7 +756,7 @@ pub struct ValueWriteAccess<'a, T: 'a + ?Sized> {
     data: &'a mut T,
 }
 
-impl<'a, T: ?Sized> Drop for ValueWriteAccess<'a, T> {
+impl<T: ?Sized> Drop for ValueWriteAccess<'_, T> {
     fn drop(&mut self) {
         unsafe { self.lifetime.lock_unchecked().release_write_access() };
     }
@@ -769,7 +769,7 @@ impl<'a, T: ?Sized> ValueWriteAccess<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> Deref for ValueWriteAccess<'a, T> {
+impl<T: ?Sized> Deref for ValueWriteAccess<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -777,7 +777,7 @@ impl<'a, T: ?Sized> Deref for ValueWriteAccess<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> DerefMut for ValueWriteAccess<'a, T> {
+impl<T: ?Sized> DerefMut for ValueWriteAccess<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.data
     }

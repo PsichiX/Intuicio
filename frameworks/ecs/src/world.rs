@@ -430,7 +430,7 @@ pub struct RelationsTraverseIter<'a, const LOCKING: bool, T: Component> {
     _phantom: PhantomData<fn() -> T>,
 }
 
-impl<'a, const LOCKING: bool, T: Component> Iterator for RelationsTraverseIter<'a, LOCKING, T> {
+impl<const LOCKING: bool, T: Component> Iterator for RelationsTraverseIter<'_, LOCKING, T> {
     type Item = Entity;
 
     fn next(&mut self) -> Option<Self::Item> {

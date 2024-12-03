@@ -170,7 +170,7 @@ impl Type {
     pub fn find_struct_fields<'a>(
         &'a self,
         query: StructFieldQuery<'a>,
-    ) -> Option<impl Iterator<Item = &StructField> + '_> {
+    ) -> Option<impl Iterator<Item = &'a StructField> + 'a> {
         if let Self::Struct(value) = self {
             Some(value.find_fields(query))
         } else {
@@ -178,7 +178,7 @@ impl Type {
         }
     }
 
-    pub fn find_struct_field<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&StructField> {
+    pub fn find_struct_field<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&'a StructField> {
         if let Self::Struct(value) = self {
             value.find_field(query)
         } else {
@@ -189,7 +189,7 @@ impl Type {
     pub fn find_enum_variants<'a>(
         &'a self,
         query: EnumVariantQuery<'a>,
-    ) -> Option<impl Iterator<Item = &EnumVariant> + '_> {
+    ) -> Option<impl Iterator<Item = &'a EnumVariant> + 'a> {
         if let Self::Enum(value) = self {
             Some(value.find_variants(query))
         } else {
@@ -197,7 +197,7 @@ impl Type {
         }
     }
 
-    pub fn find_enum_variant<'a>(&'a self, query: EnumVariantQuery<'a>) -> Option<&EnumVariant> {
+    pub fn find_enum_variant<'a>(&'a self, query: EnumVariantQuery<'a>) -> Option<&'a EnumVariant> {
         if let Self::Enum(value) = self {
             value.find_variant(query)
         } else {
@@ -279,7 +279,7 @@ pub struct StructFieldQuery<'a> {
     pub meta: Option<MetaQuery>,
 }
 
-impl<'a> StructFieldQuery<'a> {
+impl StructFieldQuery<'_> {
     pub fn is_valid(&self, field: &StructField) -> bool {
         self.name
             .as_ref()
@@ -321,7 +321,7 @@ pub struct EnumVariantQuery<'a> {
     pub meta: Option<MetaQuery>,
 }
 
-impl<'a> EnumVariantQuery<'a> {
+impl EnumVariantQuery<'_> {
     pub fn is_valid(&self, variant: &EnumVariant) -> bool {
         self.name
             .as_ref()
@@ -368,7 +368,7 @@ pub enum TypeKindQuery<'a> {
     },
 }
 
-impl<'a> TypeKindQuery<'a> {
+impl TypeKindQuery<'_> {
     pub fn is_valid(&self, type_: &Type) -> bool {
         match (self, type_) {
             (Self::None, _) => true,

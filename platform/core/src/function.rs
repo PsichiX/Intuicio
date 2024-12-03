@@ -273,7 +273,7 @@ pub struct FunctionQueryParameter<'a> {
     pub meta: Option<FunctionMetaQuery>,
 }
 
-impl<'a> FunctionQueryParameter<'a> {
+impl FunctionQueryParameter<'_> {
     pub fn is_valid(&self, parameter: &FunctionParameter) -> bool {
         self.name
             .as_ref()
@@ -314,7 +314,7 @@ pub struct FunctionQuery<'a> {
     pub meta: Option<FunctionMetaQuery>,
 }
 
-impl<'a> FunctionQuery<'a> {
+impl FunctionQuery<'_> {
     pub fn is_valid(&self, signature: &FunctionSignature) -> bool {
         self.name
             .as_ref()

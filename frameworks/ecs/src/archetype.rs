@@ -129,7 +129,7 @@ pub struct ArchetypeColumnAccess<'a, const LOCKING: bool, T: Component> {
     _phantom: PhantomData<fn() -> T>,
 }
 
-impl<'a, const LOCKING: bool, T: Component> Drop for ArchetypeColumnAccess<'a, LOCKING, T> {
+impl<const LOCKING: bool, T: Component> Drop for ArchetypeColumnAccess<'_, LOCKING, T> {
     fn drop(&mut self) {
         if self.unique {
             if LOCKING {
@@ -153,10 +153,15 @@ impl<'a, const LOCKING: bool, T: Component> Drop for ArchetypeColumnAccess<'a, L
     }
 }
 
-impl<'a, const LOCKING: bool, T: Component> ArchetypeColumnAccess<'a, LOCKING, T> {
+impl<const LOCKING: bool, T: Component> ArchetypeColumnAccess<'_, LOCKING, T> {
     #[inline]
     pub fn info(&self) -> &ArchetypeColumnInfo {
         &self.column.info
+    }
+
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.size
     }
 
     #[inline]
@@ -217,7 +222,7 @@ pub struct ArchetypeDynamicColumnAccess<'a, const LOCKING: bool> {
     unique: bool,
 }
 
-impl<'a, const LOCKING: bool> Drop for ArchetypeDynamicColumnAccess<'a, LOCKING> {
+impl<const LOCKING: bool> Drop for ArchetypeDynamicColumnAccess<'_, LOCKING> {
     fn drop(&mut self) {
         if self.unique {
             if LOCKING {
@@ -241,10 +246,15 @@ impl<'a, const LOCKING: bool> Drop for ArchetypeDynamicColumnAccess<'a, LOCKING>
     }
 }
 
-impl<'a, const LOCKING: bool> ArchetypeDynamicColumnAccess<'a, LOCKING> {
+impl<const LOCKING: bool> ArchetypeDynamicColumnAccess<'_, LOCKING> {
     #[inline]
     pub fn info(&self) -> &ArchetypeColumnInfo {
         &self.column.info
+    }
+
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.size
     }
 
     #[inline]
@@ -306,7 +316,7 @@ pub struct ArchetypeEntityColumnAccess<'a, const LOCKING: bool, T: Component> {
     _phantom: PhantomData<fn() -> T>,
 }
 
-impl<'a, const LOCKING: bool, T: Component> Drop for ArchetypeEntityColumnAccess<'a, LOCKING, T> {
+impl<const LOCKING: bool, T: Component> Drop for ArchetypeEntityColumnAccess<'_, LOCKING, T> {
     fn drop(&mut self) {
         if self.unique {
             if LOCKING {
@@ -330,7 +340,7 @@ impl<'a, const LOCKING: bool, T: Component> Drop for ArchetypeEntityColumnAccess
     }
 }
 
-impl<'a, const LOCKING: bool, T: Component> ArchetypeEntityColumnAccess<'a, LOCKING, T> {
+impl<const LOCKING: bool, T: Component> ArchetypeEntityColumnAccess<'_, LOCKING, T> {
     #[inline]
     pub fn info(&self) -> &ArchetypeColumnInfo {
         &self.column.info
@@ -380,7 +390,7 @@ pub struct ArchetypeDynamicEntityColumnAccess<'a, const LOCKING: bool> {
     unique: bool,
 }
 
-impl<'a, const LOCKING: bool> Drop for ArchetypeDynamicEntityColumnAccess<'a, LOCKING> {
+impl<const LOCKING: bool> Drop for ArchetypeDynamicEntityColumnAccess<'_, LOCKING> {
     fn drop(&mut self) {
         if self.unique {
             if LOCKING {
@@ -404,7 +414,7 @@ impl<'a, const LOCKING: bool> Drop for ArchetypeDynamicEntityColumnAccess<'a, LO
     }
 }
 
-impl<'a, const LOCKING: bool> ArchetypeDynamicEntityColumnAccess<'a, LOCKING> {
+impl<const LOCKING: bool> ArchetypeDynamicEntityColumnAccess<'_, LOCKING> {
     #[inline]
     pub fn info(&self) -> &ArchetypeColumnInfo {
         &self.column.info
@@ -457,7 +467,7 @@ pub struct ArchetypeEntityRowAccess<'a> {
     index: usize,
 }
 
-impl<'a> Drop for ArchetypeEntityRowAccess<'a> {
+impl Drop for ArchetypeEntityRowAccess<'_> {
     fn drop(&mut self) {
         for column in self.columns.as_ref() {
             while column
@@ -587,7 +597,7 @@ pub struct ArchetypeColumnWriteIter<'a, const LOCKING: bool, T: Component> {
     _phantom: PhantomData<fn() -> &'a mut T>,
 }
 
-impl<'a, const LOCKING: bool, T: Component> Drop for ArchetypeColumnWriteIter<'a, LOCKING, T> {
+impl<const LOCKING: bool, T: Component> Drop for ArchetypeColumnWriteIter<'_, LOCKING, T> {
     fn drop(&mut self) {
         if LOCKING {
             while self
@@ -636,7 +646,7 @@ pub struct ArchetypeDynamicColumnItem<'a> {
     _phantom: PhantomData<&'a ()>,
 }
 
-impl<'a> ArchetypeDynamicColumnItem<'a> {
+impl ArchetypeDynamicColumnItem<'_> {
     pub fn is_unique(&self) -> bool {
         self.unique
     }
@@ -676,7 +686,7 @@ pub struct ArchetypeDynamicColumnIter<'a, const LOCKING: bool> {
     unique: bool,
 }
 
-impl<'a, const LOCKING: bool> Drop for ArchetypeDynamicColumnIter<'a, LOCKING> {
+impl<const LOCKING: bool> Drop for ArchetypeDynamicColumnIter<'_, LOCKING> {
     fn drop(&mut self) {
         if self.unique {
             if LOCKING {
@@ -1160,7 +1170,7 @@ impl Archetype {
             .map(|column| column.dynamic_column_access::<LOCKING>(true, self.size))
             .collect::<Result<Vec<_>, _>>()?;
         for access in access {
-            for index in 0..self.size {
+            for index in 0..access.size() {
                 unsafe {
                     (access.info().finalizer())(access.data(index).unwrap().cast());
                 }
@@ -1264,37 +1274,32 @@ impl Archetype {
         }
         let index_to = other.entity_dense_map.insert(entity).unwrap();
         let index_from = self.entity_dense_map.remove(entity).unwrap();
-        let to_initialize = ArchetypeEntityRowAccess::new(
-            other
-                .columns
-                .as_ref()
-                .iter()
-                .filter(|column| {
-                    !self
-                        .columns
-                        .as_ref()
-                        .iter()
-                        .any(|c| column.info.type_hash == c.info.type_hash)
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            index_to,
-        );
-        let to_finalize = ArchetypeEntityRowAccess::new(
-            self.columns
-                .as_ref()
-                .iter()
-                .filter(|column| {
-                    !other
-                        .columns
-                        .as_ref()
-                        .iter()
-                        .any(|c| column.info.type_hash == c.info.type_hash)
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            index_from,
-        );
+        let columns = other
+            .columns
+            .as_ref()
+            .iter()
+            .filter(|column| {
+                !self
+                    .columns
+                    .as_ref()
+                    .iter()
+                    .any(|c| column.info.type_hash == c.info.type_hash)
+            })
+            .collect::<Vec<_>>();
+        let to_initialize = ArchetypeEntityRowAccess::new(columns.into_boxed_slice(), index_to);
+        let columns = self
+            .columns
+            .as_ref()
+            .iter()
+            .filter(|column| {
+                !other
+                    .columns
+                    .as_ref()
+                    .iter()
+                    .any(|c| column.info.type_hash == c.info.type_hash)
+            })
+            .collect::<Vec<_>>();
+        let to_finalize = ArchetypeEntityRowAccess::new(columns.into_boxed_slice(), index_from);
         self.size -= 1;
         other.size += 1;
         let (to_move_from, to_move_to): (Vec<_>, Vec<_>) = self
@@ -1329,6 +1334,15 @@ impl Archetype {
             unsafe {
                 let data = column.memory.add(index_from * column.info.layout.size());
                 (column.info.finalizer)(data.cast());
+            }
+        }
+        if index_from < self.size {
+            for column in self.columns.as_ref().iter() {
+                unsafe {
+                    let source = column.memory.add(self.size * column.info.layout.size());
+                    let target = column.memory.add(index_from * column.info.layout.size());
+                    source.copy_to(target, column.info.layout.size());
+                }
             }
         }
         Ok(to_initialize)

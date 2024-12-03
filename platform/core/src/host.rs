@@ -161,7 +161,7 @@ pub struct HostFunctionCall<'a, I: DataStackPack, O: DataStackPack> {
     _phantom: PhantomData<(I, O)>,
 }
 
-impl<'a, I: DataStackPack, O: DataStackPack> HostFunctionCall<'a, I, O> {
+impl<I: DataStackPack, O: DataStackPack> HostFunctionCall<'_, I, O> {
     pub fn run(self, inputs: I) -> O {
         self.handle.call(self.context, self.registry, inputs, false)
     }

@@ -94,7 +94,7 @@ pub enum ScriptOperation<'a, SE: ScriptExpression> {
     ContinueScopeConditionally,
 }
 
-impl<'a, SE: ScriptExpression> ScriptOperation<'a, SE> {
+impl<SE: ScriptExpression> ScriptOperation<'_, SE> {
     pub fn label(&self) -> &str {
         match self {
             Self::None => "None",
@@ -116,7 +116,7 @@ impl<'a, SE: ScriptExpression> ScriptOperation<'a, SE> {
 
 pub struct ScriptBuilder<'a, SE: ScriptExpression>(Script<'a, SE>);
 
-impl<'a, SE: ScriptExpression> Default for ScriptBuilder<'a, SE> {
+impl<SE: ScriptExpression> Default for ScriptBuilder<'_, SE> {
     fn default() -> Self {
         Self(vec![])
     }
@@ -202,7 +202,7 @@ pub struct ScriptFunctionParameter<'a> {
     pub type_query: TypeQuery<'a>,
 }
 
-impl<'a> ScriptFunctionParameter<'a> {
+impl ScriptFunctionParameter<'_> {
     pub fn build(&self, registry: &Registry) -> FunctionParameter {
         FunctionParameter {
             meta: self.meta.to_owned(),
@@ -227,7 +227,7 @@ pub struct ScriptFunctionSignature<'a> {
     pub outputs: Vec<ScriptFunctionParameter<'a>>,
 }
 
-impl<'a> ScriptFunctionSignature<'a> {
+impl ScriptFunctionSignature<'_> {
     pub fn build(&self, registry: &Registry) -> FunctionSignature {
         FunctionSignature {
             meta: self.meta.to_owned(),
@@ -303,7 +303,7 @@ pub struct ScriptStructField<'a> {
     pub type_query: TypeQuery<'a>,
 }
 
-impl<'a> ScriptStructField<'a> {
+impl ScriptStructField<'_> {
     pub fn build(&self, registry: &Registry) -> StructField {
         let mut result = StructField::new(
             &self.name,
@@ -328,7 +328,7 @@ pub struct ScriptStruct<'a> {
     pub fields: Vec<ScriptStructField<'a>>,
 }
 
-impl<'a> ScriptStruct<'a> {
+impl ScriptStruct<'_> {
     pub fn declare(&self, registry: &mut Registry) {
         let mut builder = RuntimeStructBuilder::new(&self.name);
         builder = builder.visibility(self.visibility);
@@ -390,7 +390,7 @@ pub struct ScriptEnumVariant<'a> {
     pub discriminant: Option<u8>,
 }
 
-impl<'a> ScriptEnumVariant<'a> {
+impl ScriptEnumVariant<'_> {
     pub fn build(&self, registry: &Registry) -> EnumVariant {
         let mut result = EnumVariant::new(&self.name);
         result.fields = self
@@ -413,7 +413,7 @@ pub struct ScriptEnum<'a> {
     pub default_variant: Option<u8>,
 }
 
-impl<'a> ScriptEnum<'a> {
+impl ScriptEnum<'_> {
     pub fn declare(&self, registry: &mut Registry) {
         let mut builder = RuntimeEnumBuilder::new(&self.name);
         if let Some(discriminant) = self.default_variant {
@@ -493,7 +493,7 @@ pub struct ScriptModule<'a, SE: ScriptExpression> {
     pub functions: Vec<ScriptFunction<'a, SE>>,
 }
 
-impl<'a, SE: ScriptExpression> ScriptModule<'a, SE> {
+impl<SE: ScriptExpression> ScriptModule<'_, SE> {
     pub fn fix_module_names(&mut self) {
         for type_ in &mut self.structs {
             type_.module_name = Some(self.name.to_owned());

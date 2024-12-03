@@ -83,8 +83,14 @@ pub struct ManagedValueTransformer<T>(PhantomData<fn() -> T>);
 
 impl<T> ValueTransformer for ManagedValueTransformer<T> {
     type Type = T;
-    type Borrow<'r> = ValueReadAccess<'r, T> where Self::Type: 'r;
-    type BorrowMut<'r> = ValueWriteAccess<'r, T> where Self::Type: 'r;
+    type Borrow<'r>
+        = ValueReadAccess<'r, T>
+    where
+        Self::Type: 'r;
+    type BorrowMut<'r>
+        = ValueWriteAccess<'r, T>
+    where
+        Self::Type: 'r;
     type Dependency = ManagedValueDependency;
     type Owned = Managed<T>;
     type Ref = ManagedRef<T>;
@@ -139,8 +145,14 @@ pub struct ManagedBoxValueTransformer<T: Clone>(PhantomData<fn() -> T>);
 
 impl<T: Clone> ValueTransformer for ManagedBoxValueTransformer<T> {
     type Type = T;
-    type Borrow<'r> = ValueReadAccess<'r, T> where Self::Type: 'r;
-    type BorrowMut<'r> = ValueWriteAccess<'r, T> where Self::Type: 'r;
+    type Borrow<'r>
+        = ValueReadAccess<'r, T>
+    where
+        Self::Type: 'r;
+    type BorrowMut<'r>
+        = ValueWriteAccess<'r, T>
+    where
+        Self::Type: 'r;
     type Dependency = ManagedValueDependency;
     type Owned = ManagedBox<T>;
     type Ref = ManagedRef<T>;
@@ -195,8 +207,14 @@ pub struct DynamicManagedValueTransformer<T: 'static>(PhantomData<fn() -> T>);
 
 impl<T: 'static> ValueTransformer for DynamicManagedValueTransformer<T> {
     type Type = T;
-    type Borrow<'r> = ValueReadAccess<'r, T> where Self::Type: 'r;
-    type BorrowMut<'r> = ValueWriteAccess<'r, T> where Self::Type: 'r;
+    type Borrow<'r>
+        = ValueReadAccess<'r, T>
+    where
+        Self::Type: 'r;
+    type BorrowMut<'r>
+        = ValueWriteAccess<'r, T>
+    where
+        Self::Type: 'r;
     type Dependency = ManagedValueDependency;
     type Owned = DynamicManaged;
     type Ref = DynamicManagedRef;
@@ -251,8 +269,14 @@ pub struct DynamicManagedBoxValueTransformer<T: Clone + 'static>(PhantomData<fn(
 
 impl<T: Clone + 'static> ValueTransformer for DynamicManagedBoxValueTransformer<T> {
     type Type = T;
-    type Borrow<'r> = ValueReadAccess<'r, T> where Self::Type: 'r;
-    type BorrowMut<'r> = ValueWriteAccess<'r, T> where Self::Type: 'r;
+    type Borrow<'r>
+        = ValueReadAccess<'r, T>
+    where
+        Self::Type: 'r;
+    type BorrowMut<'r>
+        = ValueWriteAccess<'r, T>
+    where
+        Self::Type: 'r;
     type Dependency = ManagedValueDependency;
     type Owned = DynamicManagedBox;
     type Ref = DynamicManagedRef;

@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-plugins"
-version = "0.39.0"
+version = "0.39.1"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Plugins module for Intuicio scripting platform"

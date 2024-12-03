@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use gc::{Finalize as GcFinalize, Gc, Trace as GcTrace};
 use intuicio_core::prelude::*;
 use intuicio_derive::*;

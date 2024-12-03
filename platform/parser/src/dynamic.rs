@@ -380,7 +380,7 @@ pub struct DynamicExtensionCall<'a> {
     lifetimes: Vec<Lifetime>,
 }
 
-impl<'a> DynamicExtensionCall<'a> {
+impl DynamicExtensionCall<'_> {
     pub fn arg(mut self, value: impl Into<Value>) -> Self {
         self.args.push(value.into());
         self

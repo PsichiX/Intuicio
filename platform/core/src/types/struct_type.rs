@@ -400,13 +400,13 @@ impl Struct {
     pub fn find_fields<'a>(
         &'a self,
         query: StructFieldQuery<'a>,
-    ) -> impl Iterator<Item = &StructField> + '_ {
+    ) -> impl Iterator<Item = &'a StructField> + 'a {
         self.fields
             .iter()
             .filter(move |field| query.is_valid(field))
     }
 
-    pub fn find_field<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&StructField> {
+    pub fn find_field<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&'a StructField> {
         self.find_fields(query).next()
     }
 

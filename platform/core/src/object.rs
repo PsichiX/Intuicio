@@ -202,7 +202,7 @@ impl Object {
     }
 
     /// # Safety
-    pub unsafe fn field_memory<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&[u8]> {
+    pub unsafe fn field_memory<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&'a [u8]> {
         match &*self.handle {
             Type::Struct(type_) => {
                 let field = type_.find_field(query)?;
@@ -227,7 +227,7 @@ impl Object {
     pub unsafe fn field_memory_mut<'a>(
         &'a mut self,
         query: StructFieldQuery<'a>,
-    ) -> Option<&mut [u8]> {
+    ) -> Option<&'a mut [u8]> {
         match &*self.handle {
             Type::Struct(type_) => {
                 let field = type_.find_field(query)?;
