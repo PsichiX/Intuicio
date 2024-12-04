@@ -1005,6 +1005,17 @@ impl World {
         Ok(())
     }
 
+    pub fn has_relation<const LOCKING: bool, T: Component>(
+        &self,
+        from: Entity,
+        to: Entity,
+    ) -> bool {
+        self.get::<LOCKING, Relation<T>>(from, false)
+            .ok()
+            .and_then(|relation| Some(relation.read()?.has(to)))
+            .unwrap_or_default()
+    }
+
     pub fn relations<const LOCKING: bool, T: Component>(
         &self,
     ) -> impl Iterator<Item = (Entity, &T, Entity)> + '_ {
