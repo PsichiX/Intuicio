@@ -1124,7 +1124,10 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::{Exclude, Include, Update};
+    use crate::{
+        commands::{CommandBuffer, DespawnCommand},
+        query::{Exclude, Include, Update},
+    };
     use std::{
         sync::{Arc, RwLock},
         thread::spawn,
@@ -1331,17 +1334,53 @@ mod tests {
     }
 
     #[test]
-    fn test_updating_queries() {
+    fn test_change_detection() {
         let mut world = World::default();
+
         for index in 0..10usize {
             world.spawn((index,)).unwrap();
         }
+        let mut list = world.added().iter_of::<usize>().collect::<Vec<_>>();
+        list.sort();
+        assert_eq!(
+            list,
+            (0..10)
+                .map(|index| Entity::new(index, 0).unwrap())
+                .collect::<Vec<_>>()
+        );
+
         for mut v in world.query::<true, Update<usize>>() {
             *v.write_notified(&world) *= 2;
         }
         for (entity, v) in world.query::<true, (Entity, &usize)>() {
             assert_eq!(entity.id() as usize * 2, *v);
         }
+        let mut list = world
+            .updated()
+            .unwrap()
+            .iter_of::<usize>()
+            .collect::<Vec<_>>();
+        list.sort();
+        assert_eq!(
+            list,
+            (0..10)
+                .map(|index| Entity::new(index, 0).unwrap())
+                .collect::<Vec<_>>()
+        );
+
+        let mut commands = CommandBuffer::default();
+        for entity in world.entities() {
+            commands.command(DespawnCommand::new(entity));
+        }
+        commands.execute(&mut world);
+        let mut list = world.removed().iter_of::<usize>().collect::<Vec<_>>();
+        list.sort();
+        assert_eq!(
+            list,
+            (0..10)
+                .map(|index| Entity::new(index, 0).unwrap())
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
