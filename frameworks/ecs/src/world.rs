@@ -330,7 +330,11 @@ impl<T: Component> Relation<T> {
             RelationConnections::Zero(_) => RelationConnections::One([(payload, entity)]),
             RelationConnections::One([a]) => RelationConnections::More(vec![a, (payload, entity)]),
             RelationConnections::More(mut vec) => {
-                vec.push((payload, entity));
+                if let Some(index) = vec.iter().position(|item| item.1 == entity) {
+                    vec[index].0 = payload;
+                } else {
+                    vec.push((payload, entity));
+                }
                 RelationConnections::More(vec)
             }
         };
