@@ -738,6 +738,14 @@ impl DynamicManaged {
         &self.lifetime
     }
 
+    pub fn layout(&self) -> &Layout {
+        &self.layout
+    }
+
+    pub fn finalizer(&self) -> unsafe fn(*mut ()) {
+        self.finalizer
+    }
+
     /// # Safety
     pub unsafe fn memory(&self) -> &[u8] {
         std::slice::from_raw_parts(self.memory, self.layout.size())

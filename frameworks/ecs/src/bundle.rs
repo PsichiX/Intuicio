@@ -3,7 +3,60 @@ use crate::{
     Component,
 };
 use intuicio_core::object::{DynamicObject, TypedDynamicObject};
+use intuicio_data::{managed::DynamicManaged, type_hash::TypeHash};
 use std::alloc::dealloc;
+
+#[derive(Default)]
+pub struct DynamicBundle {
+    components: Vec<DynamicManaged>,
+}
+
+impl DynamicBundle {
+    pub fn with_component<T>(mut self, data: T) -> Result<Self, T> {
+        self.add_component(data)?;
+        Ok(self)
+    }
+
+    pub fn with_component_raw(mut self, data: DynamicManaged) -> Self {
+        self.add_component_raw(data);
+        self
+    }
+
+    pub fn add_component<T>(&mut self, data: T) -> Result<(), T> {
+        self.add_component_raw(DynamicManaged::new(data)?);
+        Ok(())
+    }
+
+    pub fn add_component_raw(&mut self, data: DynamicManaged) {
+        if let Some(index) = self
+            .components
+            .iter()
+            .position(|component| component.type_hash() == data.type_hash())
+        {
+            self.components[index] = data;
+        } else {
+            self.components.push(data);
+        }
+    }
+
+    pub fn remove_component<T>(&mut self) -> Option<T> {
+        self.remove_component_raw(TypeHash::of::<T>())?
+            .consume()
+            .ok()
+    }
+
+    pub fn remove_component_raw(&mut self, type_hash: TypeHash) -> Option<DynamicManaged> {
+        if let Some(index) = self
+            .components
+            .iter()
+            .position(|component| component.type_hash() == &type_hash)
+        {
+            Some(self.components.swap_remove(index))
+        } else {
+            None
+        }
+    }
+}
 
 pub trait BundleColumns {
     fn columns_static() -> Vec<ArchetypeColumnInfo>;
@@ -71,6 +124,25 @@ impl BundleColumns for TypedDynamicObject {
     }
 }
 
+impl BundleColumns for DynamicBundle {
+    fn columns_static() -> Vec<ArchetypeColumnInfo> {
+        vec![]
+    }
+
+    fn columns(&self) -> Vec<ArchetypeColumnInfo> {
+        self.components
+            .iter()
+            .map(|component| unsafe {
+                ArchetypeColumnInfo::new_raw(
+                    *component.type_hash(),
+                    *component.layout(),
+                    component.finalizer(),
+                )
+            })
+            .collect()
+    }
+}
+
 macro_rules! impl_bundle_columns_tuple {
     ($($type:ident),+) => {
         impl<$($type: Component),+> BundleColumns for ($($type,)+) {
@@ -127,6 +199,19 @@ impl Bundle for TypedDynamicObject {
                 let target_memory = access.data(handle.type_hash()).unwrap();
                 target_memory.copy_from(source_memory, handle.layout().size());
                 dealloc(source_memory, *handle.layout());
+            }
+        }
+    }
+}
+
+impl Bundle for DynamicBundle {
+    fn initialize_into(self, access: &ArchetypeEntityRowAccess) {
+        for component in self.components {
+            unsafe {
+                let (type_hash, _, source_memory, layout, _) = component.into_inner();
+                let target_memory = access.data(type_hash).unwrap();
+                target_memory.copy_from(source_memory, layout.size());
+                dealloc(source_memory, layout);
             }
         }
     }

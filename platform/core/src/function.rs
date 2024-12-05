@@ -228,37 +228,41 @@ impl Function {
         verify: bool,
     ) -> O {
         if verify {
-            let input_types = I::pack_types();
-            if input_types.len() != self.signature.inputs.len() {
-                panic!("Function: {} got wrong inputs number!", self.signature.name);
-            }
-            let output_types = O::pack_types();
-            if output_types.len() != self.signature.outputs.len() {
-                panic!(
-                    "Function: {} got wrong outputs number!",
-                    self.signature.name
-                );
-            }
-            for (parameter, type_hash) in self.signature.inputs.iter().zip(input_types) {
-                if parameter.type_handle.type_hash() != type_hash {
-                    panic!(
-                        "Function: {} input parameter: {} got wrong value type!",
-                        self.signature.name, parameter.name
-                    );
-                }
-            }
-            for (parameter, type_hash) in self.signature.outputs.iter().zip(output_types) {
-                if parameter.type_handle.type_hash() != type_hash {
-                    panic!(
-                        "Function: {} output parameter: {} got wrong value type!",
-                        self.signature.name, parameter.name
-                    );
-                }
-            }
+            self.verify_inputs_outputs::<O, I>();
         }
         inputs.stack_push_reversed(context.stack());
         self.invoke(context, registry);
         O::stack_pop(context.stack())
+    }
+
+    pub fn verify_inputs_outputs<O: DataStackPack, I: DataStackPack>(&self) {
+        let input_types = I::pack_types();
+        if input_types.len() != self.signature.inputs.len() {
+            panic!("Function: {} got wrong inputs number!", self.signature.name);
+        }
+        let output_types = O::pack_types();
+        if output_types.len() != self.signature.outputs.len() {
+            panic!(
+                "Function: {} got wrong outputs number!",
+                self.signature.name
+            );
+        }
+        for (parameter, type_hash) in self.signature.inputs.iter().zip(input_types) {
+            if parameter.type_handle.type_hash() != type_hash {
+                panic!(
+                    "Function: {} input parameter: {} got wrong value type!",
+                    self.signature.name, parameter.name
+                );
+            }
+        }
+        for (parameter, type_hash) in self.signature.outputs.iter().zip(output_types) {
+            if parameter.type_handle.type_hash() != type_hash {
+                panic!(
+                    "Function: {} output parameter: {} got wrong value type!",
+                    self.signature.name, parameter.name
+                );
+            }
+        }
     }
 
     pub fn into_handle(self) -> FunctionHandle {

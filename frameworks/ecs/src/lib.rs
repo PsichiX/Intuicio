@@ -1,3 +1,4 @@
+pub mod actor;
 pub mod archetype;
 pub mod bundle;
 pub mod commands;
