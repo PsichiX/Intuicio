@@ -6,7 +6,7 @@ use crate::{
     bundle::{Bundle, BundleColumns},
     entity::Entity,
     query::{DynamicQueryFilter, DynamicQueryIter, TypedQueryFetch, TypedQueryIter},
-    Component,
+    Component, ComponentRef, ComponentRefMut,
 };
 use intuicio_data::type_hash::TypeHash;
 use std::{
@@ -464,7 +464,7 @@ impl<const LOCKING: bool, T: Component> Iterator for RelationsTraverseIter<'_, L
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct WorldChanges {
     table: HashMap<Entity, Vec<TypeHash>>,
 }
@@ -914,6 +914,24 @@ impl World {
             .and_then(|index| self.archetypes.get(index))
             .map(|archetype| archetype.has_type(component))
             .unwrap_or_default()
+    }
+
+    pub fn component<const LOCKING: bool, T: Component>(
+        &self,
+        entity: Entity,
+    ) -> Result<ComponentRef<LOCKING, T>, WorldError> {
+        Ok(ComponentRef {
+            inner: self.get::<LOCKING, T>(entity, false)?,
+        })
+    }
+
+    pub fn component_mut<const LOCKING: bool, T: Component>(
+        &self,
+        entity: Entity,
+    ) -> Result<ComponentRefMut<LOCKING, T>, WorldError> {
+        Ok(ComponentRefMut {
+            inner: self.get::<LOCKING, T>(entity, true)?,
+        })
     }
 
     pub fn get<const LOCKING: bool, T: Component>(

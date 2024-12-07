@@ -1,8 +1,9 @@
 use crate::{
-    archetype::ArchetypeEntityColumnAccess,
-    bundle::Bundle,
+    archetype::ArchetypeColumnInfo,
+    bundle::{Bundle, BundleColumns},
     entity::Entity,
     world::{Relation, World, WorldError},
+    Component, ComponentRef, ComponentRefMut,
 };
 use intuicio_core::{context::Context, function::FunctionHandle, registry::Registry};
 use intuicio_data::{
@@ -24,7 +25,7 @@ pub struct ActorParent;
 #[derive(Debug, Default, Clone)]
 pub struct ActorMessageListeners(HashMap<String, FunctionHandle>);
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Actor(Entity);
 
 impl Actor {
@@ -46,6 +47,26 @@ impl Actor {
         world.despawn(self.0)
     }
 
+    pub fn insert(
+        self,
+        world: &mut World,
+        bundle: impl Bundle + Send + Sync + 'static,
+    ) -> Result<(), WorldError> {
+        world.insert(self.0, bundle)
+    }
+
+    pub fn remove<T: BundleColumns>(self, world: &mut World) -> Result<(), WorldError> {
+        world.remove::<T>(self.0)
+    }
+
+    pub fn remove_raw(
+        self,
+        world: &mut World,
+        columns: Vec<ArchetypeColumnInfo>,
+    ) -> Result<(), WorldError> {
+        world.remove_raw(self.0, columns)
+    }
+
     pub fn exists(self, world: &World) -> bool {
         world.has_entity(self.0)
     }
@@ -54,18 +75,18 @@ impl Actor {
         self.0
     }
 
-    pub fn component<const LOCKING: bool, T: Send + Sync + 'static>(
+    pub fn component<const LOCKING: bool, T: Component>(
         self,
         world: &World,
-    ) -> Result<ActorComponent<LOCKING, T>, WorldError> {
-        Ok(ActorComponent(world.get::<LOCKING, T>(self.0, false)?))
+    ) -> Result<ComponentRef<LOCKING, T>, WorldError> {
+        world.component::<LOCKING, T>(self.0)
     }
 
-    pub fn component_mut<const LOCKING: bool, T: Send + Sync + 'static>(
+    pub fn component_mut<const LOCKING: bool, T: Component>(
         self,
         world: &World,
-    ) -> Result<ActorComponentMut<LOCKING, T>, WorldError> {
-        Ok(ActorComponentMut(world.get::<LOCKING, T>(self.0, true)?))
+    ) -> Result<ComponentRefMut<LOCKING, T>, WorldError> {
+        world.component_mut::<LOCKING, T>(self.0)
     }
 
     pub fn add_child<const LOCKING: bool>(
@@ -197,36 +218,6 @@ impl Actor {
     }
 }
 
-pub struct ActorComponent<'a, const LOCKING: bool, T: Send + Sync + 'static>(
-    ArchetypeEntityColumnAccess<'a, LOCKING, T>,
-);
-
-impl<const LOCKING: bool, T: Send + Sync + 'static> Deref for ActorComponent<'_, LOCKING, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.read().unwrap()
-    }
-}
-
-pub struct ActorComponentMut<'a, const LOCKING: bool, T: Send + Sync + 'static>(
-    ArchetypeEntityColumnAccess<'a, LOCKING, T>,
-);
-
-impl<const LOCKING: bool, T: Send + Sync + 'static> Deref for ActorComponentMut<'_, LOCKING, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.read().unwrap()
-    }
-}
-
-impl<const LOCKING: bool, T: Send + Sync + 'static> DerefMut for ActorComponentMut<'_, LOCKING, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.write().unwrap()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,11 +230,17 @@ mod tests {
 
     struct Lives(usize);
 
+    #[derive(Debug, Default, Clone)]
+    struct Counter {
+        odd: usize,
+        even: usize,
+    }
+
     #[intuicio_function(transformer = "DynamicManagedValueTransformer")]
     fn attack(world: &World, this: Actor, other: Actor) {
         let this_attack = this.component::<true, Attack>(world).unwrap();
         let mut other_lives = other.component_mut::<true, Lives>(world).unwrap();
-        (*other_lives).0 = (*other_lives).0.saturating_sub((*this_attack).0);
+        other_lives.0 = other_lives.0.saturating_sub(this_attack.0);
     }
 
     #[test]
@@ -289,5 +286,26 @@ mod tests {
             )
             .unwrap();
         assert_eq!(enemy.component::<true, Lives>(&world).unwrap().deref().0, 0);
+    }
+
+    #[test]
+    fn test_actor_singleton() {
+        let mut world = World::default();
+        let resources = Actor::spawn(&mut world, (Counter::default(),)).unwrap();
+
+        for index in 0..5usize {
+            world.spawn((index,)).unwrap();
+        }
+
+        let mut counter = resources.component_mut::<true, Counter>(&world).unwrap();
+        for value in world.query::<true, &usize>() {
+            if *value % 2 == 0 {
+                counter.even += 1;
+            } else {
+                counter.odd += 1;
+            }
+        }
+        assert_eq!(counter.odd, 2);
+        assert_eq!(counter.even, 3);
     }
 }

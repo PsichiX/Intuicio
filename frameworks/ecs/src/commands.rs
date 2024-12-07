@@ -38,6 +38,18 @@ impl CommandBuffer {
             (command)(world);
         }
     }
+
+    pub fn clear(&mut self) {
+        self.commands.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
 }
 
 #[derive(Default, Clone)]
@@ -135,6 +147,7 @@ impl<T: Bundle + Send + Sync + 'static> Command for RemoveCommand<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::world::World;
 
     #[test]
     fn test_async() {
@@ -146,8 +159,6 @@ mod tests {
 
     #[test]
     fn test_command_buffer() {
-        use crate::{commands::*, world::World};
-
         let mut world = World::default();
         let mut buffer = CommandBuffer::default();
         assert!(world.is_empty());

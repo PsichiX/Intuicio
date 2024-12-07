@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-ecs"
-version = "0.39.4"
+version = "0.39.5"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Entity-Component-System framework module for Intuicio scripting platform"
