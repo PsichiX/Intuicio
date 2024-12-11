@@ -1,8 +1,11 @@
 use intuicio_core::{registry::Registry, IntuicioStruct};
 use intuicio_derive::*;
+use serde::{Deserialize, Serialize};
 
 /// Entity ids start with 1, 0 is considered invalid.
-#[derive(IntuicioStruct, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    IntuicioStruct, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[intuicio(module_name = "ecs_entity")]
 pub struct Entity {
     #[intuicio(ignore)]

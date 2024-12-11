@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-ecs"
-version = "0.39.5"
+version = "0.39.6"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Entity-Component-System framework module for Intuicio scripting platform"
@@ -14,3 +14,5 @@ readme = "../../README.md"
 intuicio-data = { version = "0.39", path = "../../platform/data" }
 intuicio-core = { version = "0.39", path = "../../platform/core" }
 intuicio-derive = { version = "0.39", path = "../../platform/derive" }
+intuicio-framework-serde = { version = "0.39", path = "../serde" }
+serde = { version = "1", features = ["derive"] }

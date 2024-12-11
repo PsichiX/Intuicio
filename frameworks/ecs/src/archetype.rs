@@ -3,6 +3,7 @@ use crate::{
     entity::{Entity, EntityDenseMap},
     Component,
 };
+use intuicio_core::types::Type;
 use intuicio_data::{type_hash::TypeHash, Finalize};
 use std::{
     alloc::{alloc, dealloc, Layout},
@@ -103,6 +104,14 @@ impl ArchetypeColumnInfo {
             type_hash,
             layout: layout.pad_to_align(),
             finalizer,
+        }
+    }
+
+    pub fn from_type(type_: &Type) -> Self {
+        Self {
+            type_hash: type_.type_hash(),
+            layout: *type_.layout(),
+            finalizer: unsafe { type_.finalizer() },
         }
     }
 
@@ -555,6 +564,18 @@ impl<'a> ArchetypeEntityRowAccess<'a> {
                     .add(self.index * column.info.layout.size())
                     .cast::<T>()
                     .write(value);
+                return Ok(());
+            }
+        }
+        Err(ArchetypeError::ColumnNotFound { type_hash })
+    }
+
+    /// # Safety
+    pub unsafe fn initialize_raw(&self, type_: &Type) -> Result<(), ArchetypeError> {
+        let type_hash = type_.type_hash();
+        for column in self.columns.as_ref() {
+            if column.info.type_hash == type_hash {
+                type_.initialize(column.memory.add(self.index * column.info.layout.size()) as _);
                 return Ok(());
             }
         }

@@ -1,6 +1,6 @@
 [package]
 name = "alchemyst"
-version = "0.39.5"
+version = "0.39.6"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Alchemyst PCG tool based on Intuicio scripting platform"

@@ -396,12 +396,13 @@ pub fn intuicio_enum(input: TokenStream) -> TokenStream {
             if is_default {
                 default_variant = Some(discriminant);
             }
+            let disc = discriminant;
             discriminant += 1;
             Some(quote! {
                 let mut variant = intuicio_core::types::enum_type::EnumVariant::new(#name);
                 #(#fields)*
                 #meta
-                result = result.variant(variant, #discriminant);
+                result = result.variant(variant, #disc);
             })
         })
         .collect::<Vec<_>>();

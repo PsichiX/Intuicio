@@ -8,6 +8,7 @@ use crate::{
     query::{DynamicQueryFilter, DynamicQueryIter, TypedQueryFetch, TypedQueryIter},
     Component, ComponentRef, ComponentRefMut,
 };
+use intuicio_core::{registry::Registry, types::struct_type::NativeStructBuilder};
 use intuicio_data::type_hash::TypeHash;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -308,6 +309,14 @@ impl<T: Component> Default for Relation<T> {
 }
 
 impl<T: Component> Relation<T> {
+    pub fn install_to_registry(registry: &mut Registry) {
+        registry.add_type(NativeStructBuilder::new::<Self>().build());
+    }
+
+    pub fn new(payload: T, entity: Entity) -> Self {
+        Self::default().with(payload, entity)
+    }
+
     pub fn with(mut self, payload: T, entity: Entity) -> Self {
         self.add(payload, entity);
         self
@@ -561,10 +570,22 @@ impl World {
         self.entities.iter()
     }
 
+    // TODO:
+    // #[inline]
+    // pub(crate) fn entity_archetype_id(&self, entity: Entity) -> Result<u32, WorldError> {
+    //     self.entities.get(entity)
+    // }
+
     #[inline]
     pub fn archetypes(&self) -> impl Iterator<Item = &Archetype> {
         self.archetypes.iter()
     }
+
+    // TODO:
+    // #[inline]
+    // pub(crate) fn archetype_by_id(&self, id: u32) -> Result<&Archetype, WorldError> {
+    //     self.archetypes.get(id)
+    // }
 
     pub fn added(&self) -> &WorldChanges {
         &self.added

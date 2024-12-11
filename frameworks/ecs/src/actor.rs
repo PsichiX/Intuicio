@@ -11,10 +11,7 @@ use intuicio_data::{
     lifetime::Lifetime,
     managed::{DynamicManaged, DynamicManagedRef},
 };
-use std::{
-    collections::HashMap,
-    ops::{Deref, DerefMut},
-};
+use std::collections::HashMap;
 
 pub use intuicio_core::function::Function as ActorMessageFunction;
 
@@ -128,7 +125,6 @@ impl Actor {
         function: ActorMessageFunction,
     ) -> Result<(), WorldError> {
         let mut listeners = self.component_mut::<LOCKING, ActorMessageListeners>(world)?;
-        let listeners = listeners.deref_mut();
         listeners.0.insert(id.to_string(), function.into_handle());
         Ok(())
     }
@@ -139,7 +135,6 @@ impl Actor {
         id: &str,
     ) -> Result<(), WorldError> {
         let mut listeners = self.component_mut::<LOCKING, ActorMessageListeners>(world)?;
-        let listeners = listeners.deref_mut();
         listeners.0.remove(id);
         Ok(())
     }
@@ -150,7 +145,6 @@ impl Actor {
         id: &str,
     ) -> Result<Option<FunctionHandle>, WorldError> {
         let listeners = self.component::<LOCKING, ActorMessageListeners>(world)?;
-        let listeners = listeners.deref();
         Ok(listeners.0.get(id).cloned())
     }
 
@@ -162,7 +156,6 @@ impl Actor {
         registry: &Registry,
     ) -> Result<(), WorldError> {
         let listeners = self.component::<LOCKING, ActorMessageListeners>(world)?;
-        let listeners = listeners.deref();
         if let Some(function) = listeners.0.get(id).cloned() {
             context.stack().push(DynamicManaged::new(self).unwrap());
             let lifetime = Lifetime::default();
@@ -182,7 +175,6 @@ impl Actor {
         inputs: I,
     ) -> Result<Option<O>, WorldError> {
         let listeners = self.component::<LOCKING, ActorMessageListeners>(world)?;
-        let listeners = listeners.deref();
         if let Some(function) = listeners.0.get(id).cloned() {
             inputs.stack_push_reversed(context.stack());
             context.stack().push(DynamicManaged::new(self).unwrap());
@@ -259,22 +251,13 @@ mod tests {
             .register_message_listener::<true>(&world, "attack", attack::define_function(&registry))
             .unwrap();
         assert!(player.exists(&world));
-        assert_eq!(
-            player.component::<true, Attack>(&world).unwrap().deref().0,
-            2
-        );
-        assert_eq!(
-            player.component::<true, Lives>(&world).unwrap().deref().0,
-            1
-        );
+        assert_eq!(player.component::<true, Attack>(&world).unwrap().0, 2);
+        assert_eq!(player.component::<true, Lives>(&world).unwrap().0, 1);
 
         let enemy = Actor::spawn(&mut world, ("enemy".to_owned(), Attack(1), Lives(2))).unwrap();
         assert!(enemy.exists(&world));
-        assert_eq!(
-            enemy.component::<true, Attack>(&world).unwrap().deref().0,
-            1
-        );
-        assert_eq!(enemy.component::<true, Lives>(&world).unwrap().deref().0, 2);
+        assert_eq!(enemy.component::<true, Attack>(&world).unwrap().0, 1);
+        assert_eq!(enemy.component::<true, Lives>(&world).unwrap().0, 2);
 
         player
             .dispatch_message::<true, (), _>(
@@ -285,7 +268,7 @@ mod tests {
                 (DynamicManaged::new(enemy).unwrap(),),
             )
             .unwrap();
-        assert_eq!(enemy.component::<true, Lives>(&world).unwrap().deref().0, 0);
+        assert_eq!(enemy.component::<true, Lives>(&world).unwrap().0, 0);
     }
 
     #[test]
