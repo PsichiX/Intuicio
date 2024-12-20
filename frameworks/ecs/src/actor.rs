@@ -15,7 +15,6 @@ use std::collections::HashMap;
 
 pub use intuicio_core::function::Function as ActorMessageFunction;
 
-pub struct ActorTag;
 pub struct ActorChild;
 pub struct ActorParent;
 
@@ -31,7 +30,6 @@ impl Actor {
         bundle: impl Bundle + Send + Sync + 'static,
     ) -> Result<Self, WorldError> {
         let entity = world.spawn((
-            ActorTag,
             ActorMessageListeners::default(),
             Relation::<ActorChild>::default(),
             Relation::<ActorParent>::default(),

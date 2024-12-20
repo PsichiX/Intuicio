@@ -1,5 +1,9 @@
 use crate::{
-    archetype::{ArchetypeColumnInfo, ArchetypeError},
+    archetype::{Archetype, ArchetypeColumnInfo, ArchetypeError},
+    bundle::Bundle,
+    entity::Entity,
+    prelude::WorldProcessorEntityMapping,
+    processor::WorldProcessor,
     world::{Relation, World, WorldError},
     Component,
 };
@@ -9,7 +13,7 @@ use intuicio_framework_serde::{
     from_intermediate, to_intermediate, Intermediate, IntermediateResult, SerializationRegistry,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 #[derive(Debug)]
 pub enum PrefabError {
@@ -77,6 +81,7 @@ pub struct PrefabArchetypeColumn {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrefabArchetype {
+    pub entities: Vec<Entity>,
     pub columns: Vec<PrefabArchetypeColumn>,
 }
 
@@ -128,6 +133,7 @@ impl Prefab {
         let archetypes = world
             .archetypes()
             .map(|archetype| {
+                let entities = archetype.entities().iter().collect();
                 let columns = archetype
                     .columns()
                     .map(|column| {
@@ -158,96 +164,101 @@ impl Prefab {
                         })
                     })
                     .collect::<Result<_, PrefabError>>()?;
-                Ok(PrefabArchetype { columns })
+                Ok(PrefabArchetype { entities, columns })
             })
             .collect::<Result<_, PrefabError>>()?;
         Ok(Self { archetypes })
     }
 
-    // TODO: there is a problem with relations where those will be serialized as in
-    // original version, so they will point to wrong entities after deserialization.
-    // DON'T EXPOSE IT UNTIL YOU SOLVE THIS PROBLEM!
-    // We could actually expand list of entities by traversing relations, that would
-    // require to add a mechanism to gather entities graph from provided ones, along
-    // with registering component traversal operations.
-    // pub fn from_entities<const LOCKING: bool>(
-    //     world: &World,
-    //     entities: impl IntoIterator<Item = Entity>,
-    //     serialization: &SerializationRegistry,
-    //     registry: &Registry,
-    // ) -> Result<Self, PrefabError> {
-    //     let mut archetype_rows = HashMap::<u32, (&Archetype, Vec<usize>)>::new();
-    //     for entity in entities {
-    //         let id = world.entity_archetype_id(entity)?;
-    //         if let Some((archetype, rows)) = archetype_rows.get_mut(&id) {
-    //             rows.push(
-    //                 archetype
-    //                     .entities()
-    //                     .index_of(entity)
-    //                     .ok_or(WorldError::EntityDoesNotExists { entity })?,
-    //             );
-    //         } else {
-    //             let archetype = world.archetype_by_id(id)?;
-    //             archetype_rows.insert(
-    //                 id,
-    //                 (
-    //                     archetype,
-    //                     vec![archetype
-    //                         .entities()
-    //                         .index_of(entity)
-    //                         .ok_or(WorldError::EntityDoesNotExists { entity })?],
-    //                 ),
-    //             );
-    //         }
-    //     }
-    //     let archetypes = archetype_rows
-    //         .into_values()
-    //         .map(|(archetype, rows)| {
-    //             let columns = archetype
-    //                 .columns()
-    //                 .map(|column| {
-    //                     let type_ = registry
-    //                         .find_type(TypeQuery {
-    //                             type_hash: Some(column.type_hash()),
-    //                             ..Default::default()
-    //                         })
-    //                         .ok_or_else(|| PrefabError::CouldNotFindType(column.type_hash()))?;
-    //                     let components =
-    //                         archetype.dynamic_column::<LOCKING>(column.type_hash(), false)?;
-    //                     let components = rows
-    //                         .iter()
-    //                         .map(|row| unsafe {
-    //                             serialization
-    //                                 .dynamic_serialize_from(
-    //                                     column.type_hash(),
-    //                                     components.data(*row)?,
-    //                                 )
-    //                                 .map_err(|_| PrefabError::CouldNotSerializeType {
-    //                                     type_name: type_.type_name().to_owned(),
-    //                                     module_name: type_
-    //                                         .module_name()
-    //                                         .map(|name| name.to_owned()),
-    //                                 })
-    //                         })
-    //                         .collect::<Result<_, PrefabError>>()?;
-    //                     Ok(PrefabArchetypeColumn {
-    //                         type_name: type_.type_name().to_owned(),
-    //                         module_name: type_.module_name().map(|name| name.to_owned()),
-    //                         components,
-    //                     })
-    //                 })
-    //                 .collect::<Result<_, PrefabError>>()?;
-    //             Ok(PrefabArchetype { columns })
-    //         })
-    //         .collect::<Result<_, PrefabError>>()?;
-    //     Ok(Self { archetypes })
-    // }
-
-    pub fn to_world(
-        &self,
+    pub fn from_entities<const LOCKING: bool>(
+        world: &World,
+        entities: impl IntoIterator<Item = Entity>,
+        processor: &WorldProcessor,
         serialization: &SerializationRegistry,
         registry: &Registry,
+    ) -> Result<Self, PrefabError> {
+        let mut total_entities = Vec::default();
+        processor.all_related_entities::<LOCKING>(world, entities, &mut total_entities)?;
+        let mut archetype_rows = HashMap::<u32, (&Archetype, Vec<usize>)>::new();
+        for entity in total_entities {
+            let id = world.entity_archetype_id(entity)?;
+            if let Some((archetype, rows)) = archetype_rows.get_mut(&id) {
+                rows.push(
+                    archetype
+                        .entities()
+                        .index_of(entity)
+                        .ok_or(WorldError::EntityDoesNotExists { entity })?,
+                );
+            } else {
+                let archetype = world.archetype_by_id(id)?;
+                archetype_rows.insert(
+                    id,
+                    (
+                        archetype,
+                        vec![archetype
+                            .entities()
+                            .index_of(entity)
+                            .ok_or(WorldError::EntityDoesNotExists { entity })?],
+                    ),
+                );
+            }
+        }
+        let archetypes = archetype_rows
+            .into_values()
+            .map(|(archetype, rows)| {
+                let entities = rows
+                    .iter()
+                    .map(|row| archetype.entities().get(*row).unwrap())
+                    .collect();
+                let columns = archetype
+                    .columns()
+                    .map(|column| {
+                        let type_ = registry
+                            .find_type(TypeQuery {
+                                type_hash: Some(column.type_hash()),
+                                ..Default::default()
+                            })
+                            .ok_or_else(|| PrefabError::CouldNotFindType(column.type_hash()))?;
+                        let components =
+                            archetype.dynamic_column::<LOCKING>(column.type_hash(), false)?;
+                        let components = rows
+                            .iter()
+                            .map(|row| unsafe {
+                                serialization
+                                    .dynamic_serialize_from(
+                                        column.type_hash(),
+                                        components.data(*row)?,
+                                    )
+                                    .map_err(|_| PrefabError::CouldNotSerializeType {
+                                        type_name: type_.type_name().to_owned(),
+                                        module_name: type_
+                                            .module_name()
+                                            .map(|name| name.to_owned()),
+                                    })
+                            })
+                            .collect::<Result<_, PrefabError>>()?;
+                        Ok(PrefabArchetypeColumn {
+                            type_name: type_.type_name().to_owned(),
+                            module_name: type_.module_name().map(|name| name.to_owned()),
+                            components,
+                        })
+                    })
+                    .collect::<Result<_, PrefabError>>()?;
+                Ok(PrefabArchetype { entities, columns })
+            })
+            .collect::<Result<_, PrefabError>>()?;
+        Ok(Self { archetypes })
+    }
+
+    pub fn to_world<const LOCKING: bool>(
+        &self,
+        processor: &WorldProcessor,
+        serialization: &SerializationRegistry,
+        registry: &Registry,
+        additional_components: impl Bundle + Clone,
     ) -> Result<World, PrefabError> {
+        let additional_columns = additional_components.columns();
+        let mut mappings = HashMap::<_, _>::default();
         let mut world = World::default();
         for archetype in &self.archetypes {
             let column_types = archetype
@@ -272,6 +283,7 @@ impl Prefab {
             let column_info = column_types
                 .iter()
                 .map(|type_| ArchetypeColumnInfo::from_type(type_))
+                .chain(additional_columns.iter().cloned())
                 .collect::<Vec<_>>();
             let rows_count = archetype
                 .columns
@@ -281,7 +293,7 @@ impl Prefab {
                 .unwrap_or_default();
             for index in 0..rows_count {
                 unsafe {
-                    let (_, access) = world.spawn_uninitialized_raw(column_info.to_owned())?;
+                    let (entity, access) = world.spawn_uninitialized_raw(column_info.to_owned())?;
                     for ((column, info), type_) in archetype
                         .columns
                         .iter()
@@ -298,10 +310,32 @@ impl Prefab {
                                 module_name: column.module_name.to_owned(),
                             })?;
                     }
+                    additional_components.clone().initialize_into(&access);
+                    mappings.insert(archetype.entities[index], entity);
+                }
+            }
+        }
+        for archetype in world.archetypes() {
+            for column in archetype.columns() {
+                let access = archetype.dynamic_column::<LOCKING>(column.type_hash(), true)?;
+                for index in 0..archetype.len() {
+                    unsafe {
+                        processor.remap_entities_raw(
+                            column.type_hash(),
+                            access.data(index)?,
+                            WorldProcessorEntityMapping::new(&mappings),
+                        );
+                    }
                 }
             }
         }
         Ok(world)
+    }
+
+    pub fn entities(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.archetypes
+            .iter()
+            .flat_map(|archetype| archetype.entities.iter().copied())
     }
 }
 
@@ -317,6 +351,11 @@ mod tests {
         let mut serialization = SerializationRegistry::default().with_basic_types();
         Prefab::register_relation_serializer::<()>(&mut serialization);
 
+        let mut processor = WorldProcessor::default();
+        processor.register_display_formatter::<usize>();
+        processor.register_display_formatter::<bool>();
+        Relation::<()>::register_to_processor(&mut processor);
+
         let mut world = World::default();
         let a = world.spawn((42usize,)).unwrap();
         let b = world.spawn((false, Relation::new((), a))).unwrap();
@@ -324,7 +363,9 @@ mod tests {
 
         {
             let prefab = Prefab::from_world::<true>(&world, &serialization, &registry).unwrap();
-            let world2 = prefab.to_world(&serialization, &registry).unwrap();
+            let world2 = prefab
+                .to_world::<true>(&processor, &serialization, &registry, (4.2f32,))
+                .unwrap();
 
             let mut entities = world.entities().collect::<Vec<_>>();
             let mut entities2 = world2.entities().collect::<Vec<_>>();
@@ -332,6 +373,9 @@ mod tests {
             entities2.sort();
             assert_eq!(entities, entities2);
 
+            assert_eq!(*world2.component::<true, f32>(a).unwrap(), 4.2);
+            assert_eq!(*world2.component::<true, f32>(b).unwrap(), 4.2);
+            assert_eq!(*world2.component::<true, f32>(c).unwrap(), 4.2);
             let old = world.component::<true, usize>(a).unwrap();
             let new = world2.component::<true, usize>(a).unwrap();
             assert_eq!(*old, *new);
@@ -349,20 +393,38 @@ mod tests {
             assert_eq!(*old, *new);
         }
 
-        // {
-        //     let prefab =
-        //         Prefab::from_entities::<true>(&world, [b, c], &serialization, &registry).unwrap();
-        //     let world2 = prefab.to_world(&serialization, &registry).unwrap();
+        {
+            let prefab =
+                Prefab::from_entities::<true>(&world, [c], &processor, &serialization, &registry)
+                    .unwrap();
+            let world2 = prefab
+                .to_world::<true>(&processor, &serialization, &registry, ())
+                .unwrap();
+            
+            let entities = world2.entities().collect::<Vec<_>>();
+            assert_eq!(entities.len(), 3);
+            
+            let a = world2
+                .query::<true, (Entity, &usize)>()
+                .filter(|(_, value)| **value == 42)
+                .map(|(entity, _)| entity)
+                .next()
+                .unwrap();
+            let b = world2
+                .query::<true, (Entity, &bool)>()
+                .filter(|(_, value)| !**value)
+                .map(|(entity, _)| entity)
+                .next()
+                .unwrap();
+            let c = world2
+                .query::<true, (Entity, &bool)>()
+                .filter(|(_, value)| **value)
+                .map(|(entity, _)| entity)
+                .next()
+                .unwrap();
 
-        //     let mut entities = world2.entities().collect::<Vec<_>>();
-        //     entities.sort();
-        //     let b = entities[0];
-        //     let c = entities[1];
-
-        //     let value = world2.component::<true, bool>(b).unwrap();
-        //     assert!(!*value);
-        //     let value = world2.component::<true, bool>(c).unwrap();
-        //     assert!(*value);
-        // }
+            assert!(world2.has_relation::<true, ()>(c, b));
+            assert!(world2.has_relation::<true, ()>(b, a));
+        }
     }
 }

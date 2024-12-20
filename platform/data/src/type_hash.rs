@@ -24,3 +24,9 @@ impl TypeHash {
         self.hash
     }
 }
+
+impl std::fmt::Display for TypeHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#{:X}", self.hash)
+    }
+}

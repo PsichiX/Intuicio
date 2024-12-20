@@ -3,13 +3,18 @@ pub mod archetype;
 pub mod bundle;
 pub mod commands;
 pub mod entity;
+pub mod multiverse;
 pub mod observer;
 pub mod prefab;
+pub mod processor;
 pub mod query;
 pub mod world;
 
 pub mod prelude {
-    pub use crate::{commands::*, entity::*, observer::*, prefab::*, world::*, Component};
+    pub use crate::{
+        commands::*, entity::*, multiverse::*, observer::*, prefab::*, processor::*, world::*,
+        Component,
+    };
 }
 
 use archetype::ArchetypeEntityColumnAccess;

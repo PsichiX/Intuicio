@@ -5,6 +5,7 @@ use crate::{
     },
     bundle::{Bundle, BundleColumns},
     entity::Entity,
+    processor::{WorldProcessor, WorldProcessorEntityMapping},
     query::{DynamicQueryFilter, DynamicQueryIter, TypedQueryFetch, TypedQueryIter},
     Component, ComponentRef, ComponentRefMut,
 };
@@ -186,6 +187,12 @@ impl ArchetypeMap {
         self.table.iter().filter_map(|archetype| archetype.as_ref())
     }
 
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut Archetype> + '_ {
+        self.table
+            .iter_mut()
+            .filter_map(|archetype| archetype.as_mut())
+    }
+
     fn clear(&mut self) {
         self.id_generator = 0;
         self.table.clear();
@@ -311,6 +318,40 @@ impl<T: Component> Default for Relation<T> {
 impl<T: Component> Relation<T> {
     pub fn install_to_registry(registry: &mut Registry) {
         registry.add_type(NativeStructBuilder::new::<Self>().build());
+    }
+
+    pub fn register_to_processor(processor: &mut WorldProcessor) {
+        processor.register_entity_remapping::<Self>(|relation, mapping| {
+            let iter = match &mut relation.connections {
+                RelationConnections::Zero(a) => a.iter_mut(),
+                RelationConnections::One(a) => a.iter_mut(),
+                RelationConnections::More(vec) => vec.iter_mut(),
+            };
+            for (_, entity) in iter {
+                *entity = mapping.remap(*entity);
+            }
+        });
+        processor.register_entity_inspector::<Self>(|relation| {
+            relation.iter().map(|(_, entity)| entity).collect()
+        });
+        processor.register_formatter::<Self>(|relation, fmt| {
+            fmt.debug_struct("Relation")
+                .field(
+                    "entities",
+                    &relation
+                        .iter()
+                        .map(|(_, entity)| entity)
+                        .collect::<Vec<_>>(),
+                )
+                .finish_non_exhaustive()
+        });
+    }
+
+    pub fn register_to_processor_debug(processor: &mut WorldProcessor)
+    where
+        T: std::fmt::Debug,
+    {
+        processor.register_debug_formatter::<Self>();
     }
 
     pub fn new(payload: T, entity: Entity) -> Self {
@@ -570,22 +611,25 @@ impl World {
         self.entities.iter()
     }
 
-    // TODO:
-    // #[inline]
-    // pub(crate) fn entity_archetype_id(&self, entity: Entity) -> Result<u32, WorldError> {
-    //     self.entities.get(entity)
-    // }
+    #[inline]
+    pub(crate) fn entity_archetype_id(&self, entity: Entity) -> Result<u32, WorldError> {
+        self.entities.get(entity)
+    }
 
     #[inline]
     pub fn archetypes(&self) -> impl Iterator<Item = &Archetype> {
         self.archetypes.iter()
     }
 
-    // TODO:
-    // #[inline]
-    // pub(crate) fn archetype_by_id(&self, id: u32) -> Result<&Archetype, WorldError> {
-    //     self.archetypes.get(id)
-    // }
+    #[inline]
+    pub fn archetypes_mut(&mut self) -> impl Iterator<Item = &mut Archetype> {
+        self.archetypes.iter_mut()
+    }
+
+    #[inline]
+    pub(crate) fn archetype_by_id(&self, id: u32) -> Result<&Archetype, WorldError> {
+        self.archetypes.get(id)
+    }
 
     pub fn added(&self) -> &WorldChanges {
         &self.added
@@ -808,6 +852,26 @@ impl World {
         }
     }
 
+    /// # Safety
+    pub unsafe fn despawn_uninitialized(&mut self, entity: Entity) -> Result<(), WorldError> {
+        let id = self.entities.release(entity)?;
+        let archetype = self.archetypes.get_mut(id).unwrap();
+        match archetype.remove_uninitialized(entity) {
+            Ok(_) => {
+                self.removed
+                    .table
+                    .entry(entity)
+                    .or_default()
+                    .extend(archetype.columns().map(|column| column.type_hash()));
+                Ok(())
+            }
+            Err(error) => {
+                self.entities.acquire()?;
+                Err(error.into())
+            }
+        }
+    }
+
     pub fn insert(&mut self, entity: Entity, bundle: impl Bundle) -> Result<(), WorldError> {
         let bundle_columns = bundle.columns();
         if bundle_columns.is_empty() {
@@ -921,6 +985,69 @@ impl World {
         Ok(())
     }
 
+    pub fn merge<const LOCKING: bool>(
+        &mut self,
+        mut other: Self,
+        processor: &WorldProcessor,
+    ) -> Result<(), WorldError> {
+        let mut mappings = HashMap::<_, _>::with_capacity(other.len());
+        let mut archetype_offsets = Vec::with_capacity(other.archetypes().count());
+        for archetype_from in other.archetypes_mut() {
+            let columns = archetype_from.columns().cloned().collect::<Vec<_>>();
+            let archetype_id =
+                if let Some(archetype_id) = self.archetypes.find_by_columns_exact(&columns) {
+                    archetype_id
+                } else {
+                    let (archetype_id, archetype_slot) = self.archetypes.acquire()?;
+                    let archetype = Archetype::new(columns.clone(), self.new_archetype_capacity)?;
+                    *archetype_slot = Some(archetype);
+                    archetype_id
+                };
+            let archetype = self.archetypes.get_mut(archetype_id)?;
+            let offset = archetype.len();
+            let entities_from = archetype_from.entities().iter().collect::<Vec<_>>();
+            for entity_from in entities_from {
+                let (entity, access) = unsafe { self.spawn_uninitialized_raw(columns.clone())? };
+                let access_from = match archetype_from.row::<LOCKING>(entity_from) {
+                    Ok(access_from) => access_from,
+                    Err(error) => {
+                        drop(access);
+                        unsafe { self.despawn_uninitialized(entity)? };
+                        return Err(error.into());
+                    }
+                };
+                for column in &columns {
+                    unsafe {
+                        let data = access.data(column.type_hash()).unwrap();
+                        let data_from = access_from.data(column.type_hash()).unwrap();
+                        data.copy_from(data_from, column.layout().size());
+                    }
+                }
+                mappings.insert(entity_from, entity);
+            }
+            archetype_offsets.push((columns, offset));
+            unsafe { archetype_from.clear_uninitialized() };
+        }
+        for (columns, offset) in archetype_offsets {
+            if let Some(id) = self.archetypes.find_by_columns_exact(&columns) {
+                let archetype = self.archetype_by_id(id)?;
+                for column in archetype.columns() {
+                    let access = archetype.dynamic_column::<LOCKING>(column.type_hash(), true)?;
+                    for index in offset..archetype.len() {
+                        unsafe {
+                            processor.remap_entities_raw(
+                                column.type_hash(),
+                                access.data(index)?,
+                                WorldProcessorEntityMapping::new(&mappings),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn has_entity(&self, entity: Entity) -> bool {
         self.entities.get(entity).is_ok()
     }
@@ -976,6 +1103,16 @@ impl World {
             .archetypes
             .get(self.entities.get(entity)?)?
             .dynamic_entity::<LOCKING>(type_hash, entity, unique)?)
+    }
+
+    pub fn row<const LOCKING: bool>(
+        &self,
+        entity: Entity,
+    ) -> Result<ArchetypeEntityRowAccess, WorldError> {
+        Ok(self
+            .archetypes
+            .get(self.entities.get(entity)?)?
+            .row::<LOCKING>(entity)?)
     }
 
     pub fn query<'a, const LOCKING: bool, Fetch: TypedQueryFetch<'a, LOCKING>>(

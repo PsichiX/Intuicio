@@ -522,6 +522,14 @@ impl<'a> ArchetypeEntityRowAccess<'a> {
         Err(ArchetypeError::ColumnNotFound { type_hash })
     }
 
+    pub fn types(&self) -> impl Iterator<Item = TypeHash> + '_ {
+        self.columns.iter().map(|column| column.info.type_hash)
+    }
+
+    pub fn columns(&self) -> impl Iterator<Item = &ArchetypeColumnInfo> {
+        self.columns.iter().map(|column| &column.info)
+    }
+
     pub fn read<T: Component>(&self) -> Option<&T> {
         let type_hash = TypeHash::of::<T>();
         for column in self.columns.as_ref() {
@@ -1202,6 +1210,12 @@ impl Archetype {
         Ok(())
     }
 
+    /// # Safety
+    pub(crate) unsafe fn clear_uninitialized(&mut self) {
+        self.size = 0;
+        self.entity_dense_map.clear();
+    }
+
     pub fn insert(&mut self, entity: Entity, bundle: impl Bundle) -> Result<(), ArchetypeError> {
         for info in bundle.columns() {
             if !self
@@ -1273,6 +1287,28 @@ impl Archetype {
             unsafe {
                 let target = column.memory.add(index * column.info.layout.size());
                 (column.info.finalizer)(target.cast());
+                if self.size != index {
+                    let source = column.memory.add(self.size * column.info.layout.size());
+                    source.copy_to(target, column.info.layout.size());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// # Safety
+    pub unsafe fn remove_uninitialized(&mut self, entity: Entity) -> Result<(), ArchetypeError> {
+        if self.size == 0 {
+            return Err(ArchetypeError::EntityNotFound { entity });
+        }
+        let index = self
+            .entity_dense_map
+            .remove(entity)
+            .ok_or(ArchetypeError::EntityNotFound { entity })?;
+        self.size -= 1;
+        for column in self.columns.as_ref() {
+            unsafe {
+                let target = column.memory.add(index * column.info.layout.size());
                 if self.size != index {
                     let source = column.memory.add(self.size * column.info.layout.size());
                     source.copy_to(target, column.info.layout.size());
@@ -1429,6 +1465,25 @@ impl Archetype {
             }
         }
         Err(ArchetypeError::ColumnNotFound { type_hash })
+    }
+
+    /// # Safety
+    pub fn row<const LOCKING: bool>(
+        &self,
+        entity: Entity,
+    ) -> Result<ArchetypeEntityRowAccess, ArchetypeError> {
+        let index = self
+            .entity_dense_map
+            .index_of(entity)
+            .ok_or(ArchetypeError::EntityNotFound { entity })?;
+        Ok(ArchetypeEntityRowAccess::new(
+            self.columns
+                .as_ref()
+                .iter()
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            index,
+        ))
     }
 
     pub fn column_read_iter<const LOCKING: bool, T: Component>(
