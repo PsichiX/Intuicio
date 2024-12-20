@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-text"
-version = "0.39.6"
+version = "0.40.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Text types framework module for Intuicio scripting platform"
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/intuicio-framework-text"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-core = { version = "0.39", path = "../../platform/core" }
-intuicio-derive = { version = "0.39", path = "../../platform/derive" }
+intuicio-core = { version = "0.40", path = "../../platform/core" }
+intuicio-derive = { version = "0.40", path = "../../platform/derive" }
 string-interner = "0.18"
 lazy_static = "1.4"

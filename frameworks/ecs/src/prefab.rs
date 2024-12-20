@@ -400,10 +400,10 @@ mod tests {
             let world2 = prefab
                 .to_world::<true>(&processor, &serialization, &registry, ())
                 .unwrap();
-            
+
             let entities = world2.entities().collect::<Vec<_>>();
             assert_eq!(entities.len(), 3);
-            
+
             let a = world2
                 .query::<true, (Entity, &usize)>()
                 .filter(|(_, value)| **value == 42)
