@@ -256,7 +256,7 @@ impl Prefab {
         serialization: &SerializationRegistry,
         registry: &Registry,
         additional_components: impl Bundle + Clone,
-    ) -> Result<World, PrefabError> {
+    ) -> Result<(World, HashMap<Entity, Entity>), PrefabError> {
         let additional_columns = additional_components.columns();
         let mut mappings = HashMap::<_, _>::default();
         let mut world = World::default();
@@ -329,7 +329,7 @@ impl Prefab {
                 }
             }
         }
-        Ok(world)
+        Ok((world, mappings))
     }
 
     pub fn entities(&self) -> impl Iterator<Item = Entity> + '_ {
@@ -337,6 +337,39 @@ impl Prefab {
             .iter()
             .flat_map(|archetype| archetype.entities.iter().copied())
     }
+
+    pub fn rows(&self) -> impl Iterator<Item = PrefabRow> {
+        self.archetypes.iter().flat_map(|archetype| {
+            archetype
+                .entities
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, entity)| PrefabRow {
+                    entity,
+                    components: archetype
+                        .columns
+                        .iter()
+                        .map(|column| PrefabComponent {
+                            type_name: &column.type_name,
+                            module_name: column.module_name.as_deref(),
+                            data: &column.components[index],
+                        })
+                        .collect::<Vec<_>>(),
+                })
+        })
+    }
+}
+
+pub struct PrefabRow<'a> {
+    pub entity: Entity,
+    pub components: Vec<PrefabComponent<'a>>,
+}
+
+pub struct PrefabComponent<'a> {
+    pub type_name: &'a str,
+    pub module_name: Option<&'a str>,
+    pub data: &'a Intermediate,
 }
 
 #[cfg(test)]
@@ -352,8 +385,6 @@ mod tests {
         Prefab::register_relation_serializer::<()>(&mut serialization);
 
         let mut processor = WorldProcessor::default();
-        processor.register_display_formatter::<usize>();
-        processor.register_display_formatter::<bool>();
         Relation::<()>::register_to_processor(&mut processor);
 
         let mut world = World::default();
@@ -363,7 +394,7 @@ mod tests {
 
         {
             let prefab = Prefab::from_world::<true>(&world, &serialization, &registry).unwrap();
-            let world2 = prefab
+            let (world2, _) = prefab
                 .to_world::<true>(&processor, &serialization, &registry, (4.2f32,))
                 .unwrap();
 
@@ -376,55 +407,49 @@ mod tests {
             assert_eq!(*world2.component::<true, f32>(a).unwrap(), 4.2);
             assert_eq!(*world2.component::<true, f32>(b).unwrap(), 4.2);
             assert_eq!(*world2.component::<true, f32>(c).unwrap(), 4.2);
+
             let old = world.component::<true, usize>(a).unwrap();
             let new = world2.component::<true, usize>(a).unwrap();
             assert_eq!(*old, *new);
             let old = world.component::<true, bool>(b).unwrap();
             let new = world2.component::<true, bool>(b).unwrap();
             assert_eq!(*old, *new);
-            let old = world.component::<true, Relation<()>>(b).unwrap();
-            let new = world2.component::<true, Relation<()>>(b).unwrap();
-            assert_eq!(*old, *new);
             let old = world.component::<true, bool>(c).unwrap();
             let new = world2.component::<true, bool>(c).unwrap();
             assert_eq!(*old, *new);
-            let old = world.component::<true, Relation<()>>(c).unwrap();
-            let new = world2.component::<true, Relation<()>>(c).unwrap();
-            assert_eq!(*old, *new);
+
+            assert!(world2.has_relation::<true, ()>(c, b));
+            assert!(world2.has_relation::<true, ()>(b, a));
         }
 
         {
             let prefab =
                 Prefab::from_entities::<true>(&world, [c], &processor, &serialization, &registry)
                     .unwrap();
-            let world2 = prefab
+            let (world2, mappings) = prefab
                 .to_world::<true>(&processor, &serialization, &registry, ())
                 .unwrap();
 
             let entities = world2.entities().collect::<Vec<_>>();
             assert_eq!(entities.len(), 3);
 
-            let a = world2
-                .query::<true, (Entity, &usize)>()
-                .filter(|(_, value)| **value == 42)
-                .map(|(entity, _)| entity)
-                .next()
-                .unwrap();
-            let b = world2
-                .query::<true, (Entity, &bool)>()
-                .filter(|(_, value)| !**value)
-                .map(|(entity, _)| entity)
-                .next()
-                .unwrap();
-            let c = world2
-                .query::<true, (Entity, &bool)>()
-                .filter(|(_, value)| **value)
-                .map(|(entity, _)| entity)
-                .next()
-                .unwrap();
+            let mappings = WorldProcessorEntityMapping::new(&mappings);
+            let a2 = mappings.remap(a);
+            let b2 = mappings.remap(b);
+            let c2 = mappings.remap(c);
 
-            assert!(world2.has_relation::<true, ()>(c, b));
-            assert!(world2.has_relation::<true, ()>(b, a));
+            let old = world.component::<true, usize>(a).unwrap();
+            let new = world2.component::<true, usize>(a2).unwrap();
+            assert_eq!(*old, *new);
+            let old = world.component::<true, bool>(b).unwrap();
+            let new = world2.component::<true, bool>(b2).unwrap();
+            assert_eq!(*old, *new);
+            let old = world.component::<true, bool>(c).unwrap();
+            let new = world2.component::<true, bool>(c2).unwrap();
+            assert_eq!(*old, *new);
+
+            assert!(world2.has_relation::<true, ()>(c2, b2));
+            assert!(world2.has_relation::<true, ()>(b2, a2));
         }
     }
 }

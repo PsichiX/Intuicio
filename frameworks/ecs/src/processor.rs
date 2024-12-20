@@ -219,7 +219,7 @@ impl<T: Component> WorldProcessorComponentFormat<'_, T> {
         if let Some(formatter) = self.processor.format.get(&TypeHash::of::<T>()) {
             formatter(self.data as *const T as *const u8, fmt)
         } else {
-            Ok(())
+            write!(fmt, "<MISSING>")
         }
     }
 }
@@ -247,7 +247,7 @@ impl WorldProcessorComponentFormatRaw<'_> {
         if let Some(formatter) = self.processor.format.get(&self.type_hash) {
             formatter(self.pointer, fmt)
         } else {
-            Ok(())
+            write!(fmt, "<MISSING>")
         }
     }
 }
