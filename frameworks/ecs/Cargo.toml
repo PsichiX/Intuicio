@@ -18,4 +18,4 @@ intuicio-framework-serde = { version = "0.41", path = "../serde" }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
-rand = "*"
+rand = "0.8"
