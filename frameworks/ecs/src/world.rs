@@ -18,7 +18,7 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum WorldError {
     Archetype(ArchetypeError),
     ReachedEntityIdCapacity,
@@ -27,6 +27,25 @@ pub enum WorldError {
     ArchetypeDoesNotExists { id: u32 },
     DuplicateMutableArchetypeAccess { id: u32 },
     EmptyColumnSet,
+}
+
+impl WorldError {
+    pub fn allow<T>(
+        input: Result<T, Self>,
+        items: impl IntoIterator<Item = Self>,
+        ok: T,
+    ) -> Result<T, Self> {
+        match input {
+            Err(error) => {
+                if items.into_iter().any(|item| error == item) {
+                    Ok(ok)
+                } else {
+                    Err(error)
+                }
+            }
+            result => result,
+        }
+    }
 }
 
 impl Error for WorldError {}
@@ -455,6 +474,15 @@ impl<T: Component> Relation<T> {
                     .find_map(|(p, e)| if *e == entity { Some(p) } else { None })
             }
         }
+    }
+
+    pub fn entities(&self) -> impl Iterator<Item = Entity> + '_ {
+        match &self.connections {
+            RelationConnections::Zero(a) => a.iter(),
+            RelationConnections::One(a) => a.iter(),
+            RelationConnections::More(vec) => vec.iter(),
+        }
+        .map(|(_, e)| *e)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&T, Entity)> {
@@ -1062,6 +1090,18 @@ impl World {
             .and_then(|index| self.archetypes.get(index))
             .map(|archetype| archetype.has_type(component))
             .unwrap_or_default()
+    }
+
+    pub fn find_by<const LOCKING: bool, T: Component + PartialEq>(
+        &self,
+        data: &T,
+    ) -> Option<Entity> {
+        for (entity, component) in self.query::<LOCKING, (Entity, &T)>() {
+            if component == data {
+                return Some(entity);
+            }
+        }
+        None
     }
 
     pub fn component<const LOCKING: bool, T: Component>(

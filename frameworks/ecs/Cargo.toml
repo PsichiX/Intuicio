@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-ecs"
-version = "0.40.1"
+version = "0.41.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Entity-Component-System framework module for Intuicio scripting platform"
@@ -11,8 +11,11 @@ documentation = "https://docs.rs/intuicio-framework-ecs"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-data = { version = "0.40", path = "../../platform/data" }
-intuicio-core = { version = "0.40", path = "../../platform/core" }
-intuicio-derive = { version = "0.40", path = "../../platform/derive" }
-intuicio-framework-serde = { version = "0.40", path = "../serde" }
+intuicio-data = { version = "0.41", path = "../../platform/data" }
+intuicio-core = { version = "0.41", path = "../../platform/core" }
+intuicio-derive = { version = "0.41", path = "../../platform/derive" }
+intuicio-framework-serde = { version = "0.41", path = "../serde" }
 serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rand = "*"

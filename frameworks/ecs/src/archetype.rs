@@ -12,7 +12,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ArchetypeError {
     ColumnAlreadyUniquelyAccessed {
         type_hash: TypeHash,

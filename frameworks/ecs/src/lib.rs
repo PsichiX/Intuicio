@@ -8,16 +8,20 @@ pub mod observer;
 pub mod prefab;
 pub mod processor;
 pub mod query;
+pub mod resources;
+pub mod scheduler;
+pub mod systems;
+pub mod universe;
 pub mod world;
 
 pub mod prelude {
     pub use crate::{
-        commands::*, entity::*, multiverse::*, observer::*, prefab::*, processor::*, world::*,
-        Component,
+        commands::*, entity::*, multiverse::*, observer::*, prefab::*, processor::*, resources::*,
+        scheduler::*, systems::*, universe::*, world::*, Component, ComponentRef, ComponentRefMut,
     };
 }
 
-use archetype::ArchetypeEntityColumnAccess;
+use crate::archetype::ArchetypeEntityColumnAccess;
 use std::ops::{Deref, DerefMut};
 
 pub trait Component: Send + Sync + 'static {}

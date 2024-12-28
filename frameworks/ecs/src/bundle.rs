@@ -247,3 +247,20 @@ impl_bundle_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
 impl_bundle_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
 impl_bundle_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 impl_bundle_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
+
+pub struct BundleChain<A: Bundle, B: Bundle>(pub A, pub B);
+
+impl<A: Bundle, B: Bundle> BundleColumns for BundleChain<A, B> {
+    fn columns_static() -> Vec<ArchetypeColumnInfo> {
+        let mut result = A::columns_static();
+        result.extend(B::columns_static());
+        result
+    }
+}
+
+impl<A: Bundle, B: Bundle> Bundle for BundleChain<A, B> {
+    fn initialize_into(self, access: &ArchetypeEntityRowAccess) {
+        self.0.initialize_into(access);
+        self.1.initialize_into(access);
+    }
+}

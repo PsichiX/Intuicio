@@ -7,7 +7,11 @@ use crate::{
     Component,
 };
 use intuicio_data::type_hash::TypeHash;
-use std::{collections::HashMap, error::Error, marker::PhantomData};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    marker::PhantomData,
+};
 
 #[derive(Debug)]
 pub enum QueryError {
@@ -38,6 +42,37 @@ impl std::fmt::Display for QueryError {
     }
 }
 
+pub struct Query<'a, const LOCKING: bool, Fetch: TypedQueryFetch<'a, LOCKING>>(
+    PhantomData<fn() -> &'a Fetch>,
+);
+
+impl<'a, const LOCKING: bool, Fetch: TypedQueryFetch<'a, LOCKING>> Default
+    for Query<'a, LOCKING, Fetch>
+{
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<'a, const LOCKING: bool, Fetch: TypedQueryFetch<'a, LOCKING>> Clone
+    for Query<'a, LOCKING, Fetch>
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, const LOCKING: bool, Fetch: TypedQueryFetch<'a, LOCKING>> Copy
+    for Query<'a, LOCKING, Fetch>
+{
+}
+
+impl<'a, const LOCKING: bool, Fetch: TypedQueryFetch<'a, LOCKING>> Query<'a, LOCKING, Fetch> {
+    pub fn query(&self, world: &'a World) -> TypedQueryIter<'a, LOCKING, Fetch> {
+        world.query::<'a, LOCKING, Fetch>()
+    }
+}
+
 pub trait TypedQueryFetch<'a, const LOCKING: bool> {
     type Value;
     type Access;
@@ -45,6 +80,9 @@ pub trait TypedQueryFetch<'a, const LOCKING: bool> {
     fn does_accept_archetype(archetype: &Archetype) -> bool;
     fn access(archetype: &'a Archetype) -> Result<Self::Access, QueryError>;
     fn fetch(access: &mut Self::Access) -> Option<Self::Value>;
+
+    #[allow(unused_variables)]
+    fn unique_access(output: &mut HashSet<TypeHash>) {}
 }
 
 impl<const LOCKING: bool> TypedQueryFetch<'_, LOCKING> for () {
@@ -113,6 +151,10 @@ impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for &'a
     fn fetch(access: &mut Self::Access) -> Option<Self::Value> {
         access.next()
     }
+
+    fn unique_access(output: &mut HashSet<TypeHash>) {
+        output.insert(TypeHash::of::<T>());
+    }
 }
 
 impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Option<&'a T> {
@@ -160,6 +202,10 @@ impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Opt
             Some(access) => Some(access.next()),
             None => Some(None),
         }
+    }
+
+    fn unique_access(output: &mut HashSet<TypeHash>) {
+        output.insert(TypeHash::of::<T>());
     }
 }
 
@@ -250,6 +296,10 @@ impl<'a, const LOCKING: bool, T: Component> TypedQueryFetch<'a, LOCKING> for Upd
             .next()
             .map(|(entity, data)| UpdatedAccess(entity, data))
     }
+
+    fn unique_access(output: &mut HashSet<TypeHash>) {
+        output.insert(TypeHash::of::<T>());
+    }
 }
 
 macro_rules! impl_typed_query_fetch_tuple {
@@ -270,6 +320,12 @@ macro_rules! impl_typed_query_fetch_tuple {
                 #[allow(non_snake_case)]
                 let ($($type,)+) = access;
                 Some(($($type::fetch($type)?,)+))
+            }
+
+            fn unique_access(output: &mut HashSet<TypeHash>) {
+                $(
+                    $type::unique_access(output);
+                )+
             }
         }
     };
@@ -449,6 +505,21 @@ impl DynamicQueryFilter {
                 _ => None,
             })
             .collect()
+    }
+
+    pub fn unique_access(&self, output: &mut HashSet<TypeHash>) {
+        for (type_hash, filter) in &self.filter {
+            if matches!(filter, DynamicQueryFilterMode::Write) {
+                output.insert(*type_hash);
+            }
+        }
+    }
+
+    pub fn query<'a, const LOCKING: bool>(
+        &self,
+        world: &'a World,
+    ) -> DynamicQueryIter<'a, LOCKING> {
+        world.dynamic_query::<LOCKING>(self)
     }
 }
 
