@@ -1,7 +1,4 @@
-use intuicio_framework_ecs::{
-    prelude::*,
-    query::{Include, Query},
-};
+use intuicio_framework_ecs::prelude::*;
 use rand::{thread_rng, Rng};
 use std::{
     error::Error,

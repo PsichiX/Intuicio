@@ -2,8 +2,7 @@ use crate::{
     archetype::{Archetype, ArchetypeColumnInfo, ArchetypeError},
     bundle::Bundle,
     entity::Entity,
-    prelude::WorldProcessorEntityMapping,
-    processor::WorldProcessor,
+    processor::{WorldProcessor, WorldProcessorEntityMapping},
     world::{Relation, World, WorldError},
     Component,
 };

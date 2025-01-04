@@ -32,13 +32,6 @@ checks:
   just test
   just miri
 
-demo-emu:
-  cd ./demos/emu/resources && just package-run
-
-demo-tetra:
-  cd ./demos/plugin/ && cargo build
-  cd ./demos/tetra/ && cargo run
-
 clean:
   find . -name target -type d -exec rm -r {} +
   just remove-lockfiles
@@ -75,9 +68,7 @@ update:
   cargo update --manifest-path ./runners/simpleton/Cargo.toml --aggressive
   cargo update --manifest-path ./runners/alchemyst/Cargo.toml --aggressive
   cargo update --manifest-path ./essentials/Cargo.toml --aggressive
-  cargo update --manifest-path ./demos/tetra/Cargo.toml --aggressive
   cargo update --manifest-path ./demos/plugin/Cargo.toml --aggressive
-  cargo update --manifest-path ./demos/emu/Cargo.toml --aggressive
   cargo update --manifest-path ./demos/custom/Cargo.toml --aggressive
   cargo update --manifest-path ./tests/Cargo.toml --aggressive
   cargo update --manifest-path ./benches/Cargo.toml --aggressive

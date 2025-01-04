@@ -12,7 +12,7 @@ use intuicio_core::{
     registry::Registry,
     types::TypeQuery,
 };
-use intuicio_data::managed::DynamicManaged;
+use intuicio_data::managed::{DynamicManaged, DynamicManagedRef};
 use std::{
     borrow::Cow,
     error::Error,
@@ -28,6 +28,13 @@ pub struct SystemContext<'a> {
 impl<'a> SystemContext<'a> {
     pub fn new(universe: &'a Universe, entity: Entity) -> Self {
         Self { universe, entity }
+    }
+
+    pub fn new_unknown(universe: &'a Universe) -> Self {
+        Self {
+            universe,
+            entity: Default::default(),
+        }
     }
 
     pub fn entity(&self) -> Entity {
@@ -88,6 +95,12 @@ impl<const LOCKING: bool> System for ScriptedFunctionSystem<LOCKING> {
     fn run(&self, context: SystemContext) -> Result<(), Box<dyn Error>> {
         let (registry, mut ctx) =
             context.fetch::<(Res<LOCKING, &Registry>, Res<LOCKING, &mut Context>)>()?;
+        let entity = DynamicManaged::new(context.entity()).map_err::<Box<dyn Error>, _>(|_| {
+            "Could not make managed object out of entity!".into()
+        })?;
+        let (universe, _) = DynamicManagedRef::make(context.universe);
+        ctx.stack().push(entity);
+        ctx.stack().push(universe);
         self.run.invoke(&mut ctx, &registry);
         Ok(())
     }
@@ -143,10 +156,17 @@ impl<const LOCKING: bool> System for ScriptedObjectSystem<LOCKING> {
             );
         }
         if let ScriptedObjectFunction::Handle(function) = &*function {
+            let entity =
+                DynamicManaged::new(context.entity()).map_err::<Box<dyn Error>, _>(|_| {
+                    "Could not make managed object out of entity!".into()
+                })?;
+            let (universe, _) = DynamicManagedRef::make(context.universe);
             let this = self
                 .object
                 .borrow()
                 .ok_or_else::<Box<dyn Error>, _>(|| "Could not borrow scripted object!".into())?;
+            ctx.stack().push(entity);
+            ctx.stack().push(universe);
             ctx.stack().push(this);
             function.invoke(&mut ctx, &registry);
             Ok(())

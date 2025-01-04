@@ -16,8 +16,8 @@ pub mod world;
 
 pub mod prelude {
     pub use crate::{
-        commands::*, entity::*, multiverse::*, observer::*, prefab::*, processor::*, resources::*,
-        scheduler::*, systems::*, universe::*, world::*, Component, ComponentRef, ComponentRefMut,
+        commands::*, entity::*, query::*, resources::*, scheduler::*, systems::*, universe::*,
+        world::*, Component, ComponentRef, ComponentRefMut,
     };
 }
 

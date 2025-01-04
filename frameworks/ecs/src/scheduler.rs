@@ -45,7 +45,6 @@ impl<const LOCKING: bool> GraphScheduler<LOCKING> {
             &mut visited,
         )?;
         visited.clear();
-        universe.clear_changes();
         let mut queue = universe
             .systems
             .query::<LOCKING, (Entity, Exclude<Relation<SystemGroupChild>>)>()
@@ -54,6 +53,7 @@ impl<const LOCKING: bool> GraphScheduler<LOCKING> {
         while let Some(entity) = queue.pop_front() {
             Self::run_node(universe, entity, &mut visited, &mut queue)?;
         }
+        universe.clear_changes();
         universe.execute_commands::<LOCKING>();
         universe.maintain_plugins();
         Ok(())
@@ -212,6 +212,11 @@ impl<const LOCKING: bool, Tag: Send + Sync> GraphSchedulerQuickPlugin<LOCKING, T
             .plugin
             .system(system, BundleChain((id, SystemOrder(self.order)), locals));
         self.order += 1;
+        self
+    }
+
+    pub fn resource<T: Component>(mut self, resource: T) -> Self {
+        self.plugin = self.plugin.resource(resource);
         self
     }
 }

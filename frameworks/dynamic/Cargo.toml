@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-dynamic"
-version = "0.41.0"
+version = "0.41.1"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Dynamic type framework module for Intuicio scripting platform"
