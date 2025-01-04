@@ -8,7 +8,6 @@ struct Health(pub usize);
 struct Strength(pub usize);
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Create the universe.
     let mut universe = Universe::default();
 
     // Create heroes.

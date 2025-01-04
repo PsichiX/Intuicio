@@ -57,7 +57,10 @@ fn training(context: SystemContext) -> Result<(), Box<dyn Error>> {
     }
 
     boost.0 += increase;
-    println!("Boost applied this round: {}. Total Boost: {}", increase, boost.0);
+    println!(
+        "Boost applied this round: {}. Total Boost: {}",
+        increase, boost.0
+    );
 
     Ok(())
 }

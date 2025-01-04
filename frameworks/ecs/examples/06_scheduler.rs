@@ -66,7 +66,7 @@ fn consume_food(context: SystemContext) -> Result<(), Box<dyn Error>> {
     if food.0 >= 50 {
         food.0 -= 50;
         println!("Food consumed. Winter survived!");
-    }else{
+    } else {
         println!("Not enough food to survive the winter!")
     }
 

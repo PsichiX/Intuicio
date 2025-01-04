@@ -6,7 +6,10 @@ use crate::{
     bundle::{Bundle, BundleColumns},
     entity::Entity,
     processor::{WorldProcessor, WorldProcessorEntityMapping},
-    query::{DynamicQueryFilter, DynamicQueryIter, TypedQueryFetch, TypedQueryIter},
+    query::{
+        DynamicQueryFilter, DynamicQueryIter, TypedLookupAccess, TypedLookupFetch, TypedLookupIter,
+        TypedQueryFetch, TypedQueryIter,
+    },
     Component, ComponentRef, ComponentRefMut,
 };
 use intuicio_core::{registry::Registry, types::struct_type::NativeStructBuilder};
@@ -1168,6 +1171,19 @@ impl World {
         DynamicQueryIter::new(filter, self)
     }
 
+    pub fn lookup<'a, const LOCKING: bool, Fetch: TypedLookupFetch<'a, LOCKING>>(
+        &'a self,
+        entities: impl IntoIterator<Item = Entity> + 'a,
+    ) -> TypedLookupIter<'a, LOCKING, Fetch> {
+        TypedLookupIter::new(self, entities)
+    }
+
+    pub fn lookup_access<'a, const LOCKING: bool, Fetch: TypedLookupFetch<'a, LOCKING>>(
+        &'a self,
+    ) -> TypedLookupAccess<'a, LOCKING, Fetch> {
+        TypedLookupAccess::new(self)
+    }
+
     pub fn relate<const LOCKING: bool, T: Component>(
         &mut self,
         payload: T,
@@ -1547,6 +1563,27 @@ mod tests {
         {
             assert!((item.entity().id() as usize) < N);
         }
+    }
+
+    #[test]
+    fn test_world_lookup() {
+        const N: usize = if cfg!(miri) { 10 } else { 1000 };
+
+        let mut world = World::default().with_new_archetype_capacity(N);
+
+        let mut entities = vec![];
+        for index in 0..N {
+            let entity = world.spawn((index as u8,)).unwrap();
+            if index % 2 == 0 {
+                entities.push(entity);
+            }
+        }
+
+        let compare_entities = world
+            .lookup::<true, (Entity, &u8)>(entities.iter().copied())
+            .map(|(entity, _)| entity)
+            .collect::<Vec<_>>();
+        assert_eq!(compare_entities, entities);
     }
 
     #[test]

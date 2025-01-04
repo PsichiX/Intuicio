@@ -3,7 +3,7 @@ use crate::{
     commands::CommandBuffer,
     entity::Entity,
     processor::WorldProcessor,
-    query::{Query, TypedQueryFetch},
+    query::{Lookup, Query, TypedLookupFetch, TypedQueryFetch},
     resources::Resources,
     systems::{System, SystemContext, Systems},
     world::World,
@@ -76,6 +76,16 @@ impl<'a, const LOCKING: bool, Fetch: TypedQueryFetch<'a, LOCKING>> UniverseFetch
 
     fn fetch(_: &Universe, _: Entity) -> Result<Self::Value, Box<dyn Error>> {
         Ok(Query::<LOCKING, Fetch>::default())
+    }
+}
+
+impl<'a, const LOCKING: bool, Fetch: TypedLookupFetch<'a, LOCKING>> UniverseFetch<'a>
+    for Lookup<'a, LOCKING, Fetch>
+{
+    type Value = Lookup<'a, LOCKING, Fetch>;
+
+    fn fetch(_: &Universe, _: Entity) -> Result<Self::Value, Box<dyn Error>> {
+        Ok(Lookup::<LOCKING, Fetch>::default())
     }
 }
 
