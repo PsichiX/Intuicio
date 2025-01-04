@@ -316,6 +316,16 @@ impl<const LOCKING: bool> ArchetypeDynamicColumnAccess<'_, LOCKING> {
             None
         }
     }
+
+    pub fn dynamic_item(&self, index: usize) -> Result<ArchetypeDynamicColumnItem, ArchetypeError> {
+        let memory = unsafe { self.data(index)? };
+        Ok(ArchetypeDynamicColumnItem {
+            memory,
+            type_hash: self.column.info.type_hash,
+            unique: self.unique,
+            _phantom: PhantomData,
+        })
+    }
 }
 
 pub struct ArchetypeEntityColumnAccess<'a, const LOCKING: bool, T: Component> {

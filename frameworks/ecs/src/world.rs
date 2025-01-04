@@ -7,8 +7,8 @@ use crate::{
     entity::Entity,
     processor::{WorldProcessor, WorldProcessorEntityMapping},
     query::{
-        DynamicQueryFilter, DynamicQueryIter, TypedLookupAccess, TypedLookupFetch, TypedLookupIter,
-        TypedQueryFetch, TypedQueryIter,
+        DynamicLookupAccess, DynamicLookupIter, DynamicQueryFilter, DynamicQueryIter,
+        TypedLookupAccess, TypedLookupFetch, TypedLookupIter, TypedQueryFetch, TypedQueryIter,
     },
     Component, ComponentRef, ComponentRefMut,
 };
@@ -1184,6 +1184,21 @@ impl World {
         TypedLookupAccess::new(self)
     }
 
+    pub fn dynamic_lookup<'a, const LOCKING: bool>(
+        &'a self,
+        filter: &DynamicQueryFilter,
+        entities: impl IntoIterator<Item = Entity> + 'a,
+    ) -> DynamicLookupIter<'a, LOCKING> {
+        DynamicLookupIter::new(filter, self, entities)
+    }
+
+    pub fn dynamic_lookup_access<'a, const LOCKING: bool>(
+        &'a self,
+        filter: &DynamicQueryFilter,
+    ) -> DynamicLookupAccess<'a, LOCKING> {
+        DynamicLookupAccess::new(filter, self)
+    }
+
     pub fn relate<const LOCKING: bool, T: Component>(
         &mut self,
         payload: T,
@@ -1584,6 +1599,27 @@ mod tests {
             .map(|(entity, _)| entity)
             .collect::<Vec<_>>();
         assert_eq!(compare_entities, entities);
+
+        let mut lookup = world.lookup_access::<true, (Entity, &u8)>();
+        for entity in entities.iter().copied() {
+            assert_eq!(lookup.access(entity).unwrap().0, entity);
+        }
+
+        let compare_entities = world
+            .dynamic_lookup::<true>(
+                &DynamicQueryFilter::default().read::<u8>(),
+                entities.iter().copied(),
+            )
+            .map(|item| item.entity())
+            .collect::<Vec<_>>();
+        assert_eq!(compare_entities, entities);
+
+        let lookup =
+            world.dynamic_lookup_access::<true>(&DynamicQueryFilter::default().read::<u8>());
+        for entity in entities.iter().copied() {
+            let item = lookup.access(entity).unwrap();
+            assert_eq!(item.entity(), entity);
+        }
     }
 
     #[test]

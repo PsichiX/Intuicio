@@ -1,7 +1,7 @@
 use crate::{
     archetype::{
-        Archetype, ArchetypeColumnAccess, ArchetypeDynamicColumnItem, ArchetypeDynamicColumnIter,
-        ArchetypeError,
+        Archetype, ArchetypeColumnAccess, ArchetypeDynamicColumnAccess, ArchetypeDynamicColumnItem,
+        ArchetypeDynamicColumnIter, ArchetypeError,
     },
     entity::{Entity, EntityDenseMap},
     world::World,
@@ -875,6 +875,10 @@ impl DynamicQueryFilter {
     }
 
     fn columns(&self) -> Vec<(TypeHash, bool)> {
+        self.columns_iter().collect()
+    }
+
+    fn columns_iter(&self) -> impl Iterator<Item = (TypeHash, bool)> + '_ {
         self.filter
             .iter()
             .filter_map(|(type_hash, mode)| match mode {
@@ -882,7 +886,6 @@ impl DynamicQueryFilter {
                 DynamicQueryFilterMode::Write => Some((*type_hash, true)),
                 _ => None,
             })
-            .collect()
     }
 
     pub fn unique_access(&self, output: &mut HashSet<TypeHash>) {
@@ -1009,5 +1012,114 @@ impl<'a, const LOCKING: bool> Iterator for DynamicQueryIter<'a, LOCKING> {
             }
         }
         None
+    }
+}
+
+pub struct DynamicLookupIter<'a, const LOCKING: bool> {
+    /// [(column type, unique access)]
+    columns: Vec<(TypeHash, bool)>,
+    access: Vec<(
+        &'a EntityDenseMap,
+        ArchetypeDynamicColumnAccess<'a, LOCKING>,
+    )>,
+    entities: Box<dyn Iterator<Item = Entity> + 'a>,
+}
+
+impl<'a, const LOCKING: bool> DynamicLookupIter<'a, LOCKING> {
+    pub fn new(
+        filter: &DynamicQueryFilter,
+        world: &'a World,
+        entities: impl IntoIterator<Item = Entity> + 'a,
+    ) -> Self {
+        Self {
+            columns: filter.columns(),
+            access: world
+                .archetypes()
+                .filter(|archetype| filter.does_accept_archetype(archetype))
+                .flat_map(|archetype| {
+                    filter.columns_iter().filter_map(|(type_hash, unique)| {
+                        Some((
+                            archetype.entities(),
+                            archetype.dynamic_column(type_hash, unique).ok()?,
+                        ))
+                    })
+                })
+                .collect(),
+            entities: Box::new(entities.into_iter()),
+        }
+    }
+}
+
+impl<'a, const LOCKING: bool> Iterator for DynamicLookupIter<'a, LOCKING> {
+    type Item = DynamicQueryItem<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let entity = self.entities.next()?;
+        let columns = self
+            .columns
+            .iter()
+            .map(|(type_hash, unique)| {
+                self.access
+                    .iter()
+                    .find(|(map, access)| {
+                        map.contains(entity)
+                            && access.info().type_hash() == *type_hash
+                            && access.is_unique() == *unique
+                    })
+                    .and_then(|(map, access)| unsafe {
+                        std::mem::transmute(access.dynamic_item(map.index_of(entity).unwrap()).ok())
+                    })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(DynamicQueryItem { entity, columns })
+    }
+}
+
+pub struct DynamicLookupAccess<'a, const LOCKING: bool> {
+    /// [(column type, unique access)]
+    columns: Vec<(TypeHash, bool)>,
+    access: Vec<(
+        &'a EntityDenseMap,
+        ArchetypeDynamicColumnAccess<'a, LOCKING>,
+    )>,
+}
+
+impl<'a, const LOCKING: bool> DynamicLookupAccess<'a, LOCKING> {
+    pub fn new(filter: &DynamicQueryFilter, world: &'a World) -> Self {
+        Self {
+            columns: filter.columns(),
+            access: world
+                .archetypes()
+                .filter(|archetype| filter.does_accept_archetype(archetype))
+                .flat_map(|archetype| {
+                    filter.columns_iter().filter_map(|(type_hash, unique)| {
+                        Some((
+                            archetype.entities(),
+                            archetype.dynamic_column(type_hash, unique).ok()?,
+                        ))
+                    })
+                })
+                .collect(),
+        }
+    }
+
+    pub fn access(&self, entity: Entity) -> Option<DynamicQueryItem> {
+        let columns = self
+            .columns
+            .iter()
+            .map(|(type_hash, unique)| {
+                self.access
+                    .iter()
+                    .find(|(map, access)| {
+                        map.contains(entity)
+                            && access.info().type_hash() == *type_hash
+                            && access.is_unique() == *unique
+                    })
+                    .and_then(|(map, access)| unsafe {
+                        std::mem::transmute(access.dynamic_item(map.index_of(entity).unwrap()).ok())
+                    })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(DynamicQueryItem { entity, columns })
     }
 }
