@@ -1,6 +1,6 @@
 [package]
 name = "benches"
-version = "0.41.3"
+version = "0.42.0"
 edition = "2021"
 publish = false
 
@@ -8,7 +8,6 @@ publish = false
 bench_access = []
 bench_allocator = []
 bench_div = []
-bench_ecs = []
 bench_fib = []
 bench_misc = []
 bench_sqrt = []
@@ -16,7 +15,6 @@ bench_all = [
     "bench_access",
     "bench_allocator",
     "bench_div",
-    "bench_ecs",
     "bench_fib",
     "bench_misc",
     "bench_sqrt",
@@ -24,12 +22,10 @@ bench_all = [
 default = ["bench_all"]
 
 [dependencies]
-intuicio-data = { version = "0.41", path = "../platform/data" }
-intuicio-core = { version = "0.41", path = "../platform/core" }
-intuicio-backend-vm = { version = "0.41", path = "../backends/vm" }
-intuicio-frontend-vault = { version = "0.41", path = "../frontends/vault" }
-intuicio-framework-ecs = { version = "0.41", path = "../frameworks/ecs" }
+intuicio-data = { version = "0.42", path = "../platform/data" }
+intuicio-core = { version = "0.42", path = "../platform/core" }
+intuicio-backend-vm = { version = "0.42", path = "../backends/vm" }
+intuicio-frontend-vault = { version = "0.42", path = "../frontends/vault" }
 rune = "*"
 rune-modules = "*"
 rhai = "*"
-hecs = "*"

@@ -4,8 +4,6 @@ mod access;
 mod allocator;
 #[cfg(feature = "bench_div")]
 mod div;
-#[cfg(feature = "bench_ecs")]
-mod ecs;
 #[cfg(feature = "bench_fib")]
 mod fib;
 #[cfg(feature = "bench_misc")]
@@ -34,8 +32,6 @@ pub fn main() {
     let _ = fib::bench();
     #[cfg(feature = "bench_misc")]
     misc::bench();
-    #[cfg(feature = "bench_ecs")]
-    ecs::bench();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -15,7 +15,6 @@ test:
 miri:
   cargo +nightly miri test --manifest-path ./platform/data/Cargo.toml
   cargo +nightly miri test --manifest-path ./platform/core/Cargo.toml
-  cargo +nightly miri test --manifest-path ./frameworks/ecs/Cargo.toml
 
 bench NAME="all":
   cargo run --manifest-path ./benches/Cargo.toml --no-default-features --features=bench_{{NAME}} --release
@@ -55,14 +54,12 @@ update:
   cargo update --manifest-path ./frameworks/pointer/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/value/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/serde/Cargo.toml --aggressive
-  cargo update --manifest-path ./frameworks/ecs/Cargo.toml --aggressive
   cargo update --manifest-path ./frameworks/text/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/serde/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/assembler/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/simpleton/Cargo.toml --aggressive
   cargo update --manifest-path ./frontends/vault/Cargo.toml --aggressive
   cargo update --manifest-path ./plugins/simpleton-http/Cargo.toml --aggressive
-  cargo update --manifest-path ./plugins/simpleton-ecs/Cargo.toml --aggressive
   cargo update --manifest-path ./plugins/simpleton-window/Cargo.toml --aggressive
   cargo update --manifest-path ./plugins/simpleton-renderer/Cargo.toml --aggressive
   cargo update --manifest-path ./runners/simpleton/Cargo.toml --aggressive
@@ -101,8 +98,6 @@ publish:
   cargo publish --no-verify --manifest-path ./frameworks/value/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./frameworks/serde/Cargo.toml
-  sleep 1
-  cargo publish --no-verify --manifest-path ./frameworks/ecs/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./frameworks/text/Cargo.toml
   sleep 1
