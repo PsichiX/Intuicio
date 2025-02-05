@@ -1376,8 +1376,8 @@ mod tests {
                 pages_count: 2,
                 chunked_pages_count: 1,
                 exclusive_pages_count: 1,
-                total_size: 96592,
-                occupied_size: 89672,
+                total_size: 96528,
+                occupied_size: 89608,
                 free_size: 6912
             }
         );
@@ -1388,8 +1388,8 @@ mod tests {
                 pages_count: 2,
                 chunked_pages_count: 1,
                 exclusive_pages_count: 1,
-                total_size: 96592,
-                occupied_size: 89416,
+                total_size: 96528,
+                occupied_size: 89352,
                 free_size: 7168
             }
         );
@@ -1400,8 +1400,8 @@ mod tests {
                 pages_count: 2,
                 chunked_pages_count: 1,
                 exclusive_pages_count: 1,
-                total_size: 96592,
-                occupied_size: 88392,
+                total_size: 96528,
+                occupied_size: 88328,
                 free_size: 8192
             }
         );
@@ -1412,8 +1412,8 @@ mod tests {
                 pages_count: 1,
                 chunked_pages_count: 0,
                 exclusive_pages_count: 1,
-                total_size: 80200,
-                occupied_size: 80200,
+                total_size: 80136,
+                occupied_size: 80136,
                 free_size: 0
             }
         );

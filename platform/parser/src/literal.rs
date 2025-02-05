@@ -26,7 +26,7 @@ impl Parser for LiteralParser {
     fn parse<'a>(&self, _: &ParserRegistry, input: &'a str) -> ParseResult<'a> {
         if input.starts_with(&*self.literal) {
             Ok((
-                &input[self.literal.as_bytes().len()..],
+                &input[self.literal.len()..],
                 ParserOutput::new(self.literal.to_string()).ok().unwrap(),
             ))
         } else {

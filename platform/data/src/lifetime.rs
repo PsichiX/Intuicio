@@ -6,47 +6,55 @@ use std::{
     },
 };
 
+#[derive(Default)]
+struct LifetimeStateInner {
+    locked: AtomicBool,
+    readers: AtomicUsize,
+    writer: AtomicUsize,
+    read_access: AtomicUsize,
+    write_access: AtomicBool,
+}
+
 #[derive(Default, Clone)]
 pub struct LifetimeState {
-    locked: Arc<AtomicBool>,
-    readers: Arc<AtomicUsize>,
-    writer: Arc<AtomicUsize>,
-    read_access: Arc<AtomicUsize>,
-    write_access: Arc<AtomicBool>,
+    inner: Arc<LifetimeStateInner>,
 }
 
 impl LifetimeState {
     pub fn can_read(&self) -> bool {
-        self.writer.load(Ordering::Acquire) == 0
+        self.inner.writer.load(Ordering::Acquire) == 0
     }
 
     pub fn can_write(&self, id: usize) -> bool {
-        self.writer.load(Ordering::Acquire) == id && self.readers.load(Ordering::Acquire) == 0
+        self.inner.writer.load(Ordering::Acquire) == id
+            && self.inner.readers.load(Ordering::Acquire) == 0
     }
 
     pub fn writer_depth(&self) -> usize {
-        self.writer.load(Ordering::Acquire)
+        self.inner.writer.load(Ordering::Acquire)
     }
 
     pub fn is_read_accessible(&self) -> bool {
-        !self.write_access.load(Ordering::Acquire)
+        !self.inner.write_access.load(Ordering::Acquire)
     }
 
     pub fn is_write_accessible(&self) -> bool {
-        !self.write_access.load(Ordering::Acquire) && self.read_access.load(Ordering::Acquire) == 0
+        !self.inner.write_access.load(Ordering::Acquire)
+            && self.inner.read_access.load(Ordering::Acquire) == 0
     }
 
     pub fn is_in_use(&self) -> bool {
-        self.read_access.load(Ordering::Acquire) > 0 || self.write_access.load(Ordering::Acquire)
+        self.inner.read_access.load(Ordering::Acquire) > 0
+            || self.inner.write_access.load(Ordering::Acquire)
     }
 
     pub fn is_locked(&self) -> bool {
-        self.locked.load(Ordering::Acquire)
+        self.inner.locked.load(Ordering::Acquire)
     }
 
     pub fn try_lock(&self) -> Option<LifetimeStateAccess> {
-        if !self.locked.load(Ordering::Acquire) {
-            self.locked.store(true, Ordering::Release);
+        if !self.inner.locked.load(Ordering::Acquire) {
+            self.inner.locked.store(true, Ordering::Release);
             Some(LifetimeStateAccess {
                 state: self,
                 unlock: true,
@@ -57,10 +65,10 @@ impl LifetimeState {
     }
 
     pub fn lock(&self) -> LifetimeStateAccess {
-        while self.locked.load(Ordering::Acquire) {
+        while self.inner.locked.load(Ordering::Acquire) {
             std::hint::spin_loop();
         }
-        self.locked.store(true, Ordering::Release);
+        self.inner.locked.store(true, Ordering::Release);
         LifetimeStateAccess {
             state: self,
             unlock: true,
@@ -77,37 +85,25 @@ impl LifetimeState {
 
     pub fn downgrade(&self) -> LifetimeWeakState {
         LifetimeWeakState {
-            locked: Arc::downgrade(&self.locked),
-            readers: Arc::downgrade(&self.readers),
-            writer: Arc::downgrade(&self.writer),
-            read_access: Arc::downgrade(&self.read_access),
-            write_access: Arc::downgrade(&self.write_access),
+            inner: Arc::downgrade(&self.inner),
         }
     }
 }
 
 #[derive(Clone)]
 pub struct LifetimeWeakState {
-    locked: Weak<AtomicBool>,
-    readers: Weak<AtomicUsize>,
-    writer: Weak<AtomicUsize>,
-    read_access: Weak<AtomicUsize>,
-    write_access: Weak<AtomicBool>,
+    inner: Weak<LifetimeStateInner>,
 }
 
 impl LifetimeWeakState {
     pub fn upgrade(&self) -> Option<LifetimeState> {
         Some(LifetimeState {
-            locked: self.locked.upgrade()?,
-            readers: self.readers.upgrade()?,
-            writer: self.writer.upgrade()?,
-            read_access: self.read_access.upgrade()?,
-            write_access: self.write_access.upgrade()?,
+            inner: self.inner.upgrade()?,
         })
     }
 
     pub fn is_owned_by(&self, state: &LifetimeState) -> bool {
-        Arc::downgrade(&state.locked).ptr_eq(&self.locked)
+        Arc::downgrade(&state.inner).ptr_eq(&self.inner)
     }
 }
 
@@ -119,7 +115,7 @@ pub struct LifetimeStateAccess<'a> {
 impl Drop for LifetimeStateAccess<'_> {
     fn drop(&mut self) {
         if self.unlock {
-            self.state.locked.store(false, Ordering::Release);
+            self.state.inner.locked.store(false, Ordering::Release);
         }
     }
 }
@@ -134,51 +130,61 @@ impl LifetimeStateAccess<'_> {
     }
 
     pub fn acquire_reader(&mut self) {
-        let v = self.state.readers.load(Ordering::Acquire) + 1;
-        self.state.readers.store(v, Ordering::Release);
+        let v = self.state.inner.readers.load(Ordering::Acquire) + 1;
+        self.state.inner.readers.store(v, Ordering::Release);
     }
 
     pub fn release_reader(&mut self) {
-        let v = self.state.readers.load(Ordering::Acquire).saturating_sub(1);
-        self.state.readers.store(v, Ordering::Release);
+        let v = self
+            .state
+            .inner
+            .readers
+            .load(Ordering::Acquire)
+            .saturating_sub(1);
+        self.state.inner.readers.store(v, Ordering::Release);
     }
 
     #[must_use]
     pub fn acquire_writer(&mut self) -> usize {
-        let v = self.state.writer.load(Ordering::Acquire) + 1;
-        self.state.writer.store(v, Ordering::Release);
+        let v = self.state.inner.writer.load(Ordering::Acquire) + 1;
+        self.state.inner.writer.store(v, Ordering::Release);
         v
     }
 
     pub fn release_writer(&mut self, id: usize) {
-        let v = self.state.writer.load(Ordering::Acquire);
+        let v = self.state.inner.writer.load(Ordering::Acquire);
         if id <= v {
             self.state
+                .inner
                 .writer
                 .store(id.saturating_sub(1), Ordering::Release);
         }
     }
 
     pub fn acquire_read_access(&mut self) {
-        let v = self.state.read_access.load(Ordering::Acquire) + 1;
-        self.state.read_access.store(v, Ordering::Release);
+        let v = self.state.inner.read_access.load(Ordering::Acquire) + 1;
+        self.state.inner.read_access.store(v, Ordering::Release);
     }
 
     pub fn release_read_access(&mut self) {
         let v = self
             .state
+            .inner
             .read_access
             .load(Ordering::Acquire)
             .saturating_sub(1);
-        self.state.read_access.store(v, Ordering::Release);
+        self.state.inner.read_access.store(v, Ordering::Release);
     }
 
     pub fn acquire_write_access(&mut self) {
-        self.state.write_access.store(true, Ordering::Release);
+        self.state.inner.write_access.store(true, Ordering::Release);
     }
 
     pub fn release_write_access(&mut self) {
-        self.state.write_access.store(false, Ordering::Release);
+        self.state
+            .inner
+            .write_access
+            .store(false, Ordering::Release);
     }
 }
 
@@ -271,6 +277,30 @@ impl Lifetime {
                 })
             })
     }
+
+    pub fn read_lock(&self) -> ReadLock {
+        let mut access = self.0.lock();
+        while !access.state.is_read_accessible() {
+            std::hint::spin_loop();
+        }
+        access.unlock = false;
+        access.acquire_read_access();
+        ReadLock {
+            lifetime: self.0.clone(),
+        }
+    }
+
+    pub fn write_lock(&self) -> WriteLock {
+        let mut access = self.0.lock();
+        while !access.state.is_write_accessible() {
+            std::hint::spin_loop();
+        }
+        access.unlock = false;
+        access.acquire_write_access();
+        WriteLock {
+            lifetime: self.0.clone(),
+        }
+    }
 }
 
 pub struct LifetimeRef(LifetimeWeakState);
@@ -361,6 +391,19 @@ impl LifetimeRef {
         } else {
             None
         }
+    }
+
+    pub fn read_lock(&self) -> Option<ReadLock> {
+        let state = self.0.upgrade()?;
+        let mut access = state.lock();
+        while !access.state.is_read_accessible() {
+            std::hint::spin_loop();
+        }
+        access.unlock = false;
+        access.acquire_read_access();
+        Some(ReadLock {
+            lifetime: state.clone(),
+        })
     }
 
     pub fn consume<T: ?Sized>(self, data: &T) -> Result<ValueReadAccess<T>, Self> {
@@ -536,6 +579,32 @@ impl LifetimeRefMut {
         } else {
             None
         }
+    }
+
+    pub fn read_lock(&self) -> Option<ReadLock> {
+        let state = self.0.upgrade()?;
+        let mut access = state.lock();
+        while !access.state.is_read_accessible() {
+            std::hint::spin_loop();
+        }
+        access.unlock = false;
+        access.acquire_read_access();
+        Some(ReadLock {
+            lifetime: state.clone(),
+        })
+    }
+
+    pub fn write_lock(&self) -> Option<WriteLock> {
+        let state = self.0.upgrade()?;
+        let mut access = state.lock();
+        while !access.state.is_write_accessible() {
+            std::hint::spin_loop();
+        }
+        access.unlock = false;
+        access.acquire_write_access();
+        Some(WriteLock {
+            lifetime: state.clone(),
+        })
     }
 
     pub fn consume<T: ?Sized>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
@@ -797,6 +866,52 @@ impl<'a, T: ?Sized> ValueWriteAccess<'a, T> {
         } else {
             Err(self)
         }
+    }
+}
+
+pub struct ReadLock {
+    lifetime: LifetimeState,
+}
+
+impl Drop for ReadLock {
+    fn drop(&mut self) {
+        unsafe { self.lifetime.lock_unchecked().release_read_access() };
+    }
+}
+
+impl ReadLock {
+    /// # Safety
+    pub unsafe fn new_raw(lifetime: LifetimeState) -> Self {
+        Self { lifetime }
+    }
+
+    pub fn using<R>(self, f: impl FnOnce() -> R) -> R {
+        let result = f();
+        drop(self);
+        result
+    }
+}
+
+pub struct WriteLock {
+    lifetime: LifetimeState,
+}
+
+impl Drop for WriteLock {
+    fn drop(&mut self) {
+        unsafe { self.lifetime.lock_unchecked().release_write_access() };
+    }
+}
+
+impl WriteLock {
+    /// # Safety
+    pub unsafe fn new_raw(lifetime: LifetimeState) -> Self {
+        Self { lifetime }
+    }
+
+    pub fn using<R>(self, f: impl FnOnce() -> R) -> R {
+        let result = f();
+        drop(self);
+        result
     }
 }
 

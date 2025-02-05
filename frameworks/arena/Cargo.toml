@@ -1,18 +1,15 @@
 [package]
-name = "intuicio-derive"
+name = "intuicio-framework-arena"
 version = "0.43.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
-description = "Procedural macro module for Intuicio scripting platform"
+description = "Arena allocator framework module for Intuicio scripting platform"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
-documentation = "https://docs.rs/intuicio-derive"
+documentation = "https://docs.rs/intuicio-framework-arena"
 readme = "../../README.md"
 
 [dependencies]
-syn = { version = "1", features = ["full", "extra-traits"] }
-quote = "1.0"
+intuicio-data = { version = "0.43", path = "../../platform/data" }
 
-[lib]
-proc-macro = true

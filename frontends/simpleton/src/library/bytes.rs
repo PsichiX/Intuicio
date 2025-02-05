@@ -468,7 +468,7 @@ impl Bytes {
         let mut bytes = bytes.write::<Bytes>().unwrap();
         let buffer = value.read::<Text>().unwrap();
         if bytes.buffer.write_all(buffer.as_bytes()).is_ok() {
-            Reference::new_integer(buffer.as_bytes().len() as Integer, registry)
+            Reference::new_integer(buffer.len() as Integer, registry)
         } else {
             Reference::new_integer(0, registry)
         }

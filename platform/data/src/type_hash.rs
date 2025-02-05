@@ -6,7 +6,15 @@ pub struct TypeHash {
     hash: u64,
 }
 
+impl Default for TypeHash {
+    fn default() -> Self {
+        Self::INVALID
+    }
+}
+
 impl TypeHash {
+    pub const INVALID: Self = Self { hash: 0 };
+
     pub fn of<T: ?Sized>() -> Self {
         unsafe { Self::raw(std::any::type_name::<T>()) }
     }
