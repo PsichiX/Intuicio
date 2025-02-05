@@ -197,9 +197,10 @@ impl Arena {
         type_hash: TypeHash,
         mut item_layout: Layout,
         finalizer: unsafe fn(*mut ()),
-        capacity: usize,
+        mut capacity: usize,
     ) -> Self {
         item_layout = item_layout.pad_to_align();
+        capacity = capacity.max(1);
         let (memory, layout) = unsafe { Self::allocate_memory_unlocked(item_layout, capacity) };
         Self {
             type_hash,
@@ -785,7 +786,7 @@ mod tests {
 
     #[test]
     fn test_arena() {
-        let mut arena = Arena::new::<String>(1);
+        let mut arena = Arena::new::<String>(0);
         assert_eq!(arena.type_hash(), TypeHash::of::<String>());
         assert!(arena.is_empty());
         assert_eq!(arena.len(), 0);
