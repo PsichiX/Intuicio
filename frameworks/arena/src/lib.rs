@@ -419,7 +419,7 @@ impl Arena {
         }
     }
 
-    pub fn iter<'a, T: 'a>(&'a self) -> impl Iterator<Item = &'a T> {
+    pub fn iter<'a, T: 'a>(&'a self) -> impl Iterator<Item = ValueReadAccess<'a, T>> {
         let type_hash = TypeHash::of::<T>();
         (self.type_hash == type_hash)
             .then_some(())
@@ -428,8 +428,8 @@ impl Arena {
                 let _lock = self.lifetime.read_lock();
                 ArenaLockedIter {
                     inner: ArenaIter {
-                        left: self.indices_lifetimes.len(),
-                        address: self.memory.cast_const().cast::<T>(),
+                        arena: self,
+                        index: 0,
                         _phantom: PhantomData,
                     },
                     _lock,
@@ -437,7 +437,7 @@ impl Arena {
             })
     }
 
-    pub fn iter_mut<'a, T: 'a>(&'a self) -> impl Iterator<Item = &'a mut T> {
+    pub fn iter_mut<'a, T: 'a>(&'a self) -> impl Iterator<Item = ValueWriteAccess<'a, T>> {
         let type_hash = TypeHash::of::<T>();
         (self.type_hash == type_hash)
             .then_some(())
@@ -446,39 +446,13 @@ impl Arena {
                 let _lock = self.lifetime.read_lock();
                 ArenaLockedIter {
                     inner: ArenaIterMut {
-                        left: self.indices_lifetimes.len(),
-                        address: self.memory.cast::<T>(),
+                        arena: self,
+                        index: 0,
                         _phantom: PhantomData,
                     },
                     _lock,
                 }
             })
-    }
-
-    /// # Safety
-    pub unsafe fn raw_iter(&self) -> impl Iterator<Item = *const u8> {
-        let _lock = self.lifetime.read_lock();
-        ArenaLockedIter {
-            inner: ArenaRawIter {
-                left: self.indices_lifetimes.len(),
-                stride: self.item_layout.size(),
-                address: self.memory.cast_const(),
-            },
-            _lock,
-        }
-    }
-
-    /// # Safety
-    pub unsafe fn raw_iter_mut(&self) -> impl Iterator<Item = *mut u8> {
-        let _lock = self.lifetime.read_lock();
-        ArenaLockedIter {
-            inner: ArenaRawIterMut {
-                left: self.indices_lifetimes.len(),
-                stride: self.item_layout.size(),
-                address: self.memory,
-            },
-            _lock,
-        }
     }
 
     /// # Safety
@@ -738,21 +712,23 @@ impl<T, I: Iterator<Item = T>> Iterator for ArenaLockedIter<T, I> {
 }
 
 pub struct ArenaIter<'a, T> {
-    left: usize,
-    address: *const T,
-    _phantom: PhantomData<fn() -> &'a T>,
+    index: usize,
+    arena: &'a Arena,
+    _phantom: PhantomData<fn() -> T>,
 }
 
-impl<'a, T> Iterator for ArenaIter<'a, T> {
-    type Item = &'a T;
+impl<'a, T: 'a> Iterator for ArenaIter<'a, T> {
+    type Item = ValueReadAccess<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.left > 0 {
+        if self.index < self.arena.indices_lifetimes.len() {
             unsafe {
-                let address = self.address.cast::<T>();
-                self.address = self.address.add(1);
-                self.left -= 1;
-                address.as_ref()
+                let address = self.arena.memory.cast::<T>().add(self.index);
+                let result = self.arena.indices_lifetimes[self.index]
+                    .1
+                    .read_ptr::<T>(address);
+                self.index += 1;
+                result
             }
         } else {
             None
@@ -760,53 +736,29 @@ impl<'a, T> Iterator for ArenaIter<'a, T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.left, Some(self.left))
-    }
-}
-
-pub struct ArenaRawIter {
-    left: usize,
-    stride: usize,
-    address: *const u8,
-}
-
-impl Iterator for ArenaRawIter {
-    type Item = *const u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.left > 0 {
-            unsafe {
-                let address = self.address;
-                self.address = self.address.add(self.stride);
-                self.left -= 1;
-                Some(address)
-            }
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.left, Some(self.left))
+        let size = self.arena.indices_lifetimes.len() - self.index;
+        (size, Some(size))
     }
 }
 
 pub struct ArenaIterMut<'a, T> {
-    left: usize,
-    address: *mut T,
-    _phantom: PhantomData<fn() -> &'a T>,
+    index: usize,
+    arena: &'a Arena,
+    _phantom: PhantomData<fn() -> T>,
 }
 
-impl<'a, T> Iterator for ArenaIterMut<'a, T> {
-    type Item = &'a mut T;
+impl<'a, T: 'a> Iterator for ArenaIterMut<'a, T> {
+    type Item = ValueWriteAccess<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.left > 0 {
+        if self.index < self.arena.indices_lifetimes.len() {
             unsafe {
-                let address = self.address.cast::<T>();
-                self.address = self.address.add(1);
-                self.left -= 1;
-                address.as_mut()
+                let address = self.arena.memory.cast::<T>().add(self.index);
+                let result = self.arena.indices_lifetimes[self.index]
+                    .1
+                    .write_ptr::<T>(address);
+                self.index += 1;
+                result
             }
         } else {
             None
@@ -814,34 +766,8 @@ impl<'a, T> Iterator for ArenaIterMut<'a, T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.left, Some(self.left))
-    }
-}
-
-pub struct ArenaRawIterMut {
-    left: usize,
-    stride: usize,
-    address: *mut u8,
-}
-
-impl Iterator for ArenaRawIterMut {
-    type Item = *mut u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.left > 0 {
-            unsafe {
-                let address = self.address;
-                self.address = self.address.add(self.stride);
-                self.left -= 1;
-                Some(address)
-            }
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.left, Some(self.left))
+        let size = self.arena.indices_lifetimes.len() - self.index;
+        (size, Some(size))
     }
 }
 
@@ -882,6 +808,14 @@ mod tests {
 
         *arena.write(world).unwrap() = "world".to_owned();
         assert_eq!(arena.read::<String>(world).unwrap().as_str(), "world");
+
+        assert_eq!(
+            arena
+                .iter::<String>()
+                .map(|item| item.to_owned())
+                .collect::<Vec<_>>(),
+            vec!["Hello".to_owned(), "world".to_owned()]
+        );
 
         arena.remove(hello).unwrap();
         assert!(!arena.is_empty());

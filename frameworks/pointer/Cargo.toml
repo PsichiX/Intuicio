@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-pointer"
-version = "0.43.0"
+version = "0.44.0"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Raw pointer framework module for Intuicio scripting platform"
@@ -11,8 +11,8 @@ documentation = "https://docs.rs/intuicio-framework-dynamic"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-core = { version = "0.43", path = "../../platform/core" }
+intuicio-core = { version = "0.44", path = "../../platform/core" }
 
 [dev-dependencies]
-intuicio-data = { version = "0.43", path = "../../platform/data" }
-intuicio-derive = { version = "0.43", path = "../../platform/derive" }
+intuicio-data = { version = "0.44", path = "../../platform/data" }
+intuicio-derive = { version = "0.44", path = "../../platform/derive" }
