@@ -136,6 +136,10 @@ impl AnyIndex {
         Self { index, type_hash }
     }
 
+    pub fn is<T>(self) -> bool {
+        self.type_hash == TypeHash::of::<T>()
+    }
+
     pub const fn is_valid(self) -> bool {
         self.index.is_valid()
     }

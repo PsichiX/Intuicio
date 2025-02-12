@@ -48,6 +48,7 @@ pub fn pointer_alignment_padding(pointer: *const u8, alignment: usize) -> usize 
     result
 }
 
+#[macro_export]
 macro_rules! does_implement_trait {
     ($trait:path => $identifier:ident < $type:ident >) => {
         pub fn $identifier<$type>() -> bool {
