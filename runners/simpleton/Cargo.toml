@@ -1,6 +1,6 @@
 [package]
 name = "simpleton"
-version = "0.44.1"
+version = "0.44.2"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Simpleton runner for Intuicio scripting platform"
@@ -18,4 +18,4 @@ intuicio-derive = { version = "0.44", path = "../../platform/derive" }
 intuicio-backend-vm = { version = "0.44", path = "../../backends/vm" }
 intuicio-frontend-simpleton = { version = "0.44", path = "../../frontends/simpleton" }
 clap = { version = "4", features = ["derive"] }
-dirs = "5"
+dirs = "6"

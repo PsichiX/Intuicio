@@ -7,6 +7,24 @@ format:
 build:
   cargo build --all --all-features
 
+build-wasm:
+  cargo build --manifest-path ./platform/data/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./platform/derive/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./platform/core/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./platform/parser/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./platform/nodes/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./backends/vm/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frameworks/dynamic/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frameworks/pointer/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frameworks/value/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frameworks/serde/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frameworks/text/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frameworks/arena/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frontends/serde/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frontends/assembler/Cargo.toml --all-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frontends/simpleton/Cargo.toml --no-default-features --target wasm32-unknown-unknown
+  cargo build --manifest-path ./frontends/vault/Cargo.toml --all-features --target wasm32-unknown-unknown
+
 test:
   cargo test --all --all-features
   cd ./runners/simpleton && just run
@@ -27,6 +45,7 @@ clippy:
 checks:
   just format
   just build
+  just build-wasm
   just clippy
   just test
   just miri

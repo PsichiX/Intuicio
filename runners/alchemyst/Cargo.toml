@@ -1,6 +1,6 @@
 [package]
 name = "alchemyst"
-version = "0.44.1"
+version = "0.44.2"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Alchemyst PCG tool based on Intuicio scripting platform"
@@ -19,7 +19,7 @@ intuicio-backend-vm = { version = "0.44", path = "../../backends/vm" }
 image = "0.25"
 vek = "0.17"
 clap = { version = "4", features = ["derive"] }
-dirs = "5"
+dirs = "6"
 
 [dependencies.intuicio-frontend-simpleton]
 version = "0.44"
