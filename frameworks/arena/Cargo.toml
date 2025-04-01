@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-arena"
-version = "0.44.2"
+version = "0.44.3"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Arena allocator framework module for Intuicio scripting platform"
@@ -12,4 +12,4 @@ readme = "../../README.md"
 
 [dependencies]
 intuicio-data = { version = "0.44", path = "../../platform/data" }
-
+serde = { version = "1", features = ["derive"] }

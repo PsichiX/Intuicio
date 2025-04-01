@@ -3,6 +3,7 @@ use intuicio_data::{
     type_hash::TypeHash,
     Finalize,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     alloc::{alloc, dealloc, Layout},
     error::Error,
@@ -50,7 +51,7 @@ impl std::fmt::Display for ArenaError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Index {
     id: u32,
     generation: u32,
