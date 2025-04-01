@@ -1,6 +1,6 @@
 [package]
 name = "simpleton-window"
-version = "0.44.4"
+version = "0.44.5"
 edition = "2021"
 publish = false
 

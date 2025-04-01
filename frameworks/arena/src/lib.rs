@@ -534,6 +534,14 @@ impl AnyArena {
             .unwrap_or_default()
     }
 
+    pub fn arenas(&self) -> &[Arena] {
+        &self.arenas
+    }
+
+    pub fn arenas_mut(&mut self) -> &mut [Arena] {
+        &mut self.arenas
+    }
+
     pub fn arena<T>(&self) -> Option<&Arena> {
         unsafe { self.arena_raw(TypeHash::of::<T>()) }
     }
