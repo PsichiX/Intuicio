@@ -702,6 +702,22 @@ impl AnyArena {
             })
         }
     }
+
+    pub fn indices(&self) -> impl Iterator<Item = AnyIndex> + '_ {
+        self.arenas.iter().flat_map(|arena| {
+            arena
+                .indices()
+                .map(move |index| AnyIndex::new(index, arena.type_hash))
+        })
+    }
+
+    pub fn iter<'a, T: 'a>(&'a self) -> impl Iterator<Item = ValueReadAccess<'a, T>> {
+        self.arenas.iter().flat_map(|arena| arena.iter::<T>())
+    }
+
+    pub fn iter_mut<'a, T: 'a>(&'a self) -> impl Iterator<Item = ValueWriteAccess<'a, T>> {
+        self.arenas.iter().flat_map(|arena| arena.iter_mut::<T>())
+    }
 }
 
 pub struct ArenaLockedIter<T, I: Iterator<Item = T>> {
