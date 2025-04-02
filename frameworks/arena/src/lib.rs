@@ -417,6 +417,20 @@ impl Arena {
         })
     }
 
+    pub fn is<T>(&self, index: Index) -> Result<bool, ArenaError> {
+        self.is_raw(index, TypeHash::of::<T>())
+    }
+
+    pub fn is_raw(&self, index: Index, type_hash: TypeHash) -> Result<bool, ArenaError> {
+        self.lifetime.read_lock().using(|| {
+            if self.type_hash == type_hash {
+                Ok(self.indices_lifetimes.iter().any(|(idx, _)| *idx == index))
+            } else {
+                Err(ArenaError::InvalidAreaType { type_hash })
+            }
+        })
+    }
+
     pub fn indices(&self) -> impl Iterator<Item = Index> + '_ {
         let _lock = self.lifetime.read_lock();
         ArenaLockedIter {
@@ -709,6 +723,21 @@ impl AnyArena {
                 type_hash: index.type_hash,
             })
         }
+    }
+
+    pub fn is<T>(&self, index: AnyIndex) -> Result<bool, ArenaError> {
+        self.is_raw(index, TypeHash::of::<T>())
+    }
+
+    pub fn is_raw(&self, index: AnyIndex, type_hash: TypeHash) -> Result<bool, ArenaError> {
+        for arena in &self.arenas {
+            if arena.type_hash == type_hash {
+                return Ok(arena.contains(index.index));
+            }
+        }
+        Err(ArenaError::ArenaNotFound {
+            type_hash: index.type_hash,
+        })
     }
 
     pub fn indices(&self) -> impl Iterator<Item = AnyIndex> + '_ {

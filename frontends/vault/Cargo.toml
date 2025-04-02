@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-vault"
-version = "0.44.5"
+version = "0.44.6"
 edition = "2021"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Vault frontend module for Intuicio scripting platform"
