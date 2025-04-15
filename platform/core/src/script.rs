@@ -1,14 +1,14 @@
 use crate::{
+    Visibility,
     context::Context,
     function::{Function, FunctionBody, FunctionParameter, FunctionQuery, FunctionSignature},
     meta::Meta,
     registry::Registry,
     types::{
+        TypeQuery,
         enum_type::{EnumVariant, RuntimeEnumBuilder},
         struct_type::{RuntimeStructBuilder, StructField},
-        TypeQuery,
     },
-    Visibility,
 };
 use std::{
     collections::HashMap,

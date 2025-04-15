@@ -98,9 +98,9 @@ impl Parser for SequenceDelimitedParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserNoValue, ParserOutput, ParserRegistry,
         sequence::{SequenceDelimitedParser, SequenceParser},
         shorthand::{lit, seq, seq_del, ws},
-        ParserNoValue, ParserOutput, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

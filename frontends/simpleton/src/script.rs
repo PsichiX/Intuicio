@@ -1,6 +1,7 @@
-use crate::{parser, Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type};
+use crate::{Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type, parser};
 use bincode::{DefaultOptions, Options};
 use intuicio_core::{
+    IntuicioVersion, Visibility,
     context::Context,
     crate_version,
     function::FunctionQuery,
@@ -12,7 +13,6 @@ use intuicio_core::{
         ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
     types::TypeQuery,
-    IntuicioVersion, Visibility,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error, path::PathBuf};

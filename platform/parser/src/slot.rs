@@ -87,9 +87,9 @@ impl Parser for SlotParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserNoValue, ParserRegistry,
         shorthand::{lit, slot_empty},
         slot::SlotParser,
-        ParserNoValue, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

@@ -1,4 +1,5 @@
 use crate::{
+    Finalize,
     lifetime::{
         Lifetime, LifetimeLazy, LifetimeRef, LifetimeRefMut, ValueReadAccess, ValueWriteAccess,
     },
@@ -8,10 +9,9 @@ use crate::{
     },
     pointer_alignment_padding,
     type_hash::TypeHash,
-    Finalize,
 };
 use std::{
-    alloc::{alloc, dealloc, Layout},
+    alloc::{Layout, alloc, dealloc},
     cell::RefCell,
     collections::HashMap,
     ops::Range,
@@ -1057,7 +1057,7 @@ impl DynamicManagedBox {
         STORAGE.with_borrow(|storage| {
             storage
                 .object_layout_with_offset(self.memory, self.id, self.page)
-                .map(|(layout, offset)| {
+                .map(|(layout, offset)| unsafe {
                     std::slice::from_raw_parts(self.memory.add(offset), layout.size())
                 })
         })
@@ -1068,7 +1068,7 @@ impl DynamicManagedBox {
         STORAGE.with_borrow(|storage| {
             storage
                 .object_layout_with_offset(self.memory, self.id, self.page)
-                .map(|(layout, offset)| {
+                .map(|(layout, offset)| unsafe {
                     std::slice::from_raw_parts_mut(self.memory.add(offset), layout.size())
                 })
         })

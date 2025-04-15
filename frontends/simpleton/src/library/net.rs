@@ -1,7 +1,7 @@
 use super::bytes::Bytes;
 use crate::{Boolean, Integer, Reference, Text};
-use intuicio_core::{registry::Registry, IntuicioStruct};
-use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
+use intuicio_core::{IntuicioStruct, registry::Registry};
+use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},

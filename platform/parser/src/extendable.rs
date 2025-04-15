@@ -1,5 +1,5 @@
 use crate::{
-    alternation::AlternationParser, ParseResult, Parser, ParserExt, ParserHandle, ParserRegistry,
+    ParseResult, Parser, ParserExt, ParserHandle, ParserRegistry, alternation::AlternationParser,
 };
 use std::sync::RwLock;
 
@@ -110,11 +110,11 @@ impl Parser for ExtendableWrapperParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserRegistry,
         extendable::{ExtendableParser, ExtendableWrapperParser},
         shorthand::{
             ext_depth, ext_exchange, ext_variants, ext_wrap, lit, oc, seq, slot_empty, ws,
         },
-        ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}
@@ -176,10 +176,12 @@ mod tests {
         };
         assert!(signature.parse(&registry, "(foo)").is_err());
         signature.extend(lit("foo"));
-        assert!(signature
-            .parse(&registry, "(foo)")
-            .unwrap()
-            .1
-            .is::<String>());
+        assert!(
+            signature
+                .parse(&registry, "(foo)")
+                .unwrap()
+                .1
+                .is::<String>()
+        );
     }
 }

@@ -31,9 +31,9 @@ impl Parser for PredictParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserRegistry,
         predict::PredictParser,
         shorthand::{lit, pred, seq},
-        ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

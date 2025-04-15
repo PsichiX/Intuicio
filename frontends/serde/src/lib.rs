@@ -1,4 +1,5 @@
 use intuicio_core::{
+    IntuicioVersion, Visibility,
     context::Context,
     crate_version,
     function::FunctionQuery,
@@ -10,7 +11,6 @@ use intuicio_core::{
         ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
     types::TypeQuery,
-    IntuicioVersion, Visibility,
 };
 use intuicio_nodes::nodes::{
     Node, NodeDefinition, NodeGraphVisitor, NodePin, NodeSuggestion, NodeTypeInfo, PropertyValue,
@@ -1089,11 +1089,7 @@ impl NodeDefinition for SerdeNodes {
                         }
                     }
                     "Type module name" => {
-                        *module_name = if let Ok(v) = property_value.get_exact::<String>() {
-                            Some(v)
-                        } else {
-                            None
-                        };
+                        *module_name = property_value.get_exact::<String>().ok();
                     }
                     _ => {}
                 },
@@ -1130,25 +1126,13 @@ impl NodeDefinition for SerdeNodes {
                         }
                     }
                     "Module name" => {
-                        *module_name = if let Ok(v) = property_value.get_exact::<String>() {
-                            Some(v)
-                        } else {
-                            None
-                        };
+                        *module_name = property_value.get_exact::<String>().ok();
                     }
                     "Type name" => {
-                        *type_name = if let Ok(v) = property_value.get_exact::<String>() {
-                            Some(v)
-                        } else {
-                            None
-                        };
+                        *type_name = property_value.get_exact::<String>().ok();
                     }
                     "Visibility" => {
-                        *visibility = if let Ok(v) = property_value.get_exact::<Visibility>() {
-                            Some(v)
-                        } else {
-                            None
-                        };
+                        *visibility = property_value.get_exact::<Visibility>().ok();
                     }
                     _ => {}
                 },
@@ -1245,13 +1229,15 @@ mod tests {
                 //         .into_handle(),
                 // ),
             );
-        assert!(registry
-            .find_function(FunctionQuery {
-                name: Some("main".into()),
-                module_name: Some("test".into()),
-                ..Default::default()
-            })
-            .is_some());
+        assert!(
+            registry
+                .find_function(FunctionQuery {
+                    name: Some("main".into()),
+                    module_name: Some("test".into()),
+                    ..Default::default()
+                })
+                .is_some()
+        );
         let mut host = Host::new(Context::new(10240, 10240), RegistryHandle::new(registry));
         let (result,) = host
             .call_function::<(usize,), _>("main", "test", None)

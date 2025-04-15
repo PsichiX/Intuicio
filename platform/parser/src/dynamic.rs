@@ -460,10 +460,10 @@ pub fn dynamic_extension(
 
 #[cfg(test)]
 mod tests {
-    use super::{dynamic_extension, DynamicExtensionBuilder};
+    use super::{DynamicExtensionBuilder, dynamic_extension};
     use crate::{
-        shorthand::{map, number_float},
         ParserRegistry,
+        shorthand::{map, number_float},
     };
     use intuicio_core::transformer::{DynamicManagedValueTransformer, ValueTransformer};
     use intuicio_derive::intuicio_function;

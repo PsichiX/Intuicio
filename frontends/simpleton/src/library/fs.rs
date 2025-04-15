@@ -1,4 +1,4 @@
-use crate::{library::bytes::Bytes, Array, Reference, Text};
+use crate::{Array, Reference, Text, library::bytes::Bytes};
 use intuicio_core::registry::Registry;
 use intuicio_derive::intuicio_function;
 use std::path::{Path, PathBuf};

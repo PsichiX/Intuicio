@@ -221,11 +221,7 @@ pub fn select(mut value: Reference, path: Reference) -> Reference {
 
 #[intuicio_function(module_name = "reflect")]
 pub fn pass_or(value: Reference, default: Reference) -> Reference {
-    if value.is_null() {
-        default
-    } else {
-        value
-    }
+    if value.is_null() { default } else { value }
 }
 
 #[intuicio_function(module_name = "reflect", use_registry)]

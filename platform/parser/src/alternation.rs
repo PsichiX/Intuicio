@@ -61,9 +61,9 @@ impl FromIterator<ParserHandle> for AlternationParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserRegistry,
         alternation::AlternationParser,
         shorthand::{alt, lit},
-        ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

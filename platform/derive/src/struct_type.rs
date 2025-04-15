@@ -1,6 +1,6 @@
 use proc_macro::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, Ident, ItemStruct, Lit, Meta, NestedMeta, Visibility};
+use syn::{Ident, ItemStruct, Lit, Meta, NestedMeta, Visibility, parse_macro_input};
 
 #[derive(Default)]
 struct StructAttributes {

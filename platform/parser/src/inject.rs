@@ -26,9 +26,9 @@ impl Parser for InjectParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserNoValue, ParserOutput, ParserRegistry,
         inject::InjectParser,
         shorthand::{inject, lit, seq, ws},
-        ParserNoValue, ParserOutput, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

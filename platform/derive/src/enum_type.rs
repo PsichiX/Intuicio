@@ -1,7 +1,7 @@
 use proc_macro::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_macro_input, Expr, Fields, Ident, Index, ItemEnum, Lit, Meta, NestedMeta, Visibility,
+    Expr, Fields, Ident, Index, ItemEnum, Lit, Meta, NestedMeta, Visibility, parse_macro_input,
 };
 
 #[derive(Default)]

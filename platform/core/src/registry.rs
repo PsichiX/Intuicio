@@ -1,6 +1,6 @@
 use crate::{
     function::{Function, FunctionHandle, FunctionQuery},
-    types::{struct_type::NativeStructBuilder, Type, TypeHandle, TypeQuery},
+    types::{Type, TypeHandle, TypeQuery, struct_type::NativeStructBuilder},
 };
 use std::{
     collections::BTreeMap,

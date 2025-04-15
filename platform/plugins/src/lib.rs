@@ -1,4 +1,4 @@
-use intuicio_core::{crate_version, registry::Registry, IntuicioVersion};
+use intuicio_core::{IntuicioVersion, crate_version, registry::Registry};
 use libloading::Library;
 use std::{cell::RefCell, collections::HashMap};
 

@@ -1,11 +1,11 @@
 use crate::{
+    Integer, Real, Text,
     script::{
         SimpletonExpressionNext, SimpletonExpressionStart, SimpletonFunction, SimpletonLiteral,
         SimpletonModule, SimpletonStatement, SimpletonStruct,
     },
-    Integer, Real, Text,
 };
-use pest::{iterators::Pair, Parser};
+use pest::{Parser, iterators::Pair};
 use pest_derive::Parser;
 
 #[derive(Parser)]

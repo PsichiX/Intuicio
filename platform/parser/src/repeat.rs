@@ -42,9 +42,9 @@ impl Parser for RepeatParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserOutput, ParserRegistry,
         repeat::RepeatParser,
         shorthand::{lit, rep},
-        ParserOutput, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

@@ -1,22 +1,22 @@
 use glow::{
-    Context as GlowContext, HasContext, COLOR_BUFFER_BIT, DEPTH_BUFFER_BIT, STENCIL_BUFFER_BIT,
+    COLOR_BUFFER_BIT, Context as GlowContext, DEPTH_BUFFER_BIT, HasContext, STENCIL_BUFFER_BIT,
 };
 use glutin::{
+    ContextBuilder, ContextWrapper, PossiblyCurrent,
     dpi::{LogicalSize, PhysicalPosition},
     event::{ElementState, Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     platform::run_return::EventLoopExtRunReturn,
     window::{Fullscreen, Window as GlutinWindow, WindowBuilder},
-    ContextBuilder, ContextWrapper, PossiblyCurrent,
 };
 use intuicio_core::{
-    context::Context, core_version, define_native_struct, registry::Registry, IntuicioStruct,
-    IntuicioVersion,
+    IntuicioStruct, IntuicioVersion, context::Context, core_version, define_native_struct,
+    registry::Registry,
 };
 use intuicio_data::managed::{Managed, ManagedRef, ManagedRefMut};
-use intuicio_derive::{intuicio_function, intuicio_method, intuicio_methods, IntuicioStruct};
+use intuicio_derive::{IntuicioStruct, intuicio_function, intuicio_method, intuicio_methods};
 use intuicio_frontend_simpleton::{
-    library::event::Event as SimpletonEvent, Boolean, Integer, Real, Reference, Text,
+    Boolean, Integer, Real, Reference, Text, library::event::Event as SimpletonEvent,
 };
 use std::time::Instant;
 
@@ -426,12 +426,12 @@ pub fn window_interface_exit(mut interface: Reference) -> Reference {
     Reference::null()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn version() -> IntuicioVersion {
     core_version()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn install(registry: &mut Registry) {
     registry.add_type(define_native_struct! {
         registry => mod gl struct Gl (Gl) {}

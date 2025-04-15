@@ -1,7 +1,7 @@
 use intuicio_core::prelude::*;
 use intuicio_data::prelude::*;
 use intuicio_derive::*;
-use intuicio_framework_text::{name, text, Name, Text};
+use intuicio_framework_text::{Name, Text, name, text};
 use std::collections::HashMap;
 
 #[derive(IntuicioStruct, Debug, Default)]

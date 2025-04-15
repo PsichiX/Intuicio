@@ -1,9 +1,9 @@
 use crate::{
+    Visibility,
     context::Context,
     meta::Meta,
     registry::Registry,
     types::{Type, TypeHandle, TypeQuery},
-    Visibility,
 };
 use intuicio_data::data_stack::DataStackPack;
 use rustc_hash::FxHasher;
@@ -507,51 +507,57 @@ mod tests {
         let function = Function::new(signature.to_owned(), FunctionBody::pointer(add));
 
         assert!(FunctionQuery::default().is_valid(&signature));
-        assert!(FunctionQuery {
-            name: Some("add".into()),
-            ..Default::default()
-        }
-        .is_valid(&signature));
-        assert!(FunctionQuery {
-            name: Some("add".into()),
-            inputs: [
-                FunctionQueryParameter {
-                    name: Some("a".into()),
-                    ..Default::default()
-                },
-                FunctionQueryParameter {
-                    name: Some("b".into()),
-                    ..Default::default()
-                }
-            ]
-            .as_slice()
-            .into(),
-            outputs: [FunctionQueryParameter {
-                name: Some("result".into()),
+        assert!(
+            FunctionQuery {
+                name: Some("add".into()),
                 ..Default::default()
-            }]
-            .as_slice()
-            .into(),
-            ..Default::default()
-        }
-        .is_valid(&signature));
-        assert!(!FunctionQuery {
-            name: Some("add".into()),
-            inputs: [
-                FunctionQueryParameter {
-                    name: Some("b".into()),
+            }
+            .is_valid(&signature)
+        );
+        assert!(
+            FunctionQuery {
+                name: Some("add".into()),
+                inputs: [
+                    FunctionQueryParameter {
+                        name: Some("a".into()),
+                        ..Default::default()
+                    },
+                    FunctionQueryParameter {
+                        name: Some("b".into()),
+                        ..Default::default()
+                    }
+                ]
+                .as_slice()
+                .into(),
+                outputs: [FunctionQueryParameter {
+                    name: Some("result".into()),
                     ..Default::default()
-                },
-                FunctionQueryParameter {
-                    name: Some("a".into()),
-                    ..Default::default()
-                }
-            ]
-            .as_slice()
-            .into(),
-            ..Default::default()
-        }
-        .is_valid(&signature));
+                }]
+                .as_slice()
+                .into(),
+                ..Default::default()
+            }
+            .is_valid(&signature)
+        );
+        assert!(
+            !FunctionQuery {
+                name: Some("add".into()),
+                inputs: [
+                    FunctionQueryParameter {
+                        name: Some("b".into()),
+                        ..Default::default()
+                    },
+                    FunctionQueryParameter {
+                        name: Some("a".into()),
+                        ..Default::default()
+                    }
+                ]
+                .as_slice()
+                .into(),
+                ..Default::default()
+            }
+            .is_valid(&signature)
+        );
 
         let mut context = Context::new(10240, 10240);
         let registry = Registry::default();

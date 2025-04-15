@@ -1,4 +1,4 @@
-use intuicio_core::{registry::Registry, IntuicioVersion};
+use intuicio_core::{IntuicioVersion, registry::Registry};
 use intuicio_derive::*;
 use intuicio_frontend_simpleton::{Integer, Reference};
 
@@ -15,12 +15,12 @@ fn fib_inner(n: Integer) -> Integer {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn version() -> IntuicioVersion {
     intuicio_core::core_version()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn install(registry: &mut Registry) {
     registry.add_function(fib::define_function(registry));
 }

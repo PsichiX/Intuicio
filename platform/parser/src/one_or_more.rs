@@ -37,9 +37,9 @@ impl Parser for OneOrMoreParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserOutput, ParserRegistry,
         one_or_more::OneOrMoreParser,
         shorthand::{lit, oom},
-        ParserOutput, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

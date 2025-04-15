@@ -7,7 +7,7 @@ pub mod prelude {
     pub use crate::{library::*, script::*, *};
 }
 
-use intuicio_core::{crate_version, IntuicioVersion};
+use intuicio_core::{IntuicioVersion, crate_version};
 
 pub use intuicio_framework_dynamic::{
     Array, Boolean, Function, Integer, Map, Real, Reference, Text, Transferable, Transferred, Type,
@@ -20,9 +20,9 @@ pub fn frontend_simpleton_version() -> IntuicioVersion {
 #[cfg(test)]
 mod tests {
     use crate::{
-        library::{jobs::Jobs, ObjectBuilder},
-        script::{SimpletonContentParser, SimpletonPackage, SimpletonScriptExpression},
         Integer, Real, Reference,
+        library::{ObjectBuilder, jobs::Jobs},
+        script::{SimpletonContentParser, SimpletonPackage, SimpletonScriptExpression},
     };
     use intuicio_backend_vm::prelude::*;
     use intuicio_core::prelude::*;

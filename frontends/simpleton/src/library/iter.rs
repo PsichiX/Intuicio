@@ -1,6 +1,6 @@
-use crate::{library::closure::Closure, Array, Boolean, Function, Integer, Map, Reference};
-use intuicio_core::{context::Context, registry::Registry, IntuicioStruct};
-use intuicio_derive::{intuicio_function, intuicio_method, intuicio_methods, IntuicioStruct};
+use crate::{Array, Boolean, Function, Integer, Map, Reference, library::closure::Closure};
+use intuicio_core::{IntuicioStruct, context::Context, registry::Registry};
+use intuicio_derive::{IntuicioStruct, intuicio_function, intuicio_method, intuicio_methods};
 
 const GENERATOR: &str = "next";
 

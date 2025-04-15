@@ -1,12 +1,12 @@
 use crate::{
+    Finalize,
     lifetime::{
         Lifetime, LifetimeLazy, LifetimeRef, LifetimeRefMut, ValueReadAccess, ValueWriteAccess,
     },
     type_hash::TypeHash,
-    Finalize,
 };
 use std::{
-    alloc::{alloc, dealloc, Layout},
+    alloc::{Layout, alloc, dealloc},
     mem::MaybeUninit,
 };
 
@@ -157,7 +157,10 @@ impl<T: ?Sized> ManagedRef<T> {
     /// # Safety
     pub unsafe fn make_raw(data: *const T) -> Option<(Self, Lifetime)> {
         let result = Lifetime::default();
-        Some((Self::new_raw(data, result.borrow().unwrap())?, result))
+        Some((
+            unsafe { Self::new_raw(data, result.borrow().unwrap()) }?,
+            result,
+        ))
     }
 
     pub fn into_inner(self) -> (LifetimeRef, *const T) {
@@ -261,7 +264,10 @@ impl<T: ?Sized> ManagedRefMut<T> {
     /// # Safety
     pub unsafe fn make_raw(data: *mut T) -> Option<(Self, Lifetime)> {
         let result = Lifetime::default();
-        Some((Self::new_raw(data, result.borrow_mut().unwrap())?, result))
+        Some((
+            unsafe { Self::new_raw(data, result.borrow_mut().unwrap()) }?,
+            result,
+        ))
     }
 
     pub fn into_inner(self) -> (LifetimeRefMut, *mut T) {
@@ -397,7 +403,7 @@ impl<T: ?Sized> ManagedLazy<T> {
     /// # Safety
     pub unsafe fn make_raw(data: *mut T) -> Option<(Self, Lifetime)> {
         let result = Lifetime::default();
-        Some((Self::new_raw(data, result.lazy())?, result))
+        Some((unsafe { Self::new_raw(data, result.lazy()) }?, result))
     }
 
     pub fn into_inner(self) -> (LifetimeLazy, *mut T) {
@@ -697,8 +703,8 @@ impl DynamicManaged {
         layout: Layout,
         finalizer: unsafe fn(*mut ()),
     ) -> Self {
-        let memory = alloc(layout);
-        memory.copy_from(bytes.as_ptr(), bytes.len());
+        let memory = unsafe { alloc(layout) };
+        unsafe { memory.copy_from(bytes.as_ptr(), bytes.len()) };
         Self {
             type_hash,
             lifetime,
@@ -748,12 +754,12 @@ impl DynamicManaged {
 
     /// # Safety
     pub unsafe fn memory(&self) -> &[u8] {
-        std::slice::from_raw_parts(self.memory, self.layout.size())
+        unsafe { std::slice::from_raw_parts(self.memory, self.layout.size()) }
     }
 
     /// # Safety
     pub unsafe fn memory_mut(&mut self) -> &mut [u8] {
-        std::slice::from_raw_parts_mut(self.memory, self.layout.size())
+        unsafe { std::slice::from_raw_parts_mut(self.memory, self.layout.size()) }
     }
 
     pub fn is<T>(&self) -> bool {

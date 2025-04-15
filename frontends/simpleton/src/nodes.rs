@@ -1,4 +1,4 @@
-use crate::{script::SimpletonLiteral, Reference};
+use crate::{Reference, script::SimpletonLiteral};
 use intuicio_core::{function::FunctionQuery, registry::Registry, types::TypeQuery};
 use intuicio_nodes::nodes::{
     Node, NodeDefinition, NodePin, NodeSuggestion, NodeTypeInfo, PropertyValue,

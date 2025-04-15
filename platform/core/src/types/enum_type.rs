@@ -1,12 +1,12 @@
 //! NOTE: For now only acceptable enums are ones with `repr(u8)`,
 //! because those have stable discriminant offset and size.
 use crate::{
+    Visibility,
     meta::Meta,
     object::RuntimeObject,
-    types::{struct_type::StructField, EnumVariantQuery, MetaQuery, StructFieldQuery, Type},
-    Visibility,
+    types::{EnumVariantQuery, MetaQuery, StructFieldQuery, Type, struct_type::StructField},
 };
-use intuicio_data::{is_copy, is_send, is_sync, type_hash::TypeHash, Finalize, Initialize};
+use intuicio_data::{Finalize, Initialize, is_copy, is_send, is_sync, type_hash::TypeHash};
 use rustc_hash::FxHasher;
 use std::{
     alloc::Layout,
@@ -496,7 +496,7 @@ impl Enum {
     /// # Safety
     pub unsafe fn find_variant_by_value<T: 'static>(&self, value: &T) -> Option<&EnumVariant> {
         if TypeHash::of::<T>() == self.type_hash {
-            let discriminant = (value as *const T as *const u8).read();
+            let discriminant = unsafe { (value as *const T as *const u8).read() };
             self.variants
                 .iter()
                 .find(|variant| variant.discriminant == discriminant)
@@ -517,17 +517,17 @@ impl Enum {
             return false;
         }
         let size = self.layout.size();
-        if from < to.add(size) && from.add(size) > to {
+        if from < unsafe { to.add(size) } && unsafe { from.add(size) } > to {
             return false;
         }
-        to.copy_from_nonoverlapping(from, size);
+        unsafe { to.copy_from_nonoverlapping(from, size) };
         true
     }
 
     /// # Safety
     pub unsafe fn initialize(&self, pointer: *mut ()) -> bool {
         if let Some(initializer) = self.initializer {
-            (initializer)(pointer);
+            unsafe { (initializer)(pointer) };
             true
         } else {
             false
@@ -536,7 +536,7 @@ impl Enum {
 
     /// # Safety
     pub unsafe fn finalize(&self, pointer: *mut ()) {
-        (self.finalizer)(pointer);
+        unsafe { (self.finalizer)(pointer) };
     }
 
     /// # Safety
@@ -940,7 +940,7 @@ macro_rules! define_runtime_enum {
 #[cfg(test)]
 mod test {
     use crate::{self as intuicio_core};
-    use crate::{meta::Meta, object::*, registry::*, IntuicioEnum};
+    use crate::{IntuicioEnum, meta::Meta, object::*, registry::*};
     use intuicio_derive::*;
 
     #[derive(IntuicioEnum, Default)]

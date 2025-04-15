@@ -3,7 +3,7 @@ use intuicio_core::{
     function::{FunctionHandle, FunctionQuery},
     object::Object,
     registry::Registry,
-    types::{struct_type::NativeStructBuilder, TypeHandle, TypeQuery},
+    types::{TypeHandle, TypeQuery, struct_type::NativeStructBuilder},
 };
 use intuicio_data::{shared::Shared, type_hash::TypeHash};
 use std::{
@@ -198,7 +198,9 @@ impl Reference {
 
     /// # Safety
     pub unsafe fn uninitialized(ty: &Type) -> Self {
-        Self::new_raw(Object::new_uninitialized(ty.data.as_ref().unwrap().clone()).unwrap())
+        Self::new_raw(unsafe {
+            Object::new_uninitialized(ty.data.as_ref().unwrap().clone()).unwrap()
+        })
     }
 
     pub fn type_of(&self) -> Option<Type> {
@@ -272,13 +274,16 @@ impl Reference {
         if !data.type_handle().is_send() {
             return None;
         }
-        let mut object =
+        let mut object = unsafe {
             Object::new_uninitialized(TRANSFERRED_STRUCT_HANDLE.with(|handle| handle.clone()))
-                .unwrap();
-        object
-            .as_mut_ptr()
-            .cast::<Transferred>()
-            .write(Transferred(data.as_ptr() as usize));
+                .unwrap()
+        };
+        unsafe {
+            object
+                .as_mut_ptr()
+                .cast::<Transferred>()
+                .write(Transferred(data.as_ptr() as usize))
+        };
         Some(Ok(std::mem::replace(&mut *data, object)))
     }
 }

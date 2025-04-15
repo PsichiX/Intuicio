@@ -1,14 +1,14 @@
 use glow::{
-    Buffer, Context as GlowContext, HasContext, PixelUnpackData, Program, Texture, UniformLocation,
-    VertexArray, ARRAY_BUFFER, BLEND, CLAMP_TO_EDGE, COLOR_BUFFER_BIT, ELEMENT_ARRAY_BUFFER, FLOAT,
-    FRAGMENT_SHADER, LINEAR, NEAREST, ONE_MINUS_SRC_ALPHA, RGBA, SRC_ALPHA, STATIC_DRAW, TEXTURE0,
-    TEXTURE_2D, TEXTURE_MAG_FILTER, TEXTURE_MIN_FILTER, TEXTURE_WRAP_S, TEXTURE_WRAP_T, TRIANGLES,
-    UNSIGNED_BYTE, UNSIGNED_INT, VERTEX_SHADER,
+    ARRAY_BUFFER, BLEND, Buffer, CLAMP_TO_EDGE, COLOR_BUFFER_BIT, Context as GlowContext,
+    ELEMENT_ARRAY_BUFFER, FLOAT, FRAGMENT_SHADER, HasContext, LINEAR, NEAREST, ONE_MINUS_SRC_ALPHA,
+    PixelUnpackData, Program, RGBA, SRC_ALPHA, STATIC_DRAW, TEXTURE_2D, TEXTURE_MAG_FILTER,
+    TEXTURE_MIN_FILTER, TEXTURE_WRAP_S, TEXTURE_WRAP_T, TEXTURE0, TRIANGLES, Texture,
+    UNSIGNED_BYTE, UNSIGNED_INT, UniformLocation, VERTEX_SHADER, VertexArray,
 };
 use image::ImageReader;
 use intuicio_core::{core_version, prelude::*};
 use intuicio_data::prelude::*;
-use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
+use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
 use intuicio_frontend_simpleton::prelude::{bytes::Bytes, *};
 use std::{collections::HashMap, io::Cursor};
 use vek::{FrustumPlanes, Mat4, Quaternion, Transform as VekTransform, Vec3};
@@ -661,12 +661,12 @@ enum UniformData {
     Texture(Integer),
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn version() -> IntuicioVersion {
     core_version()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn install(registry: &mut Registry) {
     registry.add_type(Renderer::define_struct(registry));
     registry.add_type(RenderBuffer::define_struct(registry));

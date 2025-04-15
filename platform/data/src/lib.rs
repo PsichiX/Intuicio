@@ -7,8 +7,8 @@ pub mod type_hash;
 
 pub mod prelude {
     pub use crate::{
-        data_stack::*, lifetime::*, managed::*, managed_box::*, shared::*, type_hash::*, Finalize,
-        Initialize,
+        Finalize, Initialize, data_stack::*, lifetime::*, managed::*, managed_box::*, shared::*,
+        type_hash::*,
     };
 }
 
@@ -17,7 +17,7 @@ pub trait Initialize: Sized {
 
     /// # Safety
     unsafe fn initialize_raw(data: *mut ()) {
-        data.cast::<Self>().write(Self::initialize());
+        unsafe { data.cast::<Self>().write(Self::initialize()) };
     }
 }
 
@@ -33,7 +33,7 @@ where
 pub trait Finalize: Sized {
     /// # Safety
     unsafe fn finalize_raw(data: *mut ()) {
-        data.cast::<Self>().read_unaligned();
+        unsafe { data.cast::<Self>().read_unaligned() };
     }
 }
 

@@ -35,9 +35,9 @@ impl Parser for NotParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserRegistry,
         not::NotParser,
         shorthand::{lit, not, seq},
-        ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

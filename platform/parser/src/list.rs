@@ -58,9 +58,9 @@ impl Parser for ListParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserOutput, ParserRegistry,
         list::ListParser,
         shorthand::{alt, list, lit, ows},
-        ParserOutput, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

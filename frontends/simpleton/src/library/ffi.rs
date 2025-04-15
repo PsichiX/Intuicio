@@ -3,7 +3,7 @@ use intuicio_core::{
     context::Context,
     function::{Function, FunctionBody, FunctionParameter, FunctionSignature},
     registry::Registry,
-    types::{struct_type::NativeStructBuilder, TypeHandle},
+    types::{TypeHandle, struct_type::NativeStructBuilder},
     utils::object_pop_from_stack,
 };
 use intuicio_data::type_hash::TypeHash;
@@ -13,8 +13,8 @@ use intuicio_framework_dynamic::{Array, Integer, Real, Text, Type};
 use std::{
     alloc::Layout,
     ffi::{
-        c_char, c_double, c_float, c_int, c_long, c_longlong, c_short, c_uchar, c_uint, c_ulong,
-        c_ulonglong, c_ushort, c_void, CString,
+        CString, c_char, c_double, c_float, c_int, c_long, c_longlong, c_short, c_uchar, c_uint,
+        c_ulong, c_ulonglong, c_ushort, c_void,
     },
     path::Path,
     ptr::null_mut,

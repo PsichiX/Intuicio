@@ -1,4 +1,4 @@
-use intuicio_core::{core_version, registry::Registry, IntuicioStruct, IntuicioVersion};
+use intuicio_core::{IntuicioStruct, IntuicioVersion, core_version, registry::Registry};
 use intuicio_derive::*;
 use intuicio_frontend_simpleton::prelude::{bytes::Bytes, *};
 use reqwest::blocking::Client;
@@ -115,12 +115,12 @@ impl HttpClient {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn version() -> IntuicioVersion {
     core_version()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn install(registry: &mut Registry) {
     registry.add_type(HttpClient::define_struct(registry));
     registry.add_function(HttpClient::get__define_function(registry));

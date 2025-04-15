@@ -1,12 +1,13 @@
 use intuicio_data::type_hash::TypeHash;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, error::Error};
 
 pub use serde_intermediate::{
+    Intermediate, Object,
     de::intermediate::DeserializeMode,
     error::{Error as IntermediateError, Result as IntermediateResult},
     from_intermediate, from_intermediate_as, from_object, from_str, from_str_as, to_intermediate,
-    to_object, to_string, to_string_compact, to_string_pretty, Intermediate, Object,
+    to_object, to_string, to_string_compact, to_string_pretty,
 };
 
 struct Serializer {
@@ -401,9 +402,9 @@ impl SerializationRegistry {
         &mut self,
         serialize_from: impl Fn(&T) -> Result<Intermediate, Box<dyn Error>> + Send + Sync + 'static,
         deserialize_to: impl Fn(&mut T, &Intermediate) -> Result<(), Box<dyn Error>>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ) {
         unsafe {
             self.register_raw(
@@ -419,13 +420,13 @@ impl SerializationRegistry {
         &mut self,
         type_hash: TypeHash,
         serialize_from: impl Fn(*const u8) -> Result<Intermediate, Box<dyn Error>>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
         deserialize_to: impl Fn(*mut u8, &Intermediate) -> Result<(), Box<dyn Error>>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ) {
         self.mapping.insert(
             type_hash,

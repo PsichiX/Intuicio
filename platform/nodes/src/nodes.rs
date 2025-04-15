@@ -1,8 +1,8 @@
 use intuicio_core::{registry::Registry, types::TypeQuery};
-use rstar::{Envelope, Point, PointDistance, RTree, RTreeObject, AABB};
+use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
 use serde::{Deserialize, Serialize};
 use serde_intermediate::{
-    de::intermediate::DeserializeMode, error::Result as IntermediateResult, Intermediate,
+    Intermediate, de::intermediate::DeserializeMode, error::Result as IntermediateResult,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -706,7 +706,7 @@ impl<T: NodeDefinition> NodeGraph<T> {
                 return Some(ConnectionError::SourcePinNotFound {
                     node: connection.from_node.to_string(),
                     pin: connection.from_pin.to_owned(),
-                })
+                });
             }
         };
         let to_pins_in = to_node.data.node_pins_in(registry);
@@ -719,7 +719,7 @@ impl<T: NodeDefinition> NodeGraph<T> {
                 return Some(ConnectionError::TargetPinNotFound {
                     node: connection.to_node.to_string(),
                     pin: connection.to_pin.to_owned(),
-                })
+                });
             }
         };
         match (from_pin, to_pin) {

@@ -316,7 +316,7 @@ pub fn shift_right(registry: &Registry, a: Reference, b: Reference) -> Reference
 
 #[intuicio_function(module_name = "math", use_registry)]
 pub fn random_boolean(registry: &Registry) -> Reference {
-    Reference::new_boolean(rand::thread_rng().gen::<Boolean>(), registry)
+    Reference::new_boolean(rand::thread_rng().r#gen::<Boolean>(), registry)
 }
 
 #[intuicio_function(module_name = "math", use_registry)]

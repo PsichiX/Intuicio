@@ -4,13 +4,13 @@ use intuicio_core::{
     types::TypeHandle,
 };
 use libffi::raw::{
-    ffi_abi_FFI_DEFAULT_ABI, ffi_call, ffi_cif, ffi_prep_cif, ffi_type, ffi_type_void,
-    FFI_TYPE_STRUCT,
+    FFI_TYPE_STRUCT, ffi_abi_FFI_DEFAULT_ABI, ffi_call, ffi_cif, ffi_prep_cif, ffi_type,
+    ffi_type_void,
 };
 use libloading::Library;
 use std::{
     error::Error,
-    ffi::{c_void, OsString},
+    ffi::{OsString, c_void},
     path::Path,
     ptr::null_mut,
     str::FromStr,
@@ -151,7 +151,7 @@ impl FfiFunction {
             .arguments
             .iter()
             .map(|type_| {
-                if let Some((_, type_hash, _, data)) = context.stack().pop_raw() {
+                if let Some((_, type_hash, _, data)) = unsafe { context.stack().pop_raw() } {
                     if type_hash == type_.type_hash() {
                         Ok(data)
                     } else {
@@ -174,7 +174,7 @@ impl FfiFunction {
             self.result
                 .as_ref()
                 .map(Self::make_type)
-                .unwrap_or(ffi_type_void),
+                .unwrap_or(unsafe { ffi_type_void }),
         );
         for type_ in &self.arguments {
             types.push(Self::make_type(type_));
@@ -185,27 +185,33 @@ impl FfiFunction {
             .map(|type_| type_ as *mut _)
             .collect::<Vec<_>>();
         let mut cif = ffi_cif::default();
-        ffi_prep_cif(
-            &mut cif as *mut _,
-            ffi_abi_FFI_DEFAULT_ABI,
-            arguments_data.len() as _,
-            return_type,
-            argument_types.as_mut_ptr(),
-        );
-        let mut result = vec![0u8; return_type.as_ref().unwrap().size];
-        ffi_call(
-            &mut cif as *mut _,
-            Some(*self.function.as_safe_fun()),
-            result.as_mut_ptr() as *mut _,
-            arguments.as_mut_ptr(),
-        );
+        unsafe {
+            ffi_prep_cif(
+                &mut cif as *mut _,
+                ffi_abi_FFI_DEFAULT_ABI,
+                arguments_data.len() as _,
+                return_type,
+                argument_types.as_mut_ptr(),
+            )
+        };
+        let mut result = vec![0u8; unsafe { return_type.as_ref() }.unwrap().size];
+        unsafe {
+            ffi_call(
+                &mut cif as *mut _,
+                Some(*self.function.as_safe_fun()),
+                result.as_mut_ptr() as *mut _,
+                arguments.as_mut_ptr(),
+            )
+        };
         if let Some(type_) = self.result.as_ref() {
-            context.stack().push_raw(
-                *type_.layout(),
-                type_.type_hash(),
-                type_.finalizer(),
-                &result,
-            );
+            unsafe {
+                context.stack().push_raw(
+                    *type_.layout(),
+                    type_.type_hash(),
+                    type_.finalizer(),
+                    &result,
+                )
+            };
         }
         Ok(())
     }

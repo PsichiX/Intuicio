@@ -1,6 +1,6 @@
-use crate::{library::closure::Closure, Array, Boolean, Function, Integer, Reference};
-use intuicio_core::{context::Context, define_native_struct, registry::Registry, IntuicioStruct};
-use intuicio_derive::{intuicio_function, intuicio_method, intuicio_methods, IntuicioStruct};
+use crate::{Array, Boolean, Function, Integer, Reference, library::closure::Closure};
+use intuicio_core::{IntuicioStruct, context::Context, define_native_struct, registry::Registry};
+use intuicio_derive::{IntuicioStruct, intuicio_function, intuicio_method, intuicio_methods};
 
 #[intuicio_function(module_name = "array", use_registry)]
 pub fn new(registry: &Registry, capacity: Reference) -> Reference {

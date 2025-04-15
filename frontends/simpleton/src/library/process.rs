@@ -1,6 +1,6 @@
 use crate::{Array, Integer, Map, Reference, Text};
-use intuicio_core::{registry::Registry, IntuicioStruct};
-use intuicio_derive::{intuicio_function, IntuicioStruct};
+use intuicio_core::{IntuicioStruct, registry::Registry};
+use intuicio_derive::{IntuicioStruct, intuicio_function};
 use std::{
     process::Command,
     time::{SystemTime, UNIX_EPOCH},

@@ -1,7 +1,7 @@
 use crate::{Array, Boolean, Integer, Map, Real, Reference, Text};
 use byteorder::{NativeEndian, NetworkEndian, ReadBytesExt, WriteBytesExt};
-use intuicio_core::{registry::Registry, IntuicioStruct};
-use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
+use intuicio_core::{IntuicioStruct, registry::Registry};
+use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
 use std::io::{Cursor, Read, Write};
 
 #[repr(u8)]

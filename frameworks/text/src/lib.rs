@@ -6,8 +6,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 use string_interner::{
-    backend::{Backend, BufferBackend},
     StringInterner,
+    backend::{Backend, BufferBackend},
 };
 
 lazy_static! {

@@ -1,8 +1,8 @@
-use crate::{pointer_alignment_padding, type_hash::TypeHash, Finalize};
+use crate::{Finalize, pointer_alignment_padding, type_hash::TypeHash};
 use smallvec::SmallVec;
 use std::{
     alloc::Layout,
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     ops::Range,
 };
 
@@ -461,11 +461,13 @@ impl DataStack {
             });
         self.memory[self.position..(self.position + value_layout.size())].copy_from_slice(data);
         self.position += value_layout.size();
-        self.memory
-            .as_mut_ptr()
-            .add(self.position)
-            .cast::<TypeHash>()
-            .write_unaligned(type_hash);
+        unsafe {
+            self.memory
+                .as_mut_ptr()
+                .add(self.position)
+                .cast::<TypeHash>()
+                .write_unaligned(type_hash)
+        };
         self.position += type_layout.size();
         true
     }
@@ -492,7 +494,7 @@ impl DataStack {
         }
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
-        let padding = self.alignment_padding(value_layout.align());
+        let padding = unsafe { self.alignment_padding(value_layout.align()) };
         if self.position + padding + value_layout.size() + tag_layout.size() + type_layout.size()
             > self.size()
         {
@@ -976,7 +978,10 @@ impl DataStack {
     /// # Safety
     #[inline]
     unsafe fn alignment_padding(&self, alignment: usize) -> usize {
-        pointer_alignment_padding(self.memory.as_ptr().add(self.position), alignment)
+        pointer_alignment_padding(
+            unsafe { self.memory.as_ptr().add(self.position) },
+            alignment,
+        )
     }
 }
 

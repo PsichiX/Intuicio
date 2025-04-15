@@ -53,9 +53,9 @@ impl Parser for OpenCloseParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserRegistry,
         open_close::OpenCloseParser,
         shorthand::{lit, oc, prefix, suffix},
-        ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

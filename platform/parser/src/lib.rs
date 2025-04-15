@@ -234,8 +234,8 @@ impl ParserRegistry {
 #[cfg(test)]
 mod tests {
     use crate::{
-        shorthand::{eos, ignore, lit, number_int, seq, source},
         EndOfSourceParser, ParserRegistry, SourceParser,
+        shorthand::{eos, ignore, lit, number_int, seq, source},
     };
 
     fn is_async<T: Send + Sync>() {}

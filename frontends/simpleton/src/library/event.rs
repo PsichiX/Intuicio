@@ -1,6 +1,6 @@
 use crate::{Array, Function, Reference};
-use intuicio_core::{context::Context, registry::Registry, IntuicioStruct};
-use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
+use intuicio_core::{IntuicioStruct, context::Context, registry::Registry};
+use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
 
 use super::{closure::Closure, promise::Promise};
 

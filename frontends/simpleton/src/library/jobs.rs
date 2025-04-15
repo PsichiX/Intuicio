@@ -1,17 +1,17 @@
 use super::closure::Closure;
 use crate::{Array, Function, Integer, Real, Reference, Transferable};
 use intuicio_core::{
-    context::Context, function::FunctionQuery, host::HostProducer, registry::Registry,
-    IntuicioStruct,
+    IntuicioStruct, context::Context, function::FunctionQuery, host::HostProducer,
+    registry::Registry,
 };
-use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
+use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
 use std::{
     collections::VecDeque,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, RwLock,
+        atomic::{AtomicBool, Ordering},
     },
-    thread::{available_parallelism, spawn, JoinHandle},
+    thread::{JoinHandle, available_parallelism, spawn},
     time::Duration,
 };
 

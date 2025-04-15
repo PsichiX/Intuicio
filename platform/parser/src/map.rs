@@ -54,7 +54,7 @@ impl<I: 'static, O: 'static> Parser for MapParser<I, O> {
                         "MapParser cannot downcast input from `{}` type",
                         std::any::type_name::<I>()
                     )
-                    .into())
+                    .into());
                 }
             },
             Err(_) => return Err("MapParser cannot access closure mutably".into()),
@@ -128,9 +128,9 @@ impl Parser for MapErrorParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserOutput, ParserRegistry,
         map::{MapErrorParser, MapParser, OutputMapParser},
         shorthand::{map, map_err, number_float, omap},
-        ParserOutput, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

@@ -1,4 +1,5 @@
 use intuicio_core::{
+    IntuicioVersion, Visibility,
     context::Context,
     crate_version,
     function::{FunctionQuery, FunctionQueryParameter},
@@ -9,7 +10,6 @@ use intuicio_core::{
         ScriptModule, ScriptOperation, ScriptPackage, ScriptStruct, ScriptStructField,
     },
     types::TypeQuery,
-    IntuicioVersion, Visibility,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error};

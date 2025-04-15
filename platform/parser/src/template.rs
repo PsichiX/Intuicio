@@ -111,9 +111,9 @@ impl Parser for TemplateParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserOutput, ParserRegistry,
         shorthand::{inject, lit, map, number_int, prefix, seq_del, source, template, ws},
         template::TemplateParser,
-        ParserOutput, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

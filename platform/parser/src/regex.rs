@@ -188,9 +188,9 @@ impl Parser for OptionalWhiteSpaceParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserRegistry,
         regex::{OptionalWhiteSpaceParser, RegexParser, WhiteSpaceParser},
         shorthand::{ows, regex, regex_capture, string, ws},
-        ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

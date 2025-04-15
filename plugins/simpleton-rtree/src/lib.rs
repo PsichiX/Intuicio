@@ -1,10 +1,10 @@
 use intuicio_core::{
-    context::Context, core_version, function::Function, registry::Registry, IntuicioStruct,
-    IntuicioVersion,
+    IntuicioStruct, IntuicioVersion, context::Context, core_version, function::Function,
+    registry::Registry,
 };
-use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
-use intuicio_frontend_simpleton::{library::closure::Closure, Boolean, Integer, Real, Reference};
-use rstar::{primitives::GeomWithData, Envelope, Point, PointDistance, RTree, RTreeObject, AABB};
+use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
+use intuicio_frontend_simpleton::{Boolean, Integer, Real, Reference, library::closure::Closure};
+use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject, primitives::GeomWithData};
 
 #[derive(Clone)]
 pub struct Sphere {
@@ -215,12 +215,12 @@ impl Rtree {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn version() -> IntuicioVersion {
     core_version()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn install(registry: &mut Registry) {
     registry.add_type(Rtree::define_struct(registry));
     registry.add_type(RtreeResult::define_struct(registry));

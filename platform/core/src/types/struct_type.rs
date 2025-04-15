@@ -1,10 +1,10 @@
 use crate::{
+    Visibility,
     meta::Meta,
     object::RuntimeObject,
     types::{MetaQuery, StructFieldQuery, Type, TypeHandle},
-    Visibility,
 };
-use intuicio_data::{is_copy, is_send, is_sync, type_hash::TypeHash, Finalize, Initialize};
+use intuicio_data::{Finalize, Initialize, is_copy, is_send, is_sync, type_hash::TypeHash};
 use rustc_hash::FxHasher;
 use std::{
     alloc::Layout,
@@ -416,17 +416,17 @@ impl Struct {
             return false;
         }
         let size = self.layout.size();
-        if from < to.add(size) && from.add(size) > to {
+        if from < unsafe { to.add(size) } && unsafe { from.add(size) } > to {
             return false;
         }
-        to.copy_from_nonoverlapping(from, size);
+        unsafe { to.copy_from_nonoverlapping(from, size) };
         true
     }
 
     /// # Safety
     pub unsafe fn initialize(&self, pointer: *mut ()) -> bool {
         if let Some(initializer) = self.initializer {
-            (initializer)(pointer);
+            unsafe { (initializer)(pointer) };
             true
         } else {
             false
@@ -435,7 +435,7 @@ impl Struct {
 
     /// # Safety
     pub unsafe fn finalize(&self, pointer: *mut ()) {
-        (self.finalizer)(pointer);
+        unsafe { (self.finalizer)(pointer) };
     }
 
     /// # Safety
@@ -723,7 +723,7 @@ macro_rules! define_runtime_struct {
 #[cfg(test)]
 mod tests {
     use crate as intuicio_core;
-    use crate::{meta::Meta, object::*, registry::*, IntuicioStruct};
+    use crate::{IntuicioStruct, meta::Meta, object::*, registry::*};
     use intuicio_derive::*;
 
     #[derive(IntuicioStruct, Default)]

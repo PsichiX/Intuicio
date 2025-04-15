@@ -47,9 +47,9 @@ impl Parser for InspectParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserRegistry,
         inspect::InspectParser,
         shorthand::{inspect, lit},
-        ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

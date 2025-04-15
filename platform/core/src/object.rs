@@ -1,5 +1,5 @@
 use crate::types::{StructFieldQuery, Type, TypeHandle, TypeQuery};
-use intuicio_data::{type_hash::TypeHash, Initialize};
+use intuicio_data::{Initialize, type_hash::TypeHash};
 use std::{
     alloc::{alloc, dealloc},
     collections::HashMap,
@@ -93,7 +93,7 @@ impl Object {
 
     /// # Safety
     pub unsafe fn new_uninitialized(handle: TypeHandle) -> Option<Self> {
-        let memory = alloc(*handle.layout());
+        let memory = unsafe { alloc(*handle.layout()) };
         if memory.is_null() {
             None
         } else {
@@ -117,11 +117,11 @@ impl Object {
     /// # Safety
     pub unsafe fn from_bytes(handle: TypeHandle, bytes: &[u8]) -> Option<Self> {
         if handle.layout().size() == bytes.len() {
-            let memory = alloc(*handle.layout());
+            let memory = unsafe { alloc(*handle.layout()) };
             if memory.is_null() {
                 None
             } else {
-                memory.copy_from(bytes.as_ptr(), bytes.len());
+                unsafe { memory.copy_from(bytes.as_ptr(), bytes.len()) };
                 Some(Self {
                     memory,
                     handle,
@@ -148,23 +148,27 @@ impl Object {
     /// # Safety
     pub unsafe fn initialize(&mut self) {
         if self.handle.is_native() {
-            self.handle.initialize(self.memory.cast::<()>());
+            unsafe { self.handle.initialize(self.memory.cast::<()>()) };
         } else {
             match &*self.handle {
                 Type::Struct(type_) => {
                     for field in type_.fields() {
-                        field
-                            .type_handle()
-                            .initialize(self.memory.add(field.address_offset()).cast::<()>());
+                        unsafe {
+                            field
+                                .type_handle()
+                                .initialize(self.memory.add(field.address_offset()).cast::<()>())
+                        };
                     }
                 }
                 Type::Enum(type_) => {
                     if let Some(variant) = type_.default_variant() {
-                        self.memory.write(variant.discriminant());
+                        unsafe { self.memory.write(variant.discriminant()) };
                         for field in &variant.fields {
-                            field
-                                .type_handle()
-                                .initialize(self.memory.add(field.address_offset()).cast::<()>());
+                            unsafe {
+                                field.type_handle().initialize(
+                                    self.memory.add(field.address_offset()).cast::<()>(),
+                                )
+                            };
                         }
                     }
                 }
@@ -193,12 +197,12 @@ impl Object {
 
     /// # Safety
     pub unsafe fn memory(&self) -> &[u8] {
-        std::slice::from_raw_parts(self.memory, self.type_handle().layout().size())
+        unsafe { std::slice::from_raw_parts(self.memory, self.type_handle().layout().size()) }
     }
 
     /// # Safety
     pub unsafe fn memory_mut(&mut self) -> &mut [u8] {
-        std::slice::from_raw_parts_mut(self.memory, self.type_handle().layout().size())
+        unsafe { std::slice::from_raw_parts_mut(self.memory, self.type_handle().layout().size()) }
     }
 
     /// # Safety
@@ -206,19 +210,23 @@ impl Object {
         match &*self.handle {
             Type::Struct(type_) => {
                 let field = type_.find_field(query)?;
-                Some(std::slice::from_raw_parts(
-                    self.memory.add(field.address_offset()),
-                    field.type_handle().layout().size(),
-                ))
+                Some(unsafe {
+                    std::slice::from_raw_parts(
+                        self.memory.add(field.address_offset()),
+                        field.type_handle().layout().size(),
+                    )
+                })
             }
             Type::Enum(type_) => {
-                let discriminant = self.memory.read();
+                let discriminant = unsafe { self.memory.read() };
                 let variant = type_.find_variant_by_discriminant(discriminant)?;
                 let field = variant.find_field(query)?;
-                Some(std::slice::from_raw_parts(
-                    self.memory.add(field.address_offset()),
-                    field.type_handle().layout().size(),
-                ))
+                Some(unsafe {
+                    std::slice::from_raw_parts(
+                        self.memory.add(field.address_offset()),
+                        field.type_handle().layout().size(),
+                    )
+                })
             }
         }
     }
@@ -231,19 +239,23 @@ impl Object {
         match &*self.handle {
             Type::Struct(type_) => {
                 let field = type_.find_field(query)?;
-                Some(std::slice::from_raw_parts_mut(
-                    self.memory.add(field.address_offset()),
-                    field.type_handle().layout().size(),
-                ))
+                Some(unsafe {
+                    std::slice::from_raw_parts_mut(
+                        self.memory.add(field.address_offset()),
+                        field.type_handle().layout().size(),
+                    )
+                })
             }
             Type::Enum(type_) => {
-                let discriminant = self.memory.read();
+                let discriminant = unsafe { self.memory.read() };
                 let variant = type_.find_variant_by_discriminant(discriminant)?;
                 let field = variant.find_field(query)?;
-                Some(std::slice::from_raw_parts_mut(
-                    self.memory.add(field.address_offset()),
-                    field.type_handle().layout().size(),
-                ))
+                Some(unsafe {
+                    std::slice::from_raw_parts_mut(
+                        self.memory.add(field.address_offset()),
+                        field.type_handle().layout().size(),
+                    )
+                })
             }
         }
     }

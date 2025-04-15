@@ -1,5 +1,5 @@
 use crate::{
-    library::bytes::Bytes, Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type,
+    Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type, library::bytes::Bytes,
 };
 use intuicio_core::registry::Registry;
 use intuicio_derive::intuicio_function;

@@ -1,6 +1,6 @@
 use super::color::Color;
 use image::{
-    imageops::{crop_imm, resize, FilterType},
+    imageops::{FilterType, crop_imm, resize},
     *,
 };
 use intuicio_core::prelude::*;

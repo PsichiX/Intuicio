@@ -1,12 +1,12 @@
 [package]
 name = "tests"
-version = "0.44.6"
-edition = "2021"
+version = "0.45.0"
+edition = "2024"
 publish = false
 
 [dependencies]
-intuicio-data = { version = "0.44", path = "../platform/data" }
-intuicio-core = { version = "0.44", path = "../platform/core" }
-intuicio-derive = { version = "0.44", path = "../platform/derive" }
-intuicio-framework-text = { version = "0.44", path = "../frameworks/text" }
+intuicio-data = { version = "0.45", path = "../platform/data" }
+intuicio-core = { version = "0.45", path = "../platform/core" }
+intuicio-derive = { version = "0.45", path = "../platform/derive" }
+intuicio-framework-text = { version = "0.45", path = "../frameworks/text" }
 gc = { version = "*", features = ["derive"] }

@@ -1,13 +1,13 @@
 use crate::{
+    ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
     pratt::PrattParserAssociativity,
     shorthand::{
-        alpha, alpha_low, alpha_up, alphanum, alt, any, debug, digit, digit_hex, dyn_inspect,
-        dyn_map, dyn_map_err, dyn_pratt, ext_depth, ext_exchange, ext_variants, ext_wrap, id,
-        id_continue, id_start, ignore, inject, list, lit, map, map_err, nl, not, number_float,
-        number_int, number_int_pos, oc, omap, oom, opt, pred, prefix, regex, rep, seq, seq_del,
-        slot_empty, source, string, suffix, template, word, zom, DynamicPrattParserRule,
+        DynamicPrattParserRule, alpha, alpha_low, alpha_up, alphanum, alt, any, debug, digit,
+        digit_hex, dyn_inspect, dyn_map, dyn_map_err, dyn_pratt, ext_depth, ext_exchange,
+        ext_variants, ext_wrap, id, id_continue, id_start, ignore, inject, list, lit, map, map_err,
+        nl, not, number_float, number_int, number_int_pos, oc, omap, oom, opt, pred, prefix, regex,
+        rep, seq, seq_del, slot_empty, source, string, suffix, template, word, zom,
     },
-    ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
 use std::{collections::HashMap, error::Error, sync::RwLock};
 
@@ -1097,11 +1097,13 @@ mod tests {
         assert_eq!(rest, "");
         let parser = result.consume::<ParserHandle>().ok().unwrap();
         let registry = ParserRegistry::default();
-        assert!(parser
-            .parse(&registry, "foo")
-            .unwrap()
-            .1
-            .is::<ParserNoValue>());
+        assert!(
+            parser
+                .parse(&registry, "foo")
+                .unwrap()
+                .1
+                .is::<ParserNoValue>()
+        );
         parser.extend(lit("foo"));
         assert!(parser.parse(&registry, "foo").unwrap().1.is::<String>());
     }
@@ -1263,7 +1265,9 @@ mod tests {
                 .iter()
                 .map(|(k, _, _)| k.as_str())
                 .collect::<Vec<_>>(),
-            vec!["value", "op_add", "op_sub", "op_mul", "op_div", "op", "expr"]
+            vec![
+                "value", "op_add", "op_sub", "op_mul", "op_div", "op", "expr"
+            ]
         );
 
         let mut registry = ParserRegistry::default().with_extension(

@@ -1,4 +1,4 @@
-use crate::{black_box, Benchmark, COMPARISON_FORMAT, DURATION};
+use crate::{Benchmark, COMPARISON_FORMAT, DURATION, black_box};
 use intuicio_data::prelude::*;
 use std::time::Duration;
 

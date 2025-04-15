@@ -41,7 +41,7 @@ impl<T> Ptr<T> {
         if self.is_null() {
             None
         } else {
-            Some(&*(self.pointer as *const T))
+            Some(unsafe { &*(self.pointer as *const T) })
         }
     }
 
@@ -50,7 +50,7 @@ impl<T> Ptr<T> {
         if self.is_null() {
             None
         } else {
-            Some(&mut *self.pointer)
+            Some(unsafe { &mut *self.pointer })
         }
     }
 
@@ -63,7 +63,7 @@ impl<T> Ptr<T> {
 
     /// # Safety
     pub unsafe fn into_box(self) -> Box<T> {
-        Box::from_raw(self.pointer)
+        unsafe { Box::from_raw(self.pointer) }
     }
 
     /// # Safety

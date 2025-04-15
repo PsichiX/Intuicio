@@ -39,9 +39,9 @@ mod tests {
     use std::sync::RwLock;
 
     use crate::{
+        ParserRegistry,
         extension::ExtensionParser,
         shorthand::{ext, lit},
-        ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

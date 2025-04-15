@@ -276,7 +276,7 @@ impl<T: NodeDefinition + Clone> NodeGraphServer<T> {
 mod tests {
     use crate::prelude::*;
     use intuicio_core::prelude::*;
-    use serde::{de::DeserializeOwned, Deserialize, Serialize};
+    use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     struct TypeInfo;

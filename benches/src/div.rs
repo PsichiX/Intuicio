@@ -1,4 +1,4 @@
-use crate::{black_box, Benchmark, COMPARISON_FORMAT, DURATION};
+use crate::{Benchmark, COMPARISON_FORMAT, DURATION, black_box};
 use intuicio_backend_vm::prelude::*;
 use intuicio_core::prelude::*;
 use intuicio_frontend_vault::*;

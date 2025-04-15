@@ -1,8 +1,8 @@
 use std::{
     ops::{Deref, DerefMut},
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Weak,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
 
@@ -244,7 +244,7 @@ impl Lifetime {
                 access.acquire_read_access();
                 Some(ValueReadAccess {
                     lifetime: self.0.clone(),
-                    data: data.as_ref()?,
+                    data: unsafe { data.as_ref() }?,
                 })
             })
     }
@@ -273,7 +273,7 @@ impl Lifetime {
                 access.acquire_write_access();
                 Some(ValueWriteAccess {
                     lifetime: self.0.clone(),
-                    data: data.as_mut()?,
+                    data: unsafe { data.as_mut() }?,
                 })
             })
     }
@@ -386,7 +386,7 @@ impl LifetimeRef {
             drop(access);
             Some(ValueReadAccess {
                 lifetime: state,
-                data: data.as_ref()?,
+                data: unsafe { data.as_ref() }?,
             })
         } else {
             None
@@ -541,7 +541,7 @@ impl LifetimeRefMut {
             drop(access);
             Some(ValueReadAccess {
                 lifetime: state,
-                data: data.as_ref()?,
+                data: unsafe { data.as_ref() }?,
             })
         } else {
             None
@@ -574,7 +574,7 @@ impl LifetimeRefMut {
             drop(access);
             Some(ValueWriteAccess {
                 lifetime: state,
-                data: data.as_mut()?,
+                data: unsafe { data.as_mut() }?,
             })
         } else {
             None
@@ -715,7 +715,7 @@ impl LifetimeLazy {
             drop(access);
             Some(ValueReadAccess {
                 lifetime: state,
-                data: data.as_ref()?,
+                data: unsafe { data.as_ref() }?,
             })
         } else {
             None
@@ -748,7 +748,7 @@ impl LifetimeLazy {
             drop(access);
             Some(ValueWriteAccess {
                 lifetime: state,
-                data: data.as_mut()?,
+                data: unsafe { data.as_mut() }?,
             })
         } else {
             None

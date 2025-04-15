@@ -264,7 +264,7 @@ impl Parser for PrattParser {
         let mut tokens = match result.consume::<Vec<ParserOutput>>() {
             Ok(tokens) => tokens,
             Err(_) => {
-                return Err("PrattParser expects `Vec<ParserOutput>` tokenization result".into())
+                return Err("PrattParser expects `Vec<ParserOutput>` tokenization result".into());
             }
         };
         tokens.reverse();
@@ -279,11 +279,11 @@ impl Parser for PrattParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserHandle, ParserRegistry,
         pratt::{PrattParser, PrattParserAssociativity, PrattParserRule},
         shorthand::{
             alt, inject, list, lit, map, map_err, number_float, oc, ows, pratt, prefix, suffix,
         },
-        ParserHandle, ParserRegistry,
     };
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]

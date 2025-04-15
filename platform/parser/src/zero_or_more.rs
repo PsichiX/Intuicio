@@ -35,9 +35,9 @@ impl Parser for ZeroOrMoreParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserOutput, ParserRegistry,
         shorthand::{lit, zom},
         zero_or_more::ZeroOrMoreParser,
-        ParserOutput, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}
@@ -55,10 +55,12 @@ mod tests {
         assert_eq!(result.consume::<Vec<ParserOutput>>().ok().unwrap().len(), 3);
         let (rest, result) = sentence.parse(&registry, " asd ").unwrap();
         assert_eq!(rest, " asd ");
-        assert!(result
-            .consume::<Vec<ParserOutput>>()
-            .ok()
-            .unwrap()
-            .is_empty());
+        assert!(
+            result
+                .consume::<Vec<ParserOutput>>()
+                .ok()
+                .unwrap()
+                .is_empty()
+        );
     }
 }

@@ -3,7 +3,7 @@ use crate::{
     AsmModule, AsmOperation, AsmStruct, AsmStructField,
 };
 use intuicio_core::Visibility;
-use pest::{iterators::Pair, Parser};
+use pest::{Parser, iterators::Pair};
 use pest_derive::Parser;
 use std::{fmt::Debug, str::FromStr};
 

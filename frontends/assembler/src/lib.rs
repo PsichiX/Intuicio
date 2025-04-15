@@ -1,6 +1,6 @@
 pub mod parser;
 
-use intuicio_core::{crate_version, script::BytesContentParser, IntuicioVersion};
+use intuicio_core::{IntuicioVersion, crate_version, script::BytesContentParser};
 use intuicio_frontend_serde::*;
 use std::error::Error;
 
@@ -63,13 +63,15 @@ mod tests {
                 //         .into_handle(),
                 // ),
             );
-        assert!(registry
-            .find_function(FunctionQuery {
-                name: Some("main".into()),
-                module_name: Some("test".into()),
-                ..Default::default()
-            })
-            .is_some());
+        assert!(
+            registry
+                .find_function(FunctionQuery {
+                    name: Some("main".into()),
+                    module_name: Some("test".into()),
+                    ..Default::default()
+                })
+                .is_some()
+        );
         let mut host = Host::new(Context::new(10240, 10240), RegistryHandle::new(registry));
         let (result,) = host
             .call_function::<(usize,), _>("main", "test", None)

@@ -35,9 +35,9 @@ impl Parser for OptionalParser {
 #[cfg(test)]
 mod tests {
     use crate::{
+        ParserNoValue, ParserRegistry,
         optional::OptionalParser,
         shorthand::{lit, opt},
-        ParserNoValue, ParserRegistry,
     };
 
     fn is_async<T: Send + Sync>() {}

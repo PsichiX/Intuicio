@@ -1,8 +1,8 @@
 use bitvec::vec::BitVec;
-use intuicio_core::{core_version, registry::Registry, IntuicioStruct, IntuicioVersion};
-use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
+use intuicio_core::{IntuicioStruct, IntuicioVersion, core_version, registry::Registry};
+use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
 use intuicio_frontend_simpleton::{
-    library::closure::Closure, Array, Function, Integer, Reference, Type,
+    Array, Function, Integer, Reference, Type, library::closure::Closure,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -568,12 +568,12 @@ impl IterQuery {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn version() -> IntuicioVersion {
     core_version()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn install(registry: &mut Registry) {
     registry.add_type(World::define_struct(registry));
     registry.add_type(IterQuery::define_struct(registry));

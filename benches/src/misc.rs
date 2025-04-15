@@ -5,7 +5,7 @@ use intuicio_core::{
     types::TypeQuery,
 };
 use intuicio_frontend_vault::{
-    define_vault_function, VaultContentParser, VaultPackage, VaultScriptExpression,
+    VaultContentParser, VaultPackage, VaultScriptExpression, define_vault_function,
 };
 use std::time::Duration;
 

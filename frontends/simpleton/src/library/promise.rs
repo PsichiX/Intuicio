@@ -1,6 +1,6 @@
-use crate::{library::closure::Closure, Reference};
-use intuicio_core::{context::Context, registry::Registry, IntuicioStruct};
-use intuicio_derive::{intuicio_method, intuicio_methods, IntuicioStruct};
+use crate::{Reference, library::closure::Closure};
+use intuicio_core::{IntuicioStruct, context::Context, registry::Registry};
+use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
 
 #[derive(IntuicioStruct, Default)]
 #[intuicio(name = "Promise", module_name = "promise", override_send = false)]

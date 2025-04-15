@@ -63,6 +63,7 @@ macro_rules! __internal__offset_of_enum__ {
 
 pub mod prelude {
     pub use crate::{
+        IntuicioEnum, IntuicioStruct, IntuicioVersion, Visibility,
         context::*,
         function::*,
         host::*,
@@ -71,7 +72,6 @@ pub mod prelude {
         script::*,
         transformer::*,
         types::{enum_type::*, struct_type::*, *},
-        IntuicioEnum, IntuicioStruct, IntuicioVersion, Visibility,
     };
     pub use crate::{
         define_function, define_native_enum, define_native_struct, define_runtime_enum,

@@ -1,11 +1,11 @@
 use intuicio_data::{
+    Finalize,
     lifetime::{Lifetime, ReadLock, ValueReadAccess, ValueWriteAccess},
     type_hash::TypeHash,
-    Finalize,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    alloc::{alloc, dealloc, Layout},
+    alloc::{Layout, alloc, dealloc},
     error::Error,
     marker::PhantomData,
 };
@@ -284,7 +284,7 @@ impl Arena {
     pub unsafe fn allocate(&mut self) -> (Index, *mut u8) {
         self.lifetime
             .write_lock()
-            .using(|| self.allocate_unlocked())
+            .using(|| unsafe { self.allocate_unlocked() })
     }
 
     pub fn remove(&mut self, index: Index) -> Result<(), ArenaError> {
@@ -491,13 +491,16 @@ impl Arena {
         };
         let idx = self.indices_lifetimes.len();
         self.indices_lifetimes.push((index, Default::default()));
-        (index, self.memory.add(idx * self.item_layout.size()))
+        (index, unsafe {
+            self.memory.add(idx * self.item_layout.size())
+        })
     }
 
     unsafe fn reallocate_unlocked(&mut self, size: usize, capacity: usize) {
-        let (memory, layout) = Self::allocate_memory_unlocked(self.item_layout, capacity);
-        self.memory.copy_to(memory, self.item_layout.size() * size);
-        dealloc(self.memory, self.layout);
+        let (memory, layout) =
+            unsafe { Self::allocate_memory_unlocked(self.item_layout, capacity) };
+        unsafe { self.memory.copy_to(memory, self.item_layout.size() * size) };
+        unsafe { dealloc(self.memory, self.layout) };
         self.memory = memory;
         self.layout = layout;
         for (_, lifetime) in &mut self.indices_lifetimes {
@@ -511,11 +514,16 @@ impl Arena {
     ) -> (*mut u8, Layout) {
         item_layout = item_layout.pad_to_align();
         let layout = if item_layout.size() == 0 {
-            Layout::from_size_align_unchecked(1, 1)
+            unsafe { Layout::from_size_align_unchecked(1, 1) }
         } else {
-            Layout::from_size_align_unchecked(item_layout.size() * capacity, item_layout.align())
+            unsafe {
+                Layout::from_size_align_unchecked(
+                    item_layout.size() * capacity,
+                    item_layout.align(),
+                )
+            }
         };
-        let memory = alloc(layout);
+        let memory = unsafe { alloc(layout) };
         (memory, layout)
     }
 }
@@ -591,12 +599,9 @@ impl AnyArena {
         {
             Some(index) => index,
             None => {
-                self.arenas.push(Arena::new_raw(
-                    type_hash,
-                    item_layout,
-                    finalizer,
-                    self.new_arena_capacity,
-                ));
+                self.arenas.push(unsafe {
+                    Arena::new_raw(type_hash, item_layout, finalizer, self.new_arena_capacity)
+                });
                 self.arenas.len() - 1
             }
         };
@@ -638,12 +643,13 @@ impl AnyArena {
             .iter_mut()
             .find(|arena| arena.type_hash == type_hash)
         {
-            let (index, address) = arena.allocate();
+            let (index, address) = unsafe { arena.allocate() };
             (AnyIndex::new(index, type_hash), address)
         } else {
-            let mut arena =
-                Arena::new_raw(type_hash, item_layout, finalizer, self.new_arena_capacity);
-            let (index, address) = arena.allocate();
+            let mut arena = unsafe {
+                Arena::new_raw(type_hash, item_layout, finalizer, self.new_arena_capacity)
+            };
+            let (index, address) = unsafe { arena.allocate() };
             self.arenas.push(arena);
             (AnyIndex::new(index, type_hash), address)
         }
@@ -702,7 +708,7 @@ impl AnyArena {
             .iter()
             .find(|arena| arena.type_hash == index.type_hash)
         {
-            arena.read_ptr(index.index)
+            unsafe { arena.read_ptr(index.index) }
         } else {
             Err(ArenaError::ArenaNotFound {
                 type_hash: index.type_hash,
@@ -717,7 +723,7 @@ impl AnyArena {
             .iter()
             .find(|arena| arena.type_hash == index.type_hash)
         {
-            arena.write_ptr(index.index)
+            unsafe { arena.write_ptr(index.index) }
         } else {
             Err(ArenaError::ArenaNotFound {
                 type_hash: index.type_hash,

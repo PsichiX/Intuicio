@@ -37,7 +37,7 @@ impl Parser for LiteralParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::{literal::LiteralParser, shorthand::lit, ParserRegistry};
+    use crate::{ParserRegistry, literal::LiteralParser, shorthand::lit};
 
     fn is_async<T: Send + Sync>() {}
 

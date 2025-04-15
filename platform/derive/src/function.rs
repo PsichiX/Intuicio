@@ -1,8 +1,8 @@
 use proc_macro::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_macro_input, parse_str, AttributeArgs, FnArg, Ident, ItemFn, Lit, Meta, NestedMeta, Pat,
-    Path, ReturnType, Type, TypePath, Visibility,
+    AttributeArgs, FnArg, Ident, ItemFn, Lit, Meta, NestedMeta, Pat, Path, ReturnType, Type,
+    TypePath, Visibility, parse_macro_input, parse_str,
 };
 
 #[derive(Default)]
@@ -300,23 +300,25 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
     };
     let return_types = match item.sig.output {
         ReturnType::Default => vec![],
-        ReturnType::Type(_, ref ty) => vec![transformer
-            .as_ref()
-            .map(|_| match unpack_type(ty) {
-                UnpackedType::Owned(ty) => syn::parse2::<Type>(quote! {
-                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Owned
+        ReturnType::Type(_, ref ty) => vec![
+            transformer
+                .as_ref()
+                .map(|_| match unpack_type(ty) {
+                    UnpackedType::Owned(ty) => syn::parse2::<Type>(quote! {
+                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Owned
+                    })
+                    .unwrap(),
+                    UnpackedType::Ref(ty) => syn::parse2::<Type>(quote! {
+                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Ref
+                    })
+                    .unwrap(),
+                    UnpackedType::RefMut(ty) => syn::parse2::<Type>(quote! {
+                        <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::RefMut
+                    })
+                    .unwrap(),
                 })
-                .unwrap(),
-                UnpackedType::Ref(ty) => syn::parse2::<Type>(quote! {
-                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Ref
-                })
-                .unwrap(),
-                UnpackedType::RefMut(ty) => syn::parse2::<Type>(quote! {
-                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::RefMut
-                })
-                .unwrap(),
-            })
-            .unwrap_or_else(|| *ty.clone())],
+                .unwrap_or_else(|| *ty.clone()),
+        ],
     };
     let (dependency, return_transform) = if let Some(transformer) = transformer.as_ref() {
         match item.sig.output {

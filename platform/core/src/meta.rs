@@ -1,4 +1,4 @@
-use pest::{iterators::Pair, Parser};
+use pest::{Parser, iterators::Pair};
 use pest_derive::Parser;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Write};
@@ -287,11 +287,13 @@ mod tests {
         let meta = crate::meta!([]);
         assert!(matches!(meta, Meta::Array(_)));
         let meta = crate::meta!([true, 42, 4.2, "foo"]);
-        assert!(meta.as_array().unwrap()[0]
-            .as_value()
-            .unwrap()
-            .as_bool()
-            .unwrap());
+        assert!(
+            meta.as_array().unwrap()[0]
+                .as_value()
+                .unwrap()
+                .as_bool()
+                .unwrap()
+        );
         assert_eq!(
             meta.as_array().unwrap()[1]
                 .as_value()
@@ -319,11 +321,13 @@ mod tests {
         let meta = crate::meta!({});
         assert!(matches!(meta, Meta::Map(_)));
         let meta = crate::meta!({bool: true, integer: 42, float: 4.2, string: "foo"});
-        assert!(meta.as_map().unwrap()["bool"]
-            .as_value()
-            .unwrap()
-            .as_bool()
-            .unwrap());
+        assert!(
+            meta.as_map().unwrap()["bool"]
+                .as_value()
+                .unwrap()
+                .as_bool()
+                .unwrap()
+        );
         assert_eq!(
             meta.as_map().unwrap()["integer"]
                 .as_value()

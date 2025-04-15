@@ -2,12 +2,12 @@ pub mod enum_type;
 pub mod struct_type;
 
 use crate::{
+    Visibility,
     meta::Meta,
     types::{
         enum_type::{Enum, EnumVariant},
         struct_type::{Struct, StructField},
     },
-    Visibility,
 };
 use intuicio_data::type_hash::TypeHash;
 use rustc_hash::FxHasher;
@@ -208,15 +208,15 @@ impl Type {
     /// # Safety
     pub unsafe fn try_copy(&self, from: *const u8, to: *mut u8) -> bool {
         match self {
-            Self::Struct(value) => value.try_copy(from, to),
-            Self::Enum(value) => value.try_copy(from, to),
+            Self::Struct(value) => unsafe { value.try_copy(from, to) },
+            Self::Enum(value) => unsafe { value.try_copy(from, to) },
         }
     }
 
     /// # Safety
     pub unsafe fn find_enum_variant_by_value<T: 'static>(&self, value: &T) -> Option<&EnumVariant> {
         if let Self::Enum(enum_type) = self {
-            enum_type.find_variant_by_value(value)
+            unsafe { enum_type.find_variant_by_value(value) }
         } else {
             None
         }
@@ -225,32 +225,32 @@ impl Type {
     /// # Safety
     pub unsafe fn initialize(&self, pointer: *mut ()) -> bool {
         match self {
-            Self::Struct(value) => value.initialize(pointer),
-            Self::Enum(value) => value.initialize(pointer),
+            Self::Struct(value) => unsafe { value.initialize(pointer) },
+            Self::Enum(value) => unsafe { value.initialize(pointer) },
         }
     }
 
     /// # Safety
     pub unsafe fn finalize(&self, pointer: *mut ()) {
         match self {
-            Self::Struct(value) => value.finalize(pointer),
-            Self::Enum(value) => value.finalize(pointer),
+            Self::Struct(value) => unsafe { value.finalize(pointer) },
+            Self::Enum(value) => unsafe { value.finalize(pointer) },
         }
     }
 
     /// # Safety
     pub unsafe fn initializer(&self) -> Option<unsafe fn(*mut ())> {
         match self {
-            Self::Struct(value) => value.initializer(),
-            Self::Enum(value) => value.initializer(),
+            Self::Struct(value) => unsafe { value.initializer() },
+            Self::Enum(value) => unsafe { value.initializer() },
         }
     }
 
     /// # Safety
     pub unsafe fn finalizer(&self) -> unsafe fn(*mut ()) {
         match self {
-            Self::Struct(value) => value.finalizer(),
-            Self::Enum(value) => value.finalizer(),
+            Self::Struct(value) => unsafe { value.finalizer() },
+            Self::Enum(value) => unsafe { value.finalizer() },
         }
     }
 
