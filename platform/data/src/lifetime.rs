@@ -13,6 +13,7 @@ struct LifetimeStateInner {
     writer: AtomicUsize,
     read_access: AtomicUsize,
     write_access: AtomicBool,
+    tag: AtomicUsize,
 }
 
 #[derive(Default, Clone)]
@@ -83,9 +84,20 @@ impl LifetimeState {
         }
     }
 
+    /// # Safety
+    pub unsafe fn update_tag(&self, tag: &Lifetime) {
+        let tag = tag as *const Lifetime as usize;
+        self.inner.tag.store(tag, Ordering::Release);
+    }
+
+    pub fn tag(&self) -> usize {
+        self.inner.tag.load(Ordering::Acquire)
+    }
+
     pub fn downgrade(&self) -> LifetimeWeakState {
         LifetimeWeakState {
             inner: Arc::downgrade(&self.inner),
+            tag: self.inner.tag.load(Ordering::Acquire),
         }
     }
 }
@@ -93,13 +105,20 @@ impl LifetimeState {
 #[derive(Clone)]
 pub struct LifetimeWeakState {
     inner: Weak<LifetimeStateInner>,
+    tag: usize,
 }
 
 impl LifetimeWeakState {
-    pub fn upgrade(&self) -> Option<LifetimeState> {
+    /// # Safety
+    pub unsafe fn upgrade_unchecked(&self) -> Option<LifetimeState> {
         Some(LifetimeState {
             inner: self.inner.upgrade()?,
         })
+    }
+
+    pub fn upgrade(&self) -> Option<LifetimeState> {
+        let inner = self.inner.upgrade()?;
+        (inner.tag.load(Ordering::Acquire) == self.tag).then_some(LifetimeState { inner })
     }
 
     pub fn is_owned_by(&self, state: &LifetimeState) -> bool {
@@ -193,10 +212,21 @@ pub struct Lifetime(LifetimeState);
 
 impl Lifetime {
     pub fn state(&self) -> &LifetimeState {
+        unsafe { self.0.update_tag(self) };
         &self.0
     }
 
+    pub fn update_tag(&self) {
+        unsafe { self.0.update_tag(self) };
+    }
+
+    pub fn tag(&self) -> usize {
+        unsafe { self.0.update_tag(self) };
+        self.0.tag()
+    }
+
     pub fn borrow(&self) -> Option<LifetimeRef> {
+        unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
             .filter(|access| access.state.can_read())
@@ -207,6 +237,7 @@ impl Lifetime {
     }
 
     pub fn borrow_mut(&self) -> Option<LifetimeRefMut> {
+        unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
             .filter(|access| access.state.can_write(0))
@@ -217,10 +248,12 @@ impl Lifetime {
     }
 
     pub fn lazy(&self) -> LifetimeLazy {
+        unsafe { self.0.update_tag(self) };
         LifetimeLazy(self.0.downgrade())
     }
 
     pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
+        unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
             .filter(|access| access.state.is_read_accessible())
@@ -236,6 +269,7 @@ impl Lifetime {
 
     /// # Safety
     pub unsafe fn read_ptr<T: ?Sized>(&self, data: *const T) -> Option<ValueReadAccess<T>> {
+        unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
             .filter(|access| access.state.is_read_accessible())
@@ -250,6 +284,7 @@ impl Lifetime {
     }
 
     pub fn write<'a, T: ?Sized>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
+        unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
             .filter(|access| access.state.is_write_accessible())
@@ -265,6 +300,7 @@ impl Lifetime {
 
     /// # Safety
     pub unsafe fn write_ptr<T: ?Sized>(&self, data: *mut T) -> Option<ValueWriteAccess<T>> {
+        unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
             .filter(|access| access.state.is_write_accessible())
@@ -279,6 +315,7 @@ impl Lifetime {
     }
 
     pub fn read_lock(&self) -> ReadLock {
+        unsafe { self.0.update_tag(self) };
         let mut access = self.0.lock();
         while !access.state.is_read_accessible() {
             std::hint::spin_loop();
@@ -291,6 +328,7 @@ impl Lifetime {
     }
 
     pub fn write_lock(&self) -> WriteLock {
+        unsafe { self.0.update_tag(self) };
         let mut access = self.0.lock();
         while !access.state.is_write_accessible() {
             std::hint::spin_loop();
@@ -307,7 +345,7 @@ pub struct LifetimeRef(LifetimeWeakState);
 
 impl Drop for LifetimeRef {
     fn drop(&mut self) {
-        if let Some(owner) = self.0.upgrade() {
+        if let Some(owner) = unsafe { self.0.upgrade_unchecked() } {
             if let Some(mut access) = owner.try_lock() {
                 access.release_reader();
             }
@@ -318,6 +356,10 @@ impl Drop for LifetimeRef {
 impl LifetimeRef {
     pub fn state(&self) -> &LifetimeWeakState {
         &self.0
+    }
+
+    pub fn tag(&self) -> usize {
+        self.0.tag
     }
 
     pub fn exists(&self) -> bool {
@@ -433,7 +475,7 @@ pub struct LifetimeRefMut(LifetimeWeakState, usize);
 
 impl Drop for LifetimeRefMut {
     fn drop(&mut self) {
-        if let Some(state) = self.0.upgrade() {
+        if let Some(state) = unsafe { self.0.upgrade_unchecked() } {
             if let Some(mut access) = state.try_lock() {
                 access.release_writer(self.1);
             }
@@ -444,6 +486,10 @@ impl Drop for LifetimeRefMut {
 impl LifetimeRefMut {
     pub fn state(&self) -> &LifetimeWeakState {
         &self.0
+    }
+
+    pub fn tag(&self) -> usize {
+        self.0.tag
     }
 
     pub fn depth(&self) -> usize {
@@ -636,6 +682,10 @@ pub struct LifetimeLazy(LifetimeWeakState);
 impl LifetimeLazy {
     pub fn state(&self) -> &LifetimeWeakState {
         &self.0
+    }
+
+    pub fn tag(&self) -> usize {
+        self.0.tag
     }
 
     pub fn exists(&self) -> bool {
@@ -1040,5 +1090,22 @@ mod tests {
         .unwrap();
         assert!(!lifetime_ref.exists());
         assert!(!lifetime_ref.is_owned_by(&lifetime));
+    }
+
+    #[test]
+    fn test_lifetimes_move_invalidation() {
+        let lifetime = Lifetime::default();
+        let lifetime_ref = lifetime.borrow().unwrap();
+        assert_eq!(lifetime_ref.tag(), lifetime.tag());
+        assert!(lifetime_ref.exists());
+        let lifetime_ref2 = lifetime_ref;
+        assert_eq!(lifetime_ref2.tag(), lifetime.tag());
+        assert!(lifetime_ref2.exists());
+        let lifetime = Box::new(lifetime);
+        assert_ne!(lifetime_ref2.tag(), lifetime.tag());
+        assert!(!lifetime_ref2.exists());
+        let lifetime = *lifetime;
+        assert_ne!(lifetime_ref2.tag(), lifetime.tag());
+        assert!(!lifetime_ref2.exists());
     }
 }

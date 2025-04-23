@@ -1723,4 +1723,18 @@ mod tests {
             assert_eq!(*value.read::<i32>().unwrap(), 2);
         }
     }
+
+    #[test]
+    fn test_move_invalidation() {
+        let value = Managed::new(42);
+        let value_ref = value.borrow().unwrap();
+        assert_eq!(value.lifetime().tag(), value_ref.lifetime().tag());
+        assert!(value_ref.lifetime().exists());
+        let value = Box::new(value);
+        assert_ne!(value.lifetime().tag(), value_ref.lifetime().tag());
+        assert!(!value_ref.lifetime().exists());
+        let value = *value;
+        assert_ne!(value.lifetime().tag(), value_ref.lifetime().tag());
+        assert!(!value_ref.lifetime().exists());
+    }
 }

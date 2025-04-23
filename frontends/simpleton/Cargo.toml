@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-simpleton"
-version = "0.45.0"
+version = "0.45.1"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Simpleton frontend module for Intuicio scripting platform"
