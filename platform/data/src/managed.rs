@@ -87,6 +87,13 @@ impl<T> Managed<T> {
     }
 
     /// # Safety
+    pub unsafe fn lazy_immutable(&self) -> ManagedLazy<T> {
+        unsafe {
+            ManagedLazy::new_raw(&self.data as *const T as *mut T, self.lifetime.lazy()).unwrap()
+        }
+    }
+
+    /// # Safety
     pub unsafe fn map<U>(self, f: impl FnOnce(T) -> U) -> Managed<U> {
         Managed {
             lifetime: Default::default(),
