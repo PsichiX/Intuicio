@@ -702,6 +702,22 @@ impl DynamicManaged {
         }
     }
 
+    pub fn new_uninitialized(
+        type_hash: TypeHash,
+        layout: Layout,
+        finalizer: unsafe fn(*mut ()),
+    ) -> Self {
+        let memory = unsafe { alloc(layout) };
+        Self {
+            type_hash,
+            lifetime: Default::default(),
+            memory,
+            layout,
+            finalizer,
+            drop: true,
+        }
+    }
+
     /// # Safety
     pub unsafe fn from_bytes(
         type_hash: TypeHash,
