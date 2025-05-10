@@ -1,8 +1,9 @@
 main             =  { SOI ~ ows ~ meta ~ ows ~ EOI }
-meta             =  { map | array | value | identifier }
+meta             =  { map | array | named | value | identifier }
 map              =  { "{" ~ ows ~ (map_item ~ (ows ~ "," ~ ows ~ map_item)* ~ ows)? ~ "}" }
 map_item         =  { identifier ~ ows ~ ":" ~ ows ~ meta }
 array            =  { "[" ~ ows ~ (meta ~ (ows ~ "," ~ ows ~ meta)* ~ ows)? ~ "]" }
+named            =  { identifier ~ ows ~ "=" ~ ows ~ meta }
 value            =  { literal_bool | literal_float | literal_integer | literal_string }
 literal_bool     =  { "true" | "false" }
 literal_integer  = @{ ("+" | "-")? ~ ASCII_DIGIT+ }

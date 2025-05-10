@@ -28,6 +28,10 @@ impl MetaParser {
             Rule::value => Meta::Value(Self::parse_value(pair)),
             Rule::array => Meta::Array(Self::parse_array(pair)),
             Rule::map => Meta::Map(Self::parse_map(pair)),
+            Rule::named => {
+                let (id, meta) = Self::parse_named(pair);
+                Meta::Named(id, Box::new(meta))
+            }
             rule => unreachable!("{:?}", rule),
         }
     }
@@ -63,6 +67,14 @@ impl MetaParser {
                 )
             })
             .collect()
+    }
+
+    fn parse_named(pair: Pair<Rule>) -> (String, Meta) {
+        let mut pairs = pair.into_inner();
+        (
+            Self::parse_identifier(pairs.next().unwrap()),
+            Self::parse_meta(pairs.next().unwrap()),
+        )
     }
 }
 
@@ -152,6 +164,7 @@ pub enum Meta {
     Value(MetaValue),
     Array(Vec<Meta>),
     Map(HashMap<String, Meta>),
+    Named(String, Box<Meta>),
 }
 
 impl Meta {
@@ -186,6 +199,13 @@ impl Meta {
             _ => None,
         }
     }
+
+    pub fn as_named(&self) -> Option<(&str, &Meta)> {
+        match self {
+            Self::Named(name, value) => Some((name.as_str(), value)),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Meta {
@@ -215,6 +235,11 @@ impl std::fmt::Display for Meta {
                 }
                 f.write_char('}')
             }
+            Self::Named(name, value) => {
+                f.write_str(name)?;
+                f.write_str(" = ")?;
+                value.fmt(f)
+            }
         }
     }
 }
@@ -234,6 +259,12 @@ macro_rules! meta {
     }};
     (@item [ $( $item:tt ),* ]) => {
         $crate::meta::Meta::Array(vec![ $( $crate::meta!(@item $item) ),* ])
+    };
+    (@item ( $name:ident = $item:tt )) => {
+        $crate::meta::Meta::Named(
+            stringify!($name).to_owned(),
+            Box::new($crate::meta!(@item $item))
+        )
     };
     (@item $value:literal) => {
         $crate::meta::Meta::Value($crate::meta::MetaValue::from($value))
@@ -265,10 +296,11 @@ mod tests {
             "{}",
             MetaParser::parse_main("{bool: true, integer: 42, float: 4.2, string: 'foo'}").unwrap()
         );
+        println!("{}", MetaParser::parse_main("foo = true").unwrap());
     }
 
     #[test]
-    fn test_meta() {
+    fn test_macro() {
         let meta = crate::meta!(foo);
         assert!(matches!(meta, Meta::Identifier(_)));
         assert_eq!(meta.as_identifier().unwrap(), "foo");
@@ -351,6 +383,18 @@ mod tests {
                 .as_str()
                 .unwrap(),
             "foo"
+        );
+        let meta = crate::meta!((foo = true));
+        assert!(matches!(meta, Meta::Named(_, _)));
+        assert_eq!(meta.as_named().unwrap().0, "foo");
+        assert!(
+            meta.as_named()
+                .unwrap()
+                .1
+                .as_value()
+                .unwrap()
+                .as_bool()
+                .unwrap()
         );
     }
 }
