@@ -6,6 +6,7 @@ use syn::{Ident, ItemStruct, Lit, Meta, NestedMeta, Visibility, parse_macro_inpu
 struct StructAttributes {
     pub name: Option<Ident>,
     pub module_name: Option<Ident>,
+    pub uninitialized: Option<bool>,
     pub override_send: Option<bool>,
     pub override_sync: Option<bool>,
     pub override_copy: Option<bool>,
@@ -57,6 +58,13 @@ macro_rules! parse_struct_attributes {
                                                         &content.value(),
                                                         Span::call_site().into(),
                                                     ))
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if name_value.path.is_ident("uninitialized") {
+                                            match &name_value.lit {
+                                                Lit::Bool(content) => {
+                                                    result.uninitialized = Some(content.value)
                                                 }
                                                 _ => {}
                                             }
@@ -169,12 +177,18 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     let StructAttributes {
         name,
         module_name,
+        uninitialized,
         override_send,
         override_sync,
         override_copy,
         debug,
         meta,
     } = parse_struct_attributes!(attrs);
+    let construct = if uninitialized.unwrap_or(false) {
+        quote! { intuicio_core::types::struct_type::NativeStructBuilder::new_named_uninitialized::<#ident>(name) }
+    } else {
+        quote! { intuicio_core::types::struct_type::NativeStructBuilder::new_named::<#ident>(name) }
+    };
     let name = if let Some(name) = name {
         quote! { stringify!(#name) }
     } else {
@@ -268,7 +282,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
                 registry: &intuicio_core::registry::Registry,
             ) -> intuicio_core::types::struct_type::Struct {
                 let name = #name;
-                let mut result = intuicio_core::types::struct_type::NativeStructBuilder::new_named::<#ident>(name);
+                let mut result = #construct;
                 #visibility
                 #module_name
                 #(#fields)*
@@ -279,7 +293,8 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
                 result.build()
             }
         }
-    }.into();
+    }
+    .into();
     if debug {
         println!(
             "* Debug of `IntuicioStruct` derive macro\n- Input: {}\n- Result: {}",

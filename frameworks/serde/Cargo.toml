@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-serde"
-version = "0.45.4"
+version = "0.45.5"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "(De)Serialization framework module for Intuicio scripting platform"
