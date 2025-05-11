@@ -283,20 +283,21 @@ mod tests {
 
     #[test]
     fn test_parser() {
-        println!("{}", MetaParser::parse_main("foo").unwrap());
-        println!("{}", MetaParser::parse_main("true").unwrap());
-        println!("{}", MetaParser::parse_main("42").unwrap());
-        println!("{}", MetaParser::parse_main("4.2").unwrap());
-        println!("{}", MetaParser::parse_main("'foo'").unwrap());
+        println!("{}", Meta::parse("foo").unwrap());
+        println!("{}", Meta::parse("true").unwrap());
+        println!("{}", Meta::parse("42").unwrap());
+        println!("{}", Meta::parse("4.2").unwrap());
+        println!("{}", Meta::parse("'foo'").unwrap());
+        println!("{}", Meta::parse("foo = true").unwrap());
         println!(
             "{}",
-            MetaParser::parse_main("[true, 42, 4.2, 'foo']").unwrap()
+            Meta::parse("[true, 42, 4.2, 'foo', foo = true]").unwrap()
         );
         println!(
             "{}",
-            MetaParser::parse_main("{bool: true, integer: 42, float: 4.2, string: 'foo'}").unwrap()
+            Meta::parse("{bool: true, integer: 42, float: 4.2, string: 'foo', named: foo = true}")
+                .unwrap()
         );
-        println!("{}", MetaParser::parse_main("foo = true").unwrap());
     }
 
     #[test]

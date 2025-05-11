@@ -1,5 +1,6 @@
 use proc_macro::{Span, TokenStream};
 use quote::{ToTokens, quote};
+use std::collections::HashMap;
 use syn::{
     AttributeArgs, FnArg, Ident, ImplItem, ItemImpl, Lit, Meta, NestedMeta, Pat, ReturnType, Type,
     Visibility, parse_macro_input,
@@ -20,6 +21,7 @@ struct MethodAttributes {
     pub transformer: Option<Ident>,
     pub dependency: Option<Ident>,
     pub meta: Option<String>,
+    pub args_meta: HashMap<String, String>,
 }
 
 macro_rules! parse_impl_attributes {
@@ -79,6 +81,30 @@ macro_rules! parse_method_attributes {
                                             result.debug = true;
                                         }
                                     }
+                                    Meta::List(list) => {
+                                        if list.path.is_ident("args_meta") {
+                                            for meta in list.nested.iter() {
+                                                if let NestedMeta::Meta(Meta::NameValue(
+                                                    name_value,
+                                                )) = meta
+                                                {
+                                                    match &name_value.lit {
+                                                        Lit::Str(content) => {
+                                                            result.args_meta.insert(
+                                                                name_value
+                                                                    .path
+                                                                    .get_ident()
+                                                                    .unwrap()
+                                                                    .to_string(),
+                                                                content.value(),
+                                                            );
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                     Meta::NameValue(name_value) => {
                                         if name_value.path.is_ident("name") {
                                             match &name_value.lit {
@@ -119,7 +145,6 @@ macro_rules! parse_method_attributes {
                                             }
                                         }
                                     }
-                                    _ => {}
                                 },
                                 _ => {}
                             }
@@ -175,6 +200,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 mut transformer,
                 dependency,
                 meta,
+                args_meta,
             },
             found,
         ) = parse_method_attributes!(&item.attrs);
@@ -217,6 +243,25 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         } else {
             quote! {}
         };
+        let args_meta = item
+            .sig
+            .inputs
+            .iter()
+            .map(|arg| {
+                let name = match arg {
+                    FnArg::Receiver(_) => "self".to_owned(),
+                    FnArg::Typed(item) => match &*item.pat {
+                        Pat::Ident(ident) => ident.ident.to_string(),
+                        _ => panic!("Only identifiers are accepted as argument names!"),
+                    },
+                };
+                if let Some(meta) = args_meta.get(&name) {
+                    quote! { arg.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+                } else {
+                    quote! {}
+                }
+            })
+            .collect::<Vec<_>>();
         let arg_idents = item
             .sig
             .inputs
@@ -507,8 +552,9 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                 #type_handle
                 #meta
                 #(
-                    result.inputs.push(
-                        intuicio_core::function::FunctionParameter::new(
+                    {
+                        #[allow(unused_mut)]
+                        let mut arg = intuicio_core::function::FunctionParameter::new(
                             stringify!(#arg_idents),
                             registry
                                 .find_type(intuicio_core::types::TypeQuery::of_type_name::<#arg_types>())
@@ -518,8 +564,10 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                                     stringify!(#arg_idents),
                                     stringify!(#ident),
                                 ))
-                        )
-                    );
+                        );
+                        #args_meta
+                        result.inputs.push(arg);
+                    }
                 )*
                 #(
                     result.outputs.push(

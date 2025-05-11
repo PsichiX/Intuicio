@@ -1,5 +1,6 @@
 use proc_macro::{Span, TokenStream};
 use quote::quote;
+use std::collections::HashMap;
 use syn::{
     AttributeArgs, FnArg, Ident, ItemFn, Lit, Meta, NestedMeta, Pat, Path, ReturnType, Type,
     TypePath, Visibility, parse_macro_input, parse_str,
@@ -16,6 +17,7 @@ struct Attributes {
     pub transformer: Option<Ident>,
     pub dependency: Option<Ident>,
     pub meta: Option<String>,
+    pub args_meta: HashMap<String, String>,
 }
 
 macro_rules! parse_attributes {
@@ -32,6 +34,23 @@ macro_rules! parse_attributes {
                             result.use_context = true;
                         } else if path.is_ident("debug") {
                             result.debug = true;
+                        }
+                    }
+                    Meta::List(list) => {
+                        if list.path.is_ident("args_meta") {
+                            for meta in list.nested.iter() {
+                                if let NestedMeta::Meta(Meta::NameValue(name_value)) = meta {
+                                    match &name_value.lit {
+                                        Lit::Str(content) => {
+                                            result.args_meta.insert(
+                                                name_value.path.get_ident().unwrap().to_string(),
+                                                content.value(),
+                                            );
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
                         }
                     }
                     Meta::NameValue(name_value) => {
@@ -94,7 +113,6 @@ macro_rules! parse_attributes {
                             }
                         }
                     }
-                    _ => {}
                 },
                 _ => {}
             }
@@ -115,6 +133,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
         transformer,
         dependency,
         meta,
+        args_meta,
     } = parse_attributes!(attributes2);
     let input2 = input.clone();
     let item = parse_macro_input!(input2 as ItemFn);
@@ -159,6 +178,25 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
     } else {
         quote! {}
     };
+    let args_meta = item
+        .sig
+        .inputs
+        .iter()
+        .map(|arg| {
+            let name = match arg {
+                FnArg::Receiver(_) => "self".to_owned(),
+                FnArg::Typed(item) => match &*item.pat {
+                    Pat::Ident(ident) => ident.ident.to_string(),
+                    _ => panic!("Only identifiers are accepted as argument names!"),
+                },
+            };
+            if let Some(meta) = args_meta.get(&name) {
+                quote! { arg.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+            } else {
+                quote! {}
+            }
+        })
+        .collect::<Vec<_>>();
     let arg_idents = item
         .sig
         .inputs
@@ -398,19 +436,20 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
                 #type_handle
                 #meta
                 #(
-                    result.inputs.push(
-                        intuicio_core::function::FunctionParameter::new(
-                            stringify!(#arg_idents),
-                            registry
-                                .find_type(intuicio_core::types::TypeQuery::of_type_name::<#arg_types>())
-                                .unwrap_or_else(|| panic!(
-                                    "Could not find type: `{}` for argument: `{}` for function: `{}`",
-                                    std::any::type_name::<#arg_types>(),
-                                    stringify!(#arg_idents),
-                                    stringify!(#ident),
-                                ))
-                        )
+                    #[allow(unused_mut)]
+                    let mut arg = intuicio_core::function::FunctionParameter::new(
+                        stringify!(#arg_idents),
+                        registry
+                            .find_type(intuicio_core::types::TypeQuery::of_type_name::<#arg_types>())
+                            .unwrap_or_else(|| panic!(
+                                "Could not find type: `{}` for argument: `{}` for function: `{}`",
+                                std::any::type_name::<#arg_types>(),
+                                stringify!(#arg_idents),
+                                stringify!(#ident),
+                            ))
                     );
+                    #args_meta
+                    result.inputs.push(arg);
                 )*
                 #(
                     result.outputs.push(

@@ -722,6 +722,7 @@ macro_rules! define_runtime_struct {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unused_attributes)]
     use crate as intuicio_core;
     use crate::{IntuicioStruct, meta::Meta, object::*, registry::*};
     use intuicio_derive::*;
@@ -732,8 +733,8 @@ mod tests {
 
     #[intuicio_methods()]
     impl Bar {
-        #[intuicio_method(meta = "foo")]
-        fn method_meta() {}
+        #[intuicio_method(meta = "foo", args_meta(_bar = "foo"))]
+        fn method_meta(_bar: bool) {}
     }
 
     #[test]

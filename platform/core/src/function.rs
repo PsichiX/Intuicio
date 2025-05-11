@@ -66,6 +66,11 @@ impl FunctionParameter {
             type_handle,
         }
     }
+
+    pub fn with_meta(mut self, meta: Meta) -> Self {
+        self.meta = Some(meta);
+        self
+    }
 }
 
 impl std::fmt::Debug for FunctionParameter {
@@ -485,8 +490,8 @@ mod tests {
     use intuicio_data;
     use intuicio_derive::*;
 
-    #[intuicio_function(meta = "foo")]
-    fn function_meta() {}
+    #[intuicio_function(meta = "foo", args_meta(_bar = "foo"))]
+    fn function_meta(_bar: bool) {}
 
     #[test]
     fn test_function() {
@@ -560,7 +565,7 @@ mod tests {
         );
 
         let mut context = Context::new(10240, 10240);
-        let registry = Registry::default();
+        let registry = Registry::default().with_basic_types();
 
         context.stack().push(2);
         context.stack().push(40);
