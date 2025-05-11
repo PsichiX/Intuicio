@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-backend-vm"
-version = "0.45.5"
+version = "0.45.6"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "VM backend module for Intuicio scripting platform"

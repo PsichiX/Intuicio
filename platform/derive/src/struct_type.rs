@@ -6,7 +6,7 @@ use syn::{Ident, ItemStruct, Lit, Meta, NestedMeta, Visibility, parse_macro_inpu
 struct StructAttributes {
     pub name: Option<Ident>,
     pub module_name: Option<Ident>,
-    pub uninitialized: Option<bool>,
+    pub uninitialized: bool,
     pub override_send: Option<bool>,
     pub override_sync: Option<bool>,
     pub override_copy: Option<bool>,
@@ -38,6 +38,8 @@ macro_rules! parse_struct_attributes {
                                     Meta::Path(path) => {
                                         if path.is_ident("debug") {
                                             result.debug = true;
+                                        } else if path.is_ident("uninitialized") {
+                                            result.uninitialized = true;
                                         }
                                     }
                                     Meta::NameValue(name_value) => {
@@ -58,13 +60,6 @@ macro_rules! parse_struct_attributes {
                                                         &content.value(),
                                                         Span::call_site().into(),
                                                     ))
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("uninitialized") {
-                                            match &name_value.lit {
-                                                Lit::Bool(content) => {
-                                                    result.uninitialized = Some(content.value)
                                                 }
                                                 _ => {}
                                             }
@@ -184,7 +179,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
         debug,
         meta,
     } = parse_struct_attributes!(attrs);
-    let construct = if uninitialized.unwrap_or(false) {
+    let construct = if uninitialized {
         quote! { intuicio_core::types::struct_type::NativeStructBuilder::new_named_uninitialized::<#ident>(name) }
     } else {
         quote! { intuicio_core::types::struct_type::NativeStructBuilder::new_named::<#ident>(name) }
