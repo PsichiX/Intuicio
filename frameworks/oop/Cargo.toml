@@ -1,17 +1,18 @@
 [package]
-name = "intuicio-framework-text"
+name = "intuicio-framework-oop"
 version = "0.45.9"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
-description = "Text types framework module for Intuicio scripting platform"
+description = "OOP framework module for Intuicio scripting platform"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
-documentation = "https://docs.rs/intuicio-framework-text"
+documentation = "https://docs.rs/intuicio-framework-oop"
 readme = "../../README.md"
 
 [dependencies]
+intuicio-data = { version = "0.45", path = "../../platform/data" }
 intuicio-core = { version = "0.45", path = "../../platform/core" }
+
+[dev-dependencies]
 intuicio-derive = { version = "0.45", path = "../../platform/derive" }
-string-interner = "0.19"
-lazy_static = "1.4"

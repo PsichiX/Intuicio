@@ -19,6 +19,10 @@ impl TypeHash {
         unsafe { Self::raw(std::any::type_name::<T>()) }
     }
 
+    pub fn is_valid(&self) -> bool {
+        self.hash != Self::INVALID.hash
+    }
+
     /// # Safety
     pub unsafe fn raw(name: &str) -> Self {
         let mut hasher = FxHasher::default();
