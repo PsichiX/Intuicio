@@ -78,7 +78,7 @@ impl MetaParser {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum MetaValue {
     Bool(bool),
     Integer(i64),
@@ -206,6 +206,70 @@ impl Meta {
             _ => None,
         }
     }
+
+    pub fn has_id(&self, name: &str) -> bool {
+        match self {
+            Self::Identifier(value) => value == name,
+            Self::Value(value) => value.as_str() == Some(name),
+            Self::Array(values) => values.iter().any(|meta| meta.has_id(name)),
+            Self::Map(values) => values.iter().any(|(key, _)| key == name),
+            Self::Named(key, _) => key == name,
+        }
+    }
+
+    pub fn extract_by_id(&self, name: &str) -> Option<MetaExtract> {
+        match self {
+            Self::Identifier(value) => {
+                if value == name {
+                    Some(MetaExtract::Identifier(value.as_str()))
+                } else {
+                    None
+                }
+            }
+            Self::Value(value) => {
+                if value.as_str() == Some(name) {
+                    Some(MetaExtract::Value(value))
+                } else {
+                    None
+                }
+            }
+            Self::Array(values) => values
+                .iter()
+                .filter_map(|meta| meta.extract_by_id(name))
+                .next(),
+            Self::Map(values) => values
+                .iter()
+                .filter_map(|(key, value)| {
+                    if key == name {
+                        Some(MetaExtract::Meta(value))
+                    } else {
+                        None
+                    }
+                })
+                .next(),
+            Self::Named(key, value) => {
+                if key == name {
+                    Some(MetaExtract::Meta(value))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn items_iter(&self) -> MetaExtractIter {
+        match self {
+            Self::Identifier(name) => {
+                MetaExtractIter::new(std::iter::once(MetaExtract::Identifier(name.as_str())))
+            }
+            Self::Value(value) => MetaExtractIter::new(std::iter::once(MetaExtract::Value(value))),
+            Self::Array(values) => MetaExtractIter::new(values.iter().map(MetaExtract::Meta)),
+            Self::Map(values) => MetaExtractIter::new(values.values().map(MetaExtract::Meta)),
+            Self::Named(_, value) => {
+                MetaExtractIter::new(std::iter::once(MetaExtract::Meta(value)))
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for Meta {
@@ -241,6 +305,57 @@ impl std::fmt::Display for Meta {
                 value.fmt(f)
             }
         }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum MetaExtract<'a> {
+    Undefined,
+    Identifier(&'a str),
+    Meta(&'a Meta),
+    Value(&'a MetaValue),
+}
+
+impl MetaExtract<'_> {
+    pub fn is_undefined(&self) -> bool {
+        matches!(self, Self::Undefined)
+    }
+
+    pub fn as_identifier(&self) -> Option<&str> {
+        match self {
+            Self::Identifier(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn as_value(&self) -> Option<&MetaValue> {
+        match self {
+            Self::Value(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn as_meta(&self) -> Option<&Meta> {
+        match self {
+            Self::Meta(value) => Some(*value),
+            _ => None,
+        }
+    }
+}
+
+pub struct MetaExtractIter<'a>(Box<dyn Iterator<Item = MetaExtract<'a>> + 'a>);
+
+impl<'a> MetaExtractIter<'a> {
+    fn new(iter: impl Iterator<Item = MetaExtract<'a>> + 'a) -> Self {
+        Self(Box::new(iter))
+    }
+}
+
+impl<'a> Iterator for MetaExtractIter<'a> {
+    type Item = MetaExtract<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
     }
 }
 
@@ -305,20 +420,26 @@ mod tests {
         let meta = crate::meta!(foo);
         assert!(matches!(meta, Meta::Identifier(_)));
         assert_eq!(meta.as_identifier().unwrap(), "foo");
+
         let meta = crate::meta!(true);
         assert!(matches!(meta, Meta::Value(MetaValue::Bool(_))));
         assert!(meta.as_value().unwrap().as_bool().unwrap());
+
         let meta = crate::meta!(42);
         assert!(matches!(meta, Meta::Value(MetaValue::Integer(_))));
         assert_eq!(meta.as_value().unwrap().as_integer().unwrap(), 42);
+
         let meta = crate::meta!(4.2);
         assert!(matches!(meta, Meta::Value(MetaValue::Float(_))));
         assert_eq!(meta.as_value().unwrap().as_float().unwrap(), 4.2);
+
         let meta = crate::meta!("foo");
         assert!(matches!(meta, Meta::Value(MetaValue::String(_))));
         assert_eq!(meta.as_value().unwrap().as_str().unwrap(), "foo");
+
         let meta = crate::meta!([]);
         assert!(matches!(meta, Meta::Array(_)));
+
         let meta = crate::meta!([true, 42, 4.2, "foo"]);
         assert!(
             meta.as_array().unwrap()[0]
@@ -351,8 +472,10 @@ mod tests {
                 .unwrap(),
             "foo"
         );
+
         let meta = crate::meta!({});
         assert!(matches!(meta, Meta::Map(_)));
+
         let meta = crate::meta!({bool: true, integer: 42, float: 4.2, string: "foo"});
         assert!(
             meta.as_map().unwrap()["bool"]
@@ -385,6 +508,7 @@ mod tests {
                 .unwrap(),
             "foo"
         );
+
         let meta = crate::meta!((foo = true));
         assert!(matches!(meta, Meta::Named(_, _)));
         assert_eq!(meta.as_named().unwrap().0, "foo");
@@ -396,6 +520,107 @@ mod tests {
                 .unwrap()
                 .as_bool()
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_meta_extract() {
+        let meta = crate::meta!(foo);
+        assert!(meta.has_id("foo"));
+        assert_eq!(
+            meta.extract_by_id("foo").unwrap(),
+            MetaExtract::Identifier("foo")
+        );
+        assert_eq!(
+            meta.items_iter().collect::<Vec<_>>(),
+            vec![MetaExtract::Identifier("foo")]
+        );
+
+        let meta = crate::meta!("foo");
+        assert!(meta.has_id("foo"));
+        assert_eq!(
+            meta.extract_by_id("foo").unwrap(),
+            MetaExtract::Value(&MetaValue::String("foo".to_owned()))
+        );
+        assert_eq!(
+            meta.items_iter().collect::<Vec<_>>(),
+            vec![MetaExtract::Value(&MetaValue::String("foo".to_owned()))]
+        );
+
+        let meta = crate::meta!([true, 42, 4.2, "foo"]);
+        assert!(meta.has_id("foo"));
+        assert_eq!(
+            meta.extract_by_id("foo").unwrap(),
+            MetaExtract::Value(&MetaValue::String("foo".to_owned()))
+        );
+        assert_eq!(
+            meta.items_iter().collect::<Vec<_>>(),
+            vec![
+                MetaExtract::Meta(&Meta::Value(MetaValue::Bool(true))),
+                MetaExtract::Meta(&Meta::Value(MetaValue::Integer(42))),
+                MetaExtract::Meta(&Meta::Value(MetaValue::Float(4.2))),
+                MetaExtract::Meta(&Meta::Value(MetaValue::String("foo".to_owned()))),
+            ]
+        );
+
+        let meta = crate::meta!({bool: true, integer: 42, float: 4.2, string: "foo"});
+        assert!(meta.has_id("bool"));
+        assert!(meta.has_id("integer"));
+        assert!(meta.has_id("float"));
+        assert!(meta.has_id("string"));
+        assert_eq!(
+            meta.extract_by_id("bool").unwrap(),
+            MetaExtract::Meta(&Meta::Value(MetaValue::Bool(true)))
+        );
+        assert_eq!(
+            meta.extract_by_id("integer").unwrap(),
+            MetaExtract::Meta(&Meta::Value(MetaValue::Integer(42)))
+        );
+        assert_eq!(
+            meta.extract_by_id("float").unwrap(),
+            MetaExtract::Meta(&Meta::Value(MetaValue::Float(4.2)))
+        );
+        assert_eq!(
+            meta.extract_by_id("string").unwrap(),
+            MetaExtract::Meta(&Meta::Value(MetaValue::String("foo".to_owned())))
+        );
+        let mut result = meta.items_iter().collect::<Vec<_>>();
+        result.sort_by(|a, b| {
+            let a = match a {
+                MetaExtract::Meta(Meta::Value(MetaValue::Bool(_))) => 0,
+                MetaExtract::Meta(Meta::Value(MetaValue::Integer(_))) => 1,
+                MetaExtract::Meta(Meta::Value(MetaValue::Float(_))) => 2,
+                MetaExtract::Meta(Meta::Value(MetaValue::String(_))) => 3,
+                _ => 4,
+            };
+            let b = match b {
+                MetaExtract::Meta(Meta::Value(MetaValue::Bool(_))) => 0,
+                MetaExtract::Meta(Meta::Value(MetaValue::Integer(_))) => 1,
+                MetaExtract::Meta(Meta::Value(MetaValue::Float(_))) => 2,
+                MetaExtract::Meta(Meta::Value(MetaValue::String(_))) => 3,
+                _ => 4,
+            };
+            a.cmp(&b)
+        });
+        assert_eq!(
+            result,
+            vec![
+                MetaExtract::Meta(&Meta::Value(MetaValue::Bool(true))),
+                MetaExtract::Meta(&Meta::Value(MetaValue::Integer(42))),
+                MetaExtract::Meta(&Meta::Value(MetaValue::Float(4.2))),
+                MetaExtract::Meta(&Meta::Value(MetaValue::String("foo".to_owned()))),
+            ]
+        );
+
+        let meta = crate::meta!((foo = true));
+        assert!(meta.has_id("foo"));
+        assert_eq!(
+            meta.extract_by_id("foo").unwrap(),
+            MetaExtract::Meta(&Meta::Value(MetaValue::Bool(true)))
+        );
+        assert_eq!(
+            meta.items_iter().collect::<Vec<_>>(),
+            vec![MetaExtract::Meta(&Meta::Value(MetaValue::Bool(true)))]
         );
     }
 }
