@@ -422,7 +422,7 @@ pub fn intuicio_enum(input: TokenStream) -> TokenStream {
         quote! {}
     };
     let meta = if let Some(meta) = meta {
-        quote! { result.meta = intuicio_core::meta::Meta::parse(#meta).ok(); }
+        quote! { result = result.maybe_meta(intuicio_core::meta::Meta::parse(#meta).ok()); }
     } else {
         quote! {}
     };

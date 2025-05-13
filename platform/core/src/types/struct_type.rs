@@ -46,6 +46,11 @@ impl RuntimeStructBuilder {
         self
     }
 
+    pub fn maybe_meta(mut self, meta: Option<Meta>) -> Self {
+        self.meta = meta;
+        self
+    }
+
     pub fn module_name(mut self, module_name: impl ToString) -> Self {
         self.module_name = Some(module_name.to_string());
         self
@@ -197,6 +202,11 @@ impl NativeStructBuilder {
 
     pub fn meta(mut self, meta: Meta) -> Self {
         self.meta = Some(meta);
+        self
+    }
+
+    pub fn maybe_meta(mut self, meta: Option<Meta>) -> Self {
+        self.meta = meta;
         self
     }
 
