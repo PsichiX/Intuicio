@@ -1,14 +1,11 @@
 use intuicio_data::{
     Finalize,
     lifetime::{Lifetime, ReadLock, ValueReadAccess, ValueWriteAccess},
+    non_zero_alloc, non_zero_dealloc,
     type_hash::TypeHash,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    alloc::{Layout, alloc, dealloc},
-    error::Error,
-    marker::PhantomData,
-};
+use std::{alloc::Layout, error::Error, marker::PhantomData};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ArenaError {
@@ -180,7 +177,11 @@ impl Drop for Arena {
     fn drop(&mut self) {
         self.clear();
         self.lifetime.write_lock().using(|| unsafe {
-            dealloc(self.memory, self.layout);
+            if self.memory.is_null() {
+                return;
+            }
+            non_zero_dealloc(self.memory, self.layout);
+            self.memory = std::ptr::null_mut();
         });
     }
 }
@@ -500,7 +501,7 @@ impl Arena {
         let (memory, layout) =
             unsafe { Self::allocate_memory_unlocked(self.item_layout, capacity) };
         unsafe { self.memory.copy_to(memory, self.item_layout.size() * size) };
-        unsafe { dealloc(self.memory, self.layout) };
+        unsafe { non_zero_dealloc(self.memory, self.layout) };
         self.memory = memory;
         self.layout = layout;
         for (_, lifetime) in &mut self.indices_lifetimes {
@@ -523,7 +524,7 @@ impl Arena {
                 )
             }
         };
-        let memory = unsafe { alloc(layout) };
+        let memory = unsafe { non_zero_alloc(layout) };
         (memory, layout)
     }
 }

@@ -1,9 +1,6 @@
 use crate::types::{StructFieldQuery, Type, TypeHandle, TypeQuery};
-use intuicio_data::{Initialize, type_hash::TypeHash};
-use std::{
-    alloc::{alloc, dealloc},
-    collections::HashMap,
-};
+use intuicio_data::{Initialize, non_zero_alloc, non_zero_dealloc, type_hash::TypeHash};
+use std::collections::HashMap;
 
 pub struct RuntimeObject;
 
@@ -23,6 +20,9 @@ impl Drop for Object {
     fn drop(&mut self) {
         if self.drop {
             unsafe {
+                if self.memory.is_null() {
+                    return;
+                }
                 if self.handle.is_native() {
                     self.handle.finalize(self.memory.cast::<()>());
                 } else {
@@ -47,7 +47,8 @@ impl Drop for Object {
                         }
                     }
                 }
-                dealloc(self.memory, *self.handle.layout());
+                non_zero_dealloc(self.memory, *self.handle.layout());
+                self.memory = std::ptr::null_mut();
             }
         }
     }
@@ -62,7 +63,7 @@ impl Object {
                 handle.name()
             );
         }
-        let memory = unsafe { alloc(*handle.layout()) };
+        let memory = unsafe { non_zero_alloc(*handle.layout()) };
         let mut result = Self {
             memory,
             handle,
@@ -74,7 +75,7 @@ impl Object {
 
     pub fn try_new(handle: TypeHandle) -> Option<Self> {
         if handle.can_initialize() {
-            let memory = unsafe { alloc(*handle.layout()) };
+            let memory = unsafe { non_zero_alloc(*handle.layout()) };
             if memory.is_null() {
                 None
             } else {
@@ -93,7 +94,7 @@ impl Object {
 
     /// # Safety
     pub unsafe fn new_uninitialized(handle: TypeHandle) -> Option<Self> {
-        let memory = unsafe { alloc(*handle.layout()) };
+        let memory = unsafe { non_zero_alloc(*handle.layout()) };
         if memory.is_null() {
             None
         } else {
@@ -117,7 +118,7 @@ impl Object {
     /// # Safety
     pub unsafe fn from_bytes(handle: TypeHandle, bytes: &[u8]) -> Option<Self> {
         if handle.layout().size() == bytes.len() {
-            let memory = unsafe { alloc(*handle.layout()) };
+            let memory = unsafe { non_zero_alloc(*handle.layout()) };
             if memory.is_null() {
                 None
             } else {

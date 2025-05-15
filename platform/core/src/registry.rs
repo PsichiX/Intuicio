@@ -1,6 +1,11 @@
 use crate::{
     function::{Function, FunctionHandle, FunctionQuery},
+    object::Object,
     types::{Type, TypeHandle, TypeQuery, struct_type::NativeStructBuilder},
+};
+use intuicio_data::{
+    managed::{DynamicManaged, DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut},
+    managed_box::DynamicManagedBox,
 };
 use std::{
     collections::BTreeMap,
@@ -64,6 +69,34 @@ impl Registry {
             .with_type(NativeStructBuilder::new::<f64>().build())
             .with_type(NativeStructBuilder::new::<char>().build())
             .with_type(NativeStructBuilder::new_named::<String>("String").build())
+    }
+
+    pub fn with_erased_types(self) -> Self {
+        self.with_type(
+            NativeStructBuilder::new_named_uninitialized::<DynamicManaged>("DynamicManaged")
+                .build(),
+        )
+        .with_type(
+            NativeStructBuilder::new_named_uninitialized::<DynamicManagedLazy>(
+                "DynamicManagedLazy",
+            )
+            .build(),
+        )
+        .with_type(
+            NativeStructBuilder::new_named_uninitialized::<DynamicManagedRef>("DynamicManagedRef")
+                .build(),
+        )
+        .with_type(
+            NativeStructBuilder::new_named_uninitialized::<DynamicManagedRefMut>(
+                "DynamicManagedRefMut",
+            )
+            .build(),
+        )
+        .with_type(
+            NativeStructBuilder::new_named_uninitialized::<DynamicManagedBox>("DynamicManagedBox")
+                .build(),
+        )
+        .with_type(NativeStructBuilder::new_named_uninitialized::<Object>("Object").build())
     }
 
     pub fn with_index_capacity(mut self, capacity: usize) -> Self {

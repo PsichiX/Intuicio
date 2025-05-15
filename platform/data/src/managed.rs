@@ -3,12 +3,10 @@ use crate::{
     lifetime::{
         Lifetime, LifetimeLazy, LifetimeRef, LifetimeRefMut, ValueReadAccess, ValueWriteAccess,
     },
+    non_zero_alloc, non_zero_dealloc,
     type_hash::TypeHash,
 };
-use std::{
-    alloc::{Layout, alloc, dealloc},
-    mem::MaybeUninit,
-};
+use std::{alloc::Layout, mem::MaybeUninit};
 
 #[derive(Default)]
 pub struct Managed<T> {
@@ -652,9 +650,13 @@ impl Drop for DynamicManaged {
     fn drop(&mut self) {
         if self.drop {
             unsafe {
+                if self.memory.is_null() {
+                    return;
+                }
                 let data_pointer = self.memory.cast::<()>();
                 (self.finalizer)(data_pointer);
-                dealloc(self.memory, self.layout);
+                non_zero_dealloc(self.memory, self.layout);
+                self.memory = std::ptr::null_mut();
             }
         }
     }
@@ -664,7 +666,7 @@ impl DynamicManaged {
     pub fn new<T: Finalize>(data: T) -> Result<Self, T> {
         let layout = Layout::new::<T>().pad_to_align();
         unsafe {
-            let memory = alloc(layout);
+            let memory = non_zero_alloc(layout);
             if memory.is_null() {
                 Err(data)
             } else {
@@ -707,7 +709,8 @@ impl DynamicManaged {
         layout: Layout,
         finalizer: unsafe fn(*mut ()),
     ) -> Self {
-        let memory = unsafe { alloc(layout) };
+        let layout = layout.pad_to_align();
+        let memory = unsafe { non_zero_alloc(layout) };
         Self {
             type_hash,
             lifetime: Default::default(),
@@ -726,7 +729,8 @@ impl DynamicManaged {
         layout: Layout,
         finalizer: unsafe fn(*mut ()),
     ) -> Self {
-        let memory = unsafe { alloc(layout) };
+        let layout = layout.pad_to_align();
+        let memory = unsafe { non_zero_alloc(layout) };
         unsafe { memory.copy_from(bytes.as_ptr(), bytes.len()) };
         Self {
             type_hash,
@@ -807,11 +811,15 @@ impl DynamicManaged {
 
     pub fn consume<T>(mut self) -> Result<T, Self> {
         if self.type_hash == TypeHash::of::<T>() && !self.lifetime.state().is_in_use() {
+            if self.memory.is_null() {
+                return Err(self);
+            }
             self.drop = false;
             let mut result = MaybeUninit::<T>::uninit();
             unsafe {
                 result.as_mut_ptr().copy_from(self.memory.cast::<T>(), 1);
-                dealloc(self.memory, self.layout);
+                non_zero_dealloc(self.memory, self.layout);
+                self.memory = std::ptr::null_mut();
                 Ok(result.assume_init())
             }
         } else {
@@ -821,10 +829,13 @@ impl DynamicManaged {
 
     pub fn move_into_ref(self, target: DynamicManagedRefMut) -> Result<(), Self> {
         if self.type_hash == target.type_hash && self.memory != target.data {
+            if self.memory.is_null() {
+                return Err(self);
+            }
             let (_, _, memory, layout, _) = self.into_inner();
             unsafe {
                 target.data.copy_from(memory, layout.size());
-                dealloc(memory, layout);
+                non_zero_dealloc(memory, layout);
             }
             Ok(())
         } else {
@@ -834,10 +845,13 @@ impl DynamicManaged {
 
     pub fn move_into_lazy(self, target: DynamicManagedLazy) -> Result<(), Self> {
         if self.type_hash == target.type_hash && self.memory != target.data {
+            if self.memory.is_null() {
+                return Err(self);
+            }
             let (_, _, memory, layout, _) = self.into_inner();
             unsafe {
                 target.data.copy_from(memory, layout.size());
-                dealloc(memory, layout);
+                non_zero_dealloc(memory, layout);
             }
             Ok(())
         } else {

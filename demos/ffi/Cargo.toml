@@ -1,6 +1,6 @@
 [package]
 name = "ffi"
-version = "0.45.10"
+version = "0.46.0"
 edition = "2024"
 publish = false
 

@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-data"
-version = "0.45.10"
+version = "0.46.0"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Data module for Intuicio scripting platform"
@@ -9,6 +9,9 @@ homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
 documentation = "https://docs.rs/intuicio-data"
 readme = "../../README.md"
+
+[features]
+alloc-backtrace = []
 
 [dependencies]
 typid = "1"

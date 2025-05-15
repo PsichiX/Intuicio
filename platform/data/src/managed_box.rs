@@ -7,15 +7,10 @@ use crate::{
         DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut, ManagedLazy, ManagedRef,
         ManagedRefMut,
     },
-    pointer_alignment_padding,
+    non_zero_alloc, non_zero_dealloc, pointer_alignment_padding,
     type_hash::TypeHash,
 };
-use std::{
-    alloc::{Layout, alloc, dealloc},
-    cell::RefCell,
-    collections::HashMap,
-    ops::Range,
-};
+use std::{alloc::Layout, cell::RefCell, collections::HashMap, ops::Range};
 
 const MEMORY_CHUNK_SIZE: usize = 128;
 const MEMORY_PAGE_SIZE: usize = MEMORY_CHUNK_SIZE * u128::BITS as usize;
@@ -226,10 +221,16 @@ impl Drop for ManagedMemoryPage {
         unsafe {
             match self {
                 ManagedMemoryPage::Chunked { memory, layout, .. } => {
-                    dealloc(*memory, *layout);
+                    if memory.is_null() {
+                        return;
+                    }
+                    non_zero_dealloc(*memory, *layout);
                 }
                 ManagedMemoryPage::Exclusive { memory, layout, .. } => {
-                    dealloc(*memory, *layout);
+                    if memory.is_null() {
+                        return;
+                    }
+                    non_zero_dealloc(*memory, *layout);
                 }
             }
         }
@@ -241,7 +242,7 @@ impl ManagedMemoryPage {
         let header_layout = Layout::new::<ManagedObjectHeader>().pad_to_align();
         let layout = Layout::from_size_align(MEMORY_PAGE_SIZE + header_layout.align(), 1).unwrap();
         unsafe {
-            let memory = alloc(layout);
+            let memory = non_zero_alloc(layout);
             if memory.is_null() {
                 None
             } else {
@@ -267,7 +268,7 @@ impl ManagedMemoryPage {
             let header_layout = Layout::new::<ManagedObjectHeader>().pad_to_align();
             let layout =
                 Layout::from_size_align_unchecked(header_layout.size() + size + alignment, 1);
-            let memory = alloc(layout);
+            let memory = non_zero_alloc(layout);
             if memory.is_null() {
                 None
             } else {

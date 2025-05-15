@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-essentials"
-version = "0.45.10"
+version = "0.46.0"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Essentials module for Intuicio scripting platform"
@@ -16,8 +16,8 @@ plugins = ["intuicio-plugins"]
 vm = ["intuicio-backend-vm"]
 
 [dependencies]
-intuicio-data = { version = "0.45", path = "../platform/data" }
-intuicio-core = { version = "0.45", path = "../platform/core" }
-intuicio-derive = { version = "0.45", path = "../platform/derive" }
-intuicio-plugins = { version = "0.45", path = "../platform/plugins", optional = true }
-intuicio-backend-vm = { version = "0.45", path = "../backends/vm", optional = true }
+intuicio-data = { version = "0.46", path = "../platform/data" }
+intuicio-core = { version = "0.46", path = "../platform/core" }
+intuicio-derive = { version = "0.46", path = "../platform/derive" }
+intuicio-plugins = { version = "0.46", path = "../platform/plugins", optional = true }
+intuicio-backend-vm = { version = "0.46", path = "../backends/vm", optional = true }
