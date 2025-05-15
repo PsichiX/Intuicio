@@ -12,5 +12,5 @@ readme = "../../README.md"
 
 [dependencies]
 intuicio-core = { version = "0.46", path = "../core" }
-libffi = "3.2"
+libffi = "4.1"
 libloading = "0.8"

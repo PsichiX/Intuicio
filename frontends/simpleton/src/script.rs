@@ -1,5 +1,4 @@
 use crate::{Array, Boolean, Function, Integer, Map, Real, Reference, Text, Type, parser};
-use bincode::{DefaultOptions, Options};
 use intuicio_core::{
     IntuicioVersion, Visibility,
     context::Context,
@@ -1296,10 +1295,11 @@ impl SimpletonBinary {
                 })
                 .collect(),
         };
-        let options = DefaultOptions::new()
-            .with_fixint_encoding()
-            .allow_trailing_bytes();
-        Ok(options.serialize(&binary)?)
+        let config = bincode::config::legacy()
+            .with_big_endian()
+            .with_no_limit()
+            .with_fixed_int_encoding();
+        Ok(bincode::serde::encode_to_vec(&binary, config)?)
     }
 }
 
@@ -1324,11 +1324,12 @@ impl ScriptContentProvider<SimpletonModule> for SimpletonBinaryFileContentProvid
         &mut self,
         path: &str,
     ) -> Result<Vec<ScriptContent<SimpletonModule>>, Box<dyn Error>> {
-        let options = DefaultOptions::new()
-            .with_fixint_encoding()
-            .allow_trailing_bytes();
+        let config = bincode::config::legacy()
+            .with_big_endian()
+            .with_no_limit()
+            .with_fixed_int_encoding();
         let bytes = std::fs::read(path)?;
-        let binary = options.deserialize::<SimpletonBinary>(&bytes)?;
+        let binary = bincode::serde::decode_from_slice::<SimpletonBinary, _>(&bytes, config)?.0;
         let version = crate_version!();
         if !binary.version.is_compatible(&version) {
             return Err(format!(
