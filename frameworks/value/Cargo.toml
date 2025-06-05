@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-value"
-version = "0.46.0"
+version = "0.46.1"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Type erased value framework module for Intuicio scripting platform"
