@@ -12,6 +12,7 @@ So yeah, **this part of tutorial is educational only**, there is no need to crea
 ---
 
 Now let's start with creating `backend.rs` as part of our existing project and import dependencies, and create custom VM scope type:
+
 ```rust
 use intuicio_core::prelude::*;
 
@@ -29,9 +30,11 @@ impl<'a, SE: ScriptExpression> CustomScope<'a, SE> {
     }
 }
 ```
+
 As you can see, it is generic over the expression type of scripts so this backend could be used by any frontend, limiting scripts execution to expressions and function calls only.
 
 Next we implement simple VM execution of entire script operations set:
+
 ```rust
 impl<'a, SE: ScriptExpression> CustomScope<'a, SE> {
     pub fn run(&mut self, context: &mut Context, registry: &Registry) {
@@ -60,7 +63,9 @@ impl<'a, SE: ScriptExpression> CustomScope<'a, SE> {
     }
 }
 ```
+
 And last thing for this file is to implement `ScriptFunctionGenerator` for custom VM scope, so it will take any script and turn it into function body that will be provided later to function definitions:
+
 ```rust
 impl<SE: ScriptExpression + 'static> ScriptFunctionGenerator<SE> for CustomScope<'static, SE> {
     type Input = ();
@@ -85,6 +90,7 @@ impl<SE: ScriptExpression + 'static> ScriptFunctionGenerator<SE> for CustomScope
 Finally we need to change our `main.rs` file slightly to use custom VM scope instead of official VM scope.
 
 First we need to make new dependency imports in place of old ones:
+
 ```rust
 mod backend;
 mod frontend;
@@ -94,9 +100,11 @@ use crate::backend::*;
 use crate::frontend::*;
 use intuicio_core::prelude::*;
 ```
+
 We can also remove `intuicio-backend-vm` dependency from `Cargo.toml` since it won't be used anymore.
 
 Next the only thing we change in `main` function is we just replace our `main` scripting function definition into:
+
 ```rust
 registry.add_function(Function::new(
     function_signature! {
@@ -107,4 +115,5 @@ registry.add_function(Function::new(
         .0,
 ));
 ```
+
 So it will generate function body that runs custom VM scope with previously compiled script.

@@ -5,15 +5,17 @@ This is gonna be basically a pretty much stripped down version of `assembler` fr
 ---
 
 Let's start with defining goals for this frontend to achieve:
+
 - scripts operate only on `i32` values.
 - scripts will have two operations:
-    - push value on stack.
-    - call functions that takes values from stack, performs operations on them and push results back on stack.
+  - push value on stack.
+  - call functions that takes values from stack, performs operations on them and push results back on stack.
 - syntax of this language has to be simple, so that:
-    - each line is an operation or comment.
-    - we put operations in reverse order so it is easier to read script as a hierarchy of function calls with its arguments indented and in ascending order.
+  - each line is an operation or comment.
+  - we put operations in reverse order so it is easier to read script as a hierarchy of function calls with its arguments indented and in ascending order.
 
 Frontend syntax:
+
 ```text
 call lib div
     call lib mul
@@ -29,6 +31,7 @@ call lib div
 ---
 
 So now let's create new project and add Intuicio dependencies:
+
 ```toml
 [dependencies]
 intuicio-data = "*"
@@ -36,16 +39,20 @@ intuicio-core = "*"
 intuicio-derive = "*"
 intuicio-backend-vm = "*"
 ```
+
 Then create `frontend.rs` file, where we will heep all frontend-related code, and first import these dependencies:
+
 ```rust
 use intuicio_core::prelude::*;
 use std::{error::Error, str::FromStr};
 ```
+
 `intuicio_core` holds types related to script information, we use `Error` trait for errors propagation and `FromStr` for parsing.
 
 ---
 
 The most important thing to make is custom Intuiocio expression:
+
 ```rust
 #[derive(Debug)]
 pub enum CustomExpression {
@@ -62,11 +69,13 @@ impl ScriptExpression for CustomExpression {
     }
 }
 ```
+
 Expressions allow to extend available operations set of Intuicio scripts to enable features specific to given frontend - here we just allow to push `i32` literals onto stack.
 
 ---
 
 Now we will define intermediate script types for our Custom scripting language:
+
 ```rust
 pub type CustomScript = Vec<CustomOperation>;
 
@@ -76,7 +85,9 @@ pub enum CustomOperation {
     Call { name: String, module_name: String },
 }
 ```
+
 Next we need to implement parsing of operations from string lines to intermediate script data:
+
 ```rust
 impl FromStr for CustomOperation {
     type Err = CustomOperationError;
@@ -111,7 +122,9 @@ impl FromStr for CustomOperation {
     }
 }
 ```
+
 Also don't forget to implement our parsing error type:
+
 ```rust
 #[derive(Debug)]
 pub struct CustomOperationError {
@@ -130,6 +143,7 @@ impl Error for CustomOperationError {}
 ---
 
 After that we need to implement script compilation from intermediate to Intuicio scripts data, so scripts will be understood by Intuicio backend:
+
 ```rust
 impl CustomOperation {
     pub fn compile_operation(&self) -> Option<ScriptOperation<'static, CustomExpression>> {
@@ -160,11 +174,13 @@ impl CustomOperation {
     }
 }
 ```
+
 In `compile_script` method we iterate over operations in reverse order, because human-readable side of the scripts expects function call and then its parameters, while Intuicio scripts expect computer-readable order of arguments first, then function call.
 
 ---
 
 Finally we create scripts content parser so it can be used to parse byte strings into intermediate type scripts:
+
 ```rust
 pub struct CustomContentParser;
 
@@ -182,6 +198,7 @@ impl BytesContentParser<CustomScript> for CustomContentParser {
 ---
 
 Now let's create `main.rs` file, where we will test this frontend, first import dependencies:
+
 ```rust
 mod frontend;
 mod library;
@@ -194,7 +211,9 @@ fn main() {
     // next steps go here.
 }
 ```
+
 Then parse and compile some script:
+
 ```rust
 let script = b"
 call lib div
@@ -210,7 +229,9 @@ call lib div
 let script = CustomContentParser.parse(script.to_vec()).unwrap();
 let script = CustomOperation::compile_script(&script);
 ```
+
 Next, create and setup registry:
+
 ```rust
 let mut registry = Registry::default().with_basic_types();
 crate::library::install(&mut registry);
@@ -223,9 +244,11 @@ registry.add_function(Function::new(
         .0,
 ));
 ```
+
 As you can see, our scripts do not define functions, rather operations that belong to single one, so we create new main function and add it to the registry. We also use `VmScope` from VM backend to test this frontend in already existing VM backend, until we create dedicated backend ourselves.
 
 Final thing to do is to create host and test frontend:
+
 ```rust
 let mut host = Host::new(Context::new(10240, 10240), registry.into());
 let (result,) = host

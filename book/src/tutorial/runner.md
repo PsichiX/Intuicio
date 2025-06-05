@@ -5,6 +5,7 @@ In this part of tutorial we will be creating REPL solution that will prompts use
 ---
 
 First clear entire `main.rs` file, and start with importing new set of dependencies:
+
 ```rust
 mod backend;
 mod frontend;
@@ -15,7 +16,9 @@ use crate::frontend::*;
 use intuicio_core::prelude::*;
 use std::str::FromStr;
 ```
+
 Then we create our REPL structure that will hold both collected script operations and host that will run provided scripts:
+
 ```rust
 struct Repl {
     script: CustomScript,
@@ -34,7 +37,9 @@ impl Default for Repl {
     }
 }
 ```
+
 Next we need to implement feeding lines functionality, that will ask user for next operation, parse, compile and either collect into script or execute collected script if user types empty line:
+
 ```rust
 impl Repl {
     fn feed_line(&mut self) {
@@ -78,6 +83,7 @@ impl Repl {
 ---
 
 Finally here comes `main` function that runs REPL in a loop:
+
 ```rust
 fn main() {
     let mut repl = Repl::default();
@@ -91,6 +97,7 @@ fn main() {
 ---
 
 Let's test it:
+
 ```text
 $ cargo run
 Custom REPL.

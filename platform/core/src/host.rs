@@ -48,6 +48,7 @@ impl Host {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn push_global(self) -> Result<HostId, Self> {
         GLOBAL_HOST_STACK.with(|host| match host.try_borrow_mut() {
             Ok(mut stack) => {

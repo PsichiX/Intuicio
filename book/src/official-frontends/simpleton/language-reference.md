@@ -4,7 +4,8 @@ Let's start with saying that **Simpleton is not an OOP language**, you won't als
 
 **Simpleton is rather functional/procedural scripting language** that operates on structures for data transformations.
 
-## Table of contents:
+## Table of contents
+
 - [Script file structure](#script-file-structure)
 - [Structures](#structures)
 - [Functions](#functions)
@@ -19,6 +20,7 @@ Let's start with saying that **Simpleton is not an OOP language**, you won't als
 ## Script file structure
 
 Every script file consists of module definition and module items such as structures and functions:
+
 ```javascript
 mod vec2 {
     struct Vec2 { x, y }
@@ -35,9 +37,11 @@ mod vec2 {
     }
 }
 ```
+
 General rule of thumb is that one file describes one module and preferably one structure (if any) so functions in that module are working in context of that structure (somewhat similarly to how GDscript treats its files to some extent).
 
 So later these module types are operated on like this:
+
 ```javascript
 mod main {
     import "vec2";
@@ -51,6 +55,7 @@ mod main {
     }
 }
 ```
+
 First question that comes into mind is:
 
 > Why there are `add` function calls instead of operators being used?
@@ -58,6 +63,7 @@ First question that comes into mind is:
 **Simpleton does not have operators** - Simpleton believes in being explicit. If something is doing what function calls does, it should be called as function.
 
 The only exceptions are array and map accessors:
+
 ```javascript
 var array = [0, 1, 2];
 var array_item = array[1];
@@ -69,9 +75,11 @@ var map_item = map{"b"};
 ## Structures
 
 Every structure is defined by its name and list of field names:
+
 ```javascript
 struct Vec2 { x, y }
 ```
+
 The reason for that is that structures defined in simpleton are concrete objects that take up space defined by number of references they hold, they aren't dynamically sized bags of properties like in many scripting languages.
 
 If we have an object of `vec2::Vec2` type and we want to access its `x` field for reads or writes, it is guaranteed this field exists in the object and we get or set its reference.
@@ -79,12 +87,15 @@ If we have an object of `vec2::Vec2` type and we want to access its `x` field fo
 And the opposite is true too - if we try to access object field that is not defined in its type, we will get runtime error.
 
 Since Simpleton is not an OOP language, we not only do not have class methods, but also we do not have constructors, therefore we construct objects in-place like this:
+
 ```javascript
 var v = vec2::Vec2 { x: 42.0 };
 ```
+
 What this does is Simpleton creates default object of type `vec2::Vec2` and then applies values to fields listed in brackets - this also means that if we omit some fields, object will have their references `null`ed.
 
 Therefore if object expects some specific constraints on the object fields, it's good practice to make functions that return new object in-place with fields filled with arguments validated by that function:
+
 ```javascript
 func new(x, y) {
     debug::assert(
@@ -100,10 +111,13 @@ func new(x, y) {
 ```
 
 Additionally in rare situations when we do not know object type at compile-time, we can construct objects by `Type` object found at runtime:
+
 ```javascript
 var v = reflect::new(<struct vec2::Vec2>, { x: 42 });
 ```
+
 This is useful especially in case of deserialization, where type is part of deserialized data:
+
 ```javascript
 var data = {
     type_name: "Vec2",
@@ -117,6 +131,7 @@ var v = reflect::new(type, data.properties);
 ```
 
 And finally to get or set value from object field we use `.` delimiter between object and its field name:
+
 ```javascript
 var v = vec2::Vec2 { x: 42 };
 v.x = math::add(v.x, 10);
@@ -125,6 +140,7 @@ v.x = math::add(v.x, 10);
 ## Functions
 
 Every function is defined by its name, arguments list and function statements as its body:
+
 ```javascript
 func sum(a, b, c) {
     console::log_line(
@@ -141,19 +157,25 @@ func sum(a, b, c) {
     );
 }
 ```
+
 As you can see there is `return` keyword - it is used to inform Simpleton that we want to exit current function with given value.
 
 Functions always return some reference, if function does not have `return` statement in there, it implicitly returns `null`. We can also `return null;` if we want to exit function without value.
 
 Later functions can be called by providing their module name, function name and arguments:
+
 ```javascript
 var v = main::sum(1, 2, 3);
 ```
+
 If we don't know function at compile-time, we can call it at runtime by `Function` object:
+
 ```javascript
 var v = reflect::call(<func main::sum>, [1, 2, 3]);
 ```
+
 We can also find function type by its name and module name:
+
 ```javascript
 var function = reflect::find_function_by_name("sum", "main");
 var v = reflect::call(function, [1, 2, 3]);
@@ -162,6 +184,7 @@ var v = reflect::call(function, [1, 2, 3]);
 ## Closures
 
 Closures are special anonymous functions that can also capture variables from outer scope:
+
 ```javascript
 var a = 40;
 var closure = @[a](b) {
@@ -169,7 +192,9 @@ var closure = @[a](b) {
 };
 var v = closure::call(closure, [b]);
 ```
+
 Under the hood, closures are objects that store reference to `Function` object and list of captured references, and are compiled into actual functions like this:
+
 ```javascript
 mod _closures {
     func _0(a, b) {
@@ -193,19 +218,26 @@ It's worth noting that all objects, even `Boolean`, `Integer` and `Real` are box
 ## Variables
 
 Variables are local to the function, they are name aliases for references to values. You define variable with its value like this:
+
 ```javascript
 var answer = 42;
 ```
+
 You can also assign new values to existing variables:
+
 ```javascript
 answer = 10;
 ```
+
 Since variables are just named references local to given function, you can assign different type values to them than what was stored there at creation:
+
 ```javascript
 var v = 42;
 v = "Hello World!";
 ```
+
 To get value behind variable you just use its name:
+
 ```javascript
 var a = 42;
 console::log_line(reflect::to_text(a));
@@ -214,12 +246,15 @@ console::log_line(reflect::to_text(a));
 ## If-else branching
 
 Branching allows to execute some scope if condition succeeds:
+
 ```javascript
 if math::equals(a, 42) {
     console::log_line("`a` equals 42!");
 }
 ```
+
 One can also specify `else` scope in case condition fails:
+
 ```javascript
 if math::equals(a, 42) {
     console::log_line("`a` equals 42!");
@@ -231,6 +266,7 @@ if math::equals(a, 42) {
 ## While loops
 
 While loops allows to execute some scope repeatedly as long as condition succeeds:
+
 ```javascript
 var a = 0;
 while math::less_than(a, 42) {
@@ -241,6 +277,7 @@ while math::less_than(a, 42) {
 ## For loops
 
 For loops combined with iterators allow to iterate on values yielded by them until `null` value is yielded, which signals end of iteration:
+
 ```javascript
 // 2, 3, 4
 for value in iter::walk(2, 3) {
@@ -282,6 +319,7 @@ for pair in iter {
 ## Imports
 
 Packages are built by traversing modules tree - this tree is defined by entry module and its dependencies specified by imports:
+
 ```javascript
 mod main {
     import "vec2.simp";

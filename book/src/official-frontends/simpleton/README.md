@@ -3,6 +3,7 @@
 High level text-based scripting language.
 
 Key features:
+
 - Dynamically typed.
 - Influenced by **JavaScript** and **Python**.
 - Simple to understand and learn.
@@ -17,6 +18,7 @@ Simpleton was created for simplicity in mind as priority, mostly for allowing to
 It also has an educational value to showcase Intuicio users how one can create fully fledged dynamically typed scripting language - something that might be counter intuitive since Intuicio is rather strongly typed scripting platform. We achieve that by introducing Reference, Type and Function as fundamental Simpleton types, so that entire frontend is built around interactions with these types.
 
 ## Syntax
+
 ```javascript
 mod main {
     func main(args) {

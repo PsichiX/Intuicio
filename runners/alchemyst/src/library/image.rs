@@ -145,13 +145,12 @@ impl Image {
             .iter()
             .flat_map(|color| {
                 let color = color.read::<Color>().unwrap();
-                let result = [
+                [
                     *color.r.read::<Real>().unwrap() as f32,
                     *color.g.read::<Real>().unwrap() as f32,
                     *color.b.read::<Real>().unwrap() as f32,
                     *color.a.read::<Real>().unwrap() as f32,
-                ];
-                result
+                ]
             })
             .collect();
         Rgba32FImage::from_vec(cols, rows, pixels)

@@ -1,6 +1,7 @@
 # Tutorial
 
 In this tutorial we will be building entire custom and very simple scripting pipeline step by step, in order:
+
 - [Frontend](./frontend.html)
 - [Backend](./backend.html)
 - [Runner (REPL)](./runner.html)
@@ -12,6 +13,7 @@ We have choosen this particular order because each next part uses things made in
 ---
 
 Before we start tutorials, let's provide native-side library of functions we will use in the scripts right away, as `library.rs` file:
+
 ```rust
 use intuicio_core::prelude::*;
 use intuicio_derive::*;
@@ -43,7 +45,9 @@ pub fn install(registry: &mut Registry) {
     registry.add_function(div::define_function(registry));
 }
 ```
+
 So whenever you'll see in next tutorials this line, remember it calls `install` function from `library.rs` provided above:
+
 ```rust
 crate::library::install(&mut registry);
 ```
