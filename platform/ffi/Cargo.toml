@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-ffi"
-version = "0.46.1"
+version = "0.46.2"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "FFI module for Intuicio scripting platform"

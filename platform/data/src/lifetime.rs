@@ -1,9 +1,11 @@
 use std::{
+    future::poll_fn,
     ops::{Deref, DerefMut},
     sync::{
         Arc, Weak,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
+    task::Poll,
 };
 
 #[derive(Default)]
@@ -236,6 +238,19 @@ impl Lifetime {
             })
     }
 
+    pub async fn borrow_async(&self) -> LifetimeRef {
+        loop {
+            if let Some(lifetime_ref) = self.borrow() {
+                return lifetime_ref;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<LifetimeRef>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn borrow_mut(&self) -> Option<LifetimeRefMut> {
         unsafe { self.0.update_tag(self) };
         self.0
@@ -245,6 +260,19 @@ impl Lifetime {
                 let id = access.acquire_writer();
                 LifetimeRefMut(self.0.downgrade(), id)
             })
+    }
+
+    pub async fn borrow_mut_async(&self) -> LifetimeRefMut {
+        loop {
+            if let Some(lifetime_ref_mut) = self.borrow_mut() {
+                return lifetime_ref_mut;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<LifetimeRefMut>::Pending
+            })
+            .await;
+        }
     }
 
     pub fn lazy(&self) -> LifetimeLazy {
@@ -267,6 +295,10 @@ impl Lifetime {
             })
     }
 
+    pub async fn read_async<'a, T: ?Sized>(&'a self, data: &'a T) -> ValueReadAccess<'a, T> {
+        unsafe { self.read_ptr_async(data as *const T).await }
+    }
+
     /// # Safety
     pub unsafe fn read_ptr<T: ?Sized>(&self, data: *const T) -> Option<ValueReadAccess<T>> {
         unsafe { self.0.update_tag(self) };
@@ -283,6 +315,23 @@ impl Lifetime {
             })
     }
 
+    /// # Safety
+    pub async unsafe fn read_ptr_async<'a, T: ?Sized + 'a>(
+        &'a self,
+        data: *const T,
+    ) -> ValueReadAccess<'a, T> {
+        loop {
+            if let Some(access) = unsafe { self.read_ptr(data) } {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<'a, T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn write<'a, T: ?Sized>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
         unsafe { self.0.update_tag(self) };
         self.0
@@ -296,6 +345,10 @@ impl Lifetime {
                     data,
                 }
             })
+    }
+
+    pub async fn write_async<'a, T: ?Sized>(&'a self, data: &'a mut T) -> ValueWriteAccess<'a, T> {
+        unsafe { self.write_ptr_async(data as *mut T).await }
     }
 
     /// # Safety
@@ -314,6 +367,23 @@ impl Lifetime {
             })
     }
 
+    /// # Safety
+    pub async unsafe fn write_ptr_async<'a, T: ?Sized + 'a>(
+        &'a self,
+        data: *mut T,
+    ) -> ValueWriteAccess<'a, T> {
+        loop {
+            if let Some(access) = unsafe { self.write_ptr(data) } {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueWriteAccess<'a, T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn read_lock(&self) -> ReadLock {
         unsafe { self.0.update_tag(self) };
         let mut access = self.0.lock();
@@ -327,6 +397,25 @@ impl Lifetime {
         }
     }
 
+    pub async fn read_lock_async(&self) -> ReadLock {
+        loop {
+            unsafe { self.0.update_tag(self) };
+            let mut access = self.0.lock();
+            if access.state.is_read_accessible() {
+                access.unlock = false;
+                access.acquire_read_access();
+                return ReadLock {
+                    lifetime: self.0.clone(),
+                };
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ReadLock>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn write_lock(&self) -> WriteLock {
         unsafe { self.0.update_tag(self) };
         let mut access = self.0.lock();
@@ -337,6 +426,25 @@ impl Lifetime {
         access.acquire_write_access();
         WriteLock {
             lifetime: self.0.clone(),
+        }
+    }
+
+    pub async fn write_lock_async(&self) -> WriteLock {
+        loop {
+            unsafe { self.0.update_tag(self) };
+            let mut access = self.0.lock();
+            if access.state.is_write_accessible() {
+                access.unlock = false;
+                access.acquire_write_access();
+                return WriteLock {
+                    lifetime: self.0.clone(),
+                };
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<WriteLock>::Pending
+            })
+            .await;
         }
     }
 }
@@ -402,6 +510,19 @@ impl LifetimeRef {
             })
     }
 
+    pub async fn borrow_async(&self) -> LifetimeRef {
+        loop {
+            if let Some(lifetime_ref) = self.borrow() {
+                return lifetime_ref;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<LifetimeRef>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
@@ -415,6 +536,19 @@ impl LifetimeRef {
             })
         } else {
             None
+        }
+    }
+
+    pub async fn read_async<'a, T: ?Sized>(&'a self, data: &'a T) -> ValueReadAccess<'a, T> {
+        loop {
+            if let Some(access) = self.read(data) {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<'a, T>>::Pending
+            })
+            .await;
         }
     }
 
@@ -435,6 +569,23 @@ impl LifetimeRef {
         }
     }
 
+    /// # Safety
+    pub async unsafe fn read_ptr_async<'a, T: ?Sized + 'a>(
+        &'a self,
+        data: *const T,
+    ) -> ValueReadAccess<'a, T> {
+        loop {
+            if let Some(access) = unsafe { self.read_ptr(data) } {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<'a, T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn read_lock(&self) -> Option<ReadLock> {
         let state = self.0.upgrade()?;
         let mut access = state.lock();
@@ -446,6 +597,19 @@ impl LifetimeRef {
         Some(ReadLock {
             lifetime: state.clone(),
         })
+    }
+
+    pub async fn read_lock_async(&self) -> ReadLock {
+        loop {
+            if let Some(lock) = self.read_lock() {
+                return lock;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ReadLock>::Pending
+            })
+            .await;
+        }
     }
 
     pub fn consume<T: ?Sized>(self, data: &T) -> Result<ValueReadAccess<T>, Self> {
@@ -550,6 +714,19 @@ impl LifetimeRefMut {
             })
     }
 
+    pub async fn borrow_async(&self) -> LifetimeRef {
+        loop {
+            if let Some(lifetime_ref) = self.borrow() {
+                return lifetime_ref;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<LifetimeRef>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn borrow_mut(&self) -> Option<LifetimeRefMut> {
         self.0
             .upgrade()?
@@ -559,6 +736,19 @@ impl LifetimeRefMut {
                 let id = access.acquire_writer();
                 LifetimeRefMut(self.0.clone(), id)
             })
+    }
+
+    pub async fn borrow_mut_async(&self) -> LifetimeRefMut {
+        loop {
+            if let Some(lifetime_ref_mut) = self.borrow_mut() {
+                return lifetime_ref_mut;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<LifetimeRefMut>::Pending
+            })
+            .await;
+        }
     }
 
     pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
@@ -574,6 +764,19 @@ impl LifetimeRefMut {
             })
         } else {
             None
+        }
+    }
+
+    pub async fn read_async<'a, T: ?Sized>(&'a self, data: &'a T) -> ValueReadAccess<'a, T> {
+        loop {
+            if let Some(access) = self.read(data) {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<'a, T>>::Pending
+            })
+            .await;
         }
     }
 
@@ -594,6 +797,23 @@ impl LifetimeRefMut {
         }
     }
 
+    /// # Safety
+    pub async unsafe fn read_ptr_async<'a, T: ?Sized + 'a>(
+        &'a self,
+        data: *const T,
+    ) -> ValueReadAccess<'a, T> {
+        loop {
+            if let Some(access) = unsafe { self.read_ptr(data) } {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<'a, T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn write<'a, T: ?Sized>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
@@ -608,6 +828,10 @@ impl LifetimeRefMut {
         } else {
             None
         }
+    }
+
+    pub async fn write_async<'a, T: ?Sized>(&'a self, data: &'a mut T) -> ValueWriteAccess<'a, T> {
+        unsafe { self.write_ptr_async(data as *mut T).await }
     }
 
     /// # Safety
@@ -627,6 +851,23 @@ impl LifetimeRefMut {
         }
     }
 
+    /// # Safety
+    pub async unsafe fn write_ptr_async<'a, T: ?Sized + 'a>(
+        &'a self,
+        data: *mut T,
+    ) -> ValueWriteAccess<'a, T> {
+        loop {
+            if let Some(access) = unsafe { self.write_ptr(data) } {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueWriteAccess<'a, T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn read_lock(&self) -> Option<ReadLock> {
         let state = self.0.upgrade()?;
         let mut access = state.lock();
@@ -640,6 +881,19 @@ impl LifetimeRefMut {
         })
     }
 
+    pub async fn read_lock_async(&self) -> ReadLock {
+        loop {
+            if let Some(lock) = self.read_lock() {
+                return lock;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ReadLock>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn write_lock(&self) -> Option<WriteLock> {
         let state = self.0.upgrade()?;
         let mut access = state.lock();
@@ -651,6 +905,19 @@ impl LifetimeRefMut {
         Some(WriteLock {
             lifetime: state.clone(),
         })
+    }
+
+    pub async fn write_lock_async(&self) -> WriteLock {
+        loop {
+            if let Some(lock) = self.write_lock() {
+                return lock;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<WriteLock>::Pending
+            })
+            .await;
+        }
     }
 
     pub fn consume<T: ?Sized>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
@@ -728,6 +995,19 @@ impl LifetimeLazy {
             })
     }
 
+    pub async fn borrow_async(&self) -> LifetimeRef {
+        loop {
+            if let Some(lifetime_ref) = self.borrow() {
+                return lifetime_ref;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<LifetimeRef>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn borrow_mut(&self) -> Option<LifetimeRefMut> {
         self.0
             .upgrade()?
@@ -737,6 +1017,19 @@ impl LifetimeLazy {
                 let id = access.acquire_writer();
                 LifetimeRefMut(self.0.clone(), id)
             })
+    }
+
+    pub async fn borrow_mut_async(&self) -> LifetimeRefMut {
+        loop {
+            if let Some(lifetime_ref_mut) = self.borrow_mut() {
+                return lifetime_ref_mut;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<LifetimeRefMut>::Pending
+            })
+            .await;
+        }
     }
 
     pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
@@ -752,6 +1045,19 @@ impl LifetimeLazy {
             })
         } else {
             None
+        }
+    }
+
+    pub async fn read_async<'a, T: ?Sized>(&'a self, data: &'a T) -> ValueReadAccess<'a, T> {
+        loop {
+            if let Some(access) = self.read(data) {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<'a, T>>::Pending
+            })
+            .await;
         }
     }
 
@@ -772,6 +1078,23 @@ impl LifetimeLazy {
         }
     }
 
+    /// # Safety
+    pub async unsafe fn read_ptr_async<'a, T: ?Sized + 'a>(
+        &'a self,
+        data: *const T,
+    ) -> ValueReadAccess<'a, T> {
+        loop {
+            if let Some(access) = unsafe { self.read_ptr(data) } {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<'a, T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn write<'a, T: ?Sized>(&'a self, data: &'a mut T) -> Option<ValueWriteAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
@@ -788,6 +1111,10 @@ impl LifetimeLazy {
         }
     }
 
+    pub async fn write_async<'a, T: ?Sized>(&'a self, data: &'a mut T) -> ValueWriteAccess<'a, T> {
+        unsafe { self.write_ptr_async(data as *mut T).await }
+    }
+
     /// # Safety
     pub unsafe fn write_ptr<T: ?Sized>(&self, data: *mut T) -> Option<ValueWriteAccess<T>> {
         let state = self.0.upgrade()?;
@@ -802,6 +1129,23 @@ impl LifetimeLazy {
             })
         } else {
             None
+        }
+    }
+
+    /// # Safety
+    pub async unsafe fn write_ptr_async<'a, T: ?Sized + 'a>(
+        &'a self,
+        data: *mut T,
+    ) -> ValueWriteAccess<'a, T> {
+        loop {
+            if let Some(access) = unsafe { self.write_ptr(data) } {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueWriteAccess<'a, T>>::Pending
+            })
+            .await;
         }
     }
 

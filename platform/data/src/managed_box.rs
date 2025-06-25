@@ -10,7 +10,9 @@ use crate::{
     non_zero_alloc, non_zero_dealloc, pointer_alignment_padding,
     type_hash::TypeHash,
 };
-use std::{alloc::Layout, cell::RefCell, collections::HashMap, ops::Range};
+use std::{
+    alloc::Layout, cell::RefCell, collections::HashMap, future::poll_fn, ops::Range, task::Poll,
+};
 
 const MEMORY_CHUNK_SIZE: usize = 128;
 const MEMORY_PAGE_SIZE: usize = MEMORY_CHUNK_SIZE * u128::BITS as usize;
@@ -774,6 +776,19 @@ impl<T> ManagedBox<T> {
         })
     }
 
+    pub async fn read_async(&self) -> ValueReadAccess<T> {
+        loop {
+            if let Some(access) = self.read() {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
@@ -784,6 +799,28 @@ impl<T> ManagedBox<T> {
             )?;
             unsafe { lifetime.as_mut()?.write_ptr(pointer) }
         })
+    }
+
+    pub async fn write_async(&mut self) -> ValueWriteAccess<T> {
+        loop {
+            let result = STORAGE.with_borrow(|storage| {
+                let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                    self.memory.cast(),
+                    self.id,
+                    self.page,
+                    true,
+                )?;
+                unsafe { lifetime.as_mut()?.write_ptr(pointer) }
+            });
+            if let Some(access) = result {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueWriteAccess<T>>::Pending
+            })
+            .await;
+        }
     }
 
     pub fn borrow(&self) -> Option<ManagedRef<T>> {
@@ -798,6 +835,19 @@ impl<T> ManagedBox<T> {
         })
     }
 
+    pub async fn borrow_async(&self) -> ManagedRef<T> {
+        loop {
+            if let Some(access) = self.borrow() {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ManagedRef<T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
@@ -808,6 +858,19 @@ impl<T> ManagedBox<T> {
             )?;
             unsafe { ManagedRefMut::new_raw(pointer, lifetime.as_mut()?.borrow_mut()?) }
         })
+    }
+
+    pub async fn borrow_mut_async(&mut self) -> ManagedRefMut<T> {
+        loop {
+            if let Some(access) = self.borrow_mut() {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ManagedRefMut<T>>::Pending
+            })
+            .await;
+        }
     }
 
     pub fn lazy(&self) -> Option<ManagedLazy<T>> {
@@ -1009,6 +1072,19 @@ impl DynamicManagedBox {
         })
     }
 
+    pub async fn borrow_async(&self) -> DynamicManagedRef {
+        loop {
+            if let Some(access) = self.borrow() {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<DynamicManagedRef>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, type_hash) = storage.access_object_lifetime_type::<u8>(
@@ -1021,6 +1097,19 @@ impl DynamicManagedBox {
                 DynamicManagedRefMut::new_raw(type_hash, lifetime.as_mut()?.borrow_mut()?, pointer)
             }
         })
+    }
+
+    pub async fn borrow_mut_async(&mut self) -> DynamicManagedRefMut {
+        loop {
+            if let Some(access) = self.borrow_mut() {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<DynamicManagedRefMut>::Pending
+            })
+            .await;
+        }
     }
 
     pub fn lazy(&self) -> Option<DynamicManagedLazy> {
@@ -1045,12 +1134,47 @@ impl DynamicManagedBox {
         })
     }
 
+    pub async fn read_async<'a, T: 'a>(&'a self) -> ValueReadAccess<'a, T> {
+        loop {
+            if let Some(access) = self.read() {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueReadAccess<T>>::Pending
+            })
+            .await;
+        }
+    }
+
     pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, _) =
                 storage.access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)?;
             unsafe { lifetime.as_mut()?.write_ptr(pointer) }
         })
+    }
+
+    pub async fn write_async<'a, T: 'a>(&'a mut self) -> ValueWriteAccess<'a, T> {
+        loop {
+            let result = STORAGE.with_borrow(|storage| {
+                let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
+                    self.memory,
+                    self.id,
+                    self.page,
+                    true,
+                )?;
+                unsafe { lifetime.as_mut()?.write_ptr(pointer) }
+            });
+            if let Some(access) = result {
+                return access;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<ValueWriteAccess<T>>::Pending
+            })
+            .await;
+        }
     }
 
     /// # Safety
