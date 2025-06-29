@@ -1452,4 +1452,35 @@ mod tests {
         assert_ne!(lifetime_ref2.tag(), lifetime.tag());
         assert!(!lifetime_ref2.exists());
     }
+
+    #[pollster::test]
+    async fn test_lifetime_async() {
+        let mut value = 42usize;
+        let lifetime = Lifetime::default();
+        assert_eq!(*lifetime.read_async(&value).await, 42);
+        {
+            let lifetime_ref = lifetime.borrow_async().await;
+            {
+                let access = lifetime_ref.read_async(&value).await;
+                assert_eq!(*access, 42);
+            }
+        }
+        {
+            let lifetime_ref_mut = lifetime.borrow_mut_async().await;
+            {
+                let mut access = lifetime_ref_mut.write_async(&mut value).await;
+                *access = 7;
+                assert_eq!(*access, 7);
+            }
+            assert_eq!(*lifetime.read_async(&value).await, 7);
+        }
+        {
+            let mut access = lifetime.write_async(&mut value).await;
+            *access = 84;
+        }
+        {
+            let access = lifetime.read_async(&value).await;
+            assert_eq!(*access, 84);
+        }
+    }
 }

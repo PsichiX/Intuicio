@@ -2033,4 +2033,17 @@ mod tests {
         assert_ne!(value.lifetime().tag(), value_ref.lifetime().tag());
         assert!(!value_ref.lifetime().exists());
     }
+
+    #[pollster::test]
+    async fn test_managed_async() {
+        let mut value = Managed::new(42);
+        *value.write_async().await = 40;
+        assert_eq!(*value.read_async().await, 40);
+        *value.borrow_mut_async().await.write_async().await = 2;
+        assert_eq!(*value.read_async().await, 2);
+        let value_lazy = value.lazy();
+        assert_eq!(*value_lazy.read_async().await, 2);
+        *value_lazy.write_async().await = 42;
+        assert_eq!(*value_lazy.read_async().await, 42);
+    }
 }

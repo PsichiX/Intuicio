@@ -17,3 +17,6 @@ alloc-backtrace = []
 typid = "1"
 rustc-hash = "2"
 smallvec = "1.13"
+
+[dev-dependencies]
+pollster = { version = "0.4", features = ["macro"] }
