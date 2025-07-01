@@ -447,6 +447,32 @@ impl Lifetime {
             .await;
         }
     }
+
+    pub async fn wait_for_read_access(&self) {
+        loop {
+            if self.state().is_read_accessible() {
+                return;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<()>::Pending
+            })
+            .await;
+        }
+    }
+
+    pub async fn wait_for_write_access(&self) {
+        loop {
+            if self.state().is_write_accessible() {
+                return;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<()>::Pending
+            })
+            .await;
+        }
+    }
 }
 
 pub struct LifetimeRef(LifetimeWeakState);
@@ -631,6 +657,38 @@ impl LifetimeRef {
             })
         } else {
             Err(self)
+        }
+    }
+
+    pub async fn wait_for_read_access(&self) {
+        loop {
+            let Some(state) = self.0.upgrade() else {
+                return;
+            };
+            if state.is_read_accessible() {
+                return;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<()>::Pending
+            })
+            .await;
+        }
+    }
+
+    pub async fn wait_for_write_access(&self) {
+        loop {
+            let Some(state) = self.0.upgrade() else {
+                return;
+            };
+            if state.is_read_accessible() {
+                return;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<()>::Pending
+            })
+            .await;
         }
     }
 }
@@ -941,6 +999,38 @@ impl LifetimeRefMut {
             Err(self)
         }
     }
+
+    pub async fn wait_for_read_access(&self) {
+        loop {
+            let Some(state) = self.0.upgrade() else {
+                return;
+            };
+            if state.is_read_accessible() {
+                return;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<()>::Pending
+            })
+            .await;
+        }
+    }
+
+    pub async fn wait_for_write_access(&self) {
+        loop {
+            let Some(state) = self.0.upgrade() else {
+                return;
+            };
+            if state.is_read_accessible() {
+                return;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<()>::Pending
+            })
+            .await;
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -1168,6 +1258,38 @@ impl LifetimeLazy {
             })
         } else {
             Err(self)
+        }
+    }
+
+    pub async fn wait_for_read_access(&self) {
+        loop {
+            let Some(state) = self.0.upgrade() else {
+                return;
+            };
+            if state.is_read_accessible() {
+                return;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<()>::Pending
+            })
+            .await;
+        }
+    }
+
+    pub async fn wait_for_write_access(&self) {
+        loop {
+            let Some(state) = self.0.upgrade() else {
+                return;
+            };
+            if state.is_read_accessible() {
+                return;
+            }
+            poll_fn(|cx| {
+                cx.waker().wake_by_ref();
+                Poll::<()>::Pending
+            })
+            .await;
         }
     }
 }

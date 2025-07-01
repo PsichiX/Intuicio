@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-arena"
-version = "0.46.2"
+version = "0.46.3"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Arena allocator framework module for Intuicio scripting platform"
