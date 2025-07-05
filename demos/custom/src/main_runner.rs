@@ -28,7 +28,7 @@ impl Repl {
     fn feed_line(&mut self) {
         let mut line = String::default();
         if let Err(error) = std::io::stdin().read_line(&mut line) {
-            println!("* Could not read line: {}", error);
+            println!("* Could not read line: {error}");
         }
         if line.trim().is_empty() {
             let (context, registry) = self.host.context_and_registry();
@@ -48,7 +48,7 @@ impl Repl {
             );
             function.invoke(context, registry);
             if let Some(value) = context.stack().pop::<i32>() {
-                println!("* Completed with result: {}", value);
+                println!("* Completed with result: {value}");
             } else {
                 println!("* Completed!");
             }
@@ -56,7 +56,7 @@ impl Repl {
         } else {
             match CustomOperation::from_str(&line) {
                 Ok(operation) => self.script.push(operation),
-                Err(error) => println!("* Could not parse operation: {}", error),
+                Err(error) => println!("* Could not parse operation: {error}"),
             }
         }
     }

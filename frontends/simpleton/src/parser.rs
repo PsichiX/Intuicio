@@ -21,7 +21,7 @@ pub fn parse(content: &str) -> Result<SimpletonModule, String> {
                 rule => unreachable!("{:?}", rule),
             }
         }
-        Err(error) => Err(format!("{}", error)),
+        Err(error) => Err(format!("{error}")),
     }
 }
 

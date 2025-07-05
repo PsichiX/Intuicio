@@ -138,15 +138,15 @@ impl NodeDefinition for SimpletonNodes {
                     SimpletonLiteral::Null => vec![],
                     SimpletonLiteral::Array { items } => (0..items.len())
                         .map(|index| {
-                            NodePin::parameter(format!("Value #{}", index), SimpletonNodeTypeInfo)
+                            NodePin::parameter(format!("Value #{index}"), SimpletonNodeTypeInfo)
                         })
                         .collect(),
                     SimpletonLiteral::Map { items } => (0..items.len())
                         .flat_map(|index| {
                             [
-                                NodePin::property(format!("Key #{}", index)),
+                                NodePin::property(format!("Key #{index}")),
                                 NodePin::parameter(
-                                    format!("Value #{}", index),
+                                    format!("Value #{index}"),
                                     SimpletonNodeTypeInfo,
                                 ),
                             ]
@@ -157,9 +157,9 @@ impl NodeDefinition for SimpletonNodes {
                             vec![NodePin::property("Name"), NodePin::property("Module name")];
                         result.extend((0..fields.len()).flat_map(|index| {
                             [
-                                NodePin::property(format!("Field #{}", index)),
+                                NodePin::property(format!("Field #{index}")),
                                 NodePin::parameter(
-                                    format!("Value #{}", index),
+                                    format!("Value #{index}"),
                                     SimpletonNodeTypeInfo,
                                 ),
                             ]

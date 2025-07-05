@@ -161,10 +161,10 @@ impl std::fmt::Debug for FunctionSignature {
 impl std::fmt::Display for FunctionSignature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(meta) = self.meta.as_ref() {
-            write!(f, "#{} ", meta)?;
+            write!(f, "#{meta} ")?;
         }
         if let Some(module_name) = self.module_name.as_ref() {
-            write!(f, "mod {} ", module_name)?;
+            write!(f, "mod {module_name} ")?;
         }
         if let Some(type_handle) = self.type_handle.as_ref() {
             match &**type_handle {

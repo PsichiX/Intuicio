@@ -63,7 +63,7 @@ pub fn current_time(registry: &Registry) -> Reference {
     let start = SystemTime::now();
     let since_the_epoch = start
         .duration_since(UNIX_EPOCH)
-        .unwrap_or_else(|_| panic!("Time went backwards: {:?}", start));
+        .unwrap_or_else(|_| panic!("Time went backwards: {start:?}"));
     Reference::new_real(since_the_epoch.as_secs_f64(), registry)
 }
 

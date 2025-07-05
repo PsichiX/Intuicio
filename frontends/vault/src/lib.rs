@@ -769,7 +769,7 @@ mod tests {
         let mut registry = Registry::default().with_basic_types();
         registry.add_function(define_vault_function! {
             registry => mod intrinsics fn print(content: String) -> () {
-                println!("PRINT: {}", content);
+                println!("PRINT: {content}");
             }
         });
         registry.add_function(define_vault_function! {

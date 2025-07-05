@@ -485,8 +485,7 @@ pub fn intuicio_function(attributes: TokenStream, input: TokenStream) -> TokenSt
     .into();
     if debug {
         println!(
-            "* Debug of `intuicio_function` attribute macro\n- Attributes: {}\n- Input: {}\n- Result: {}",
-            attributes, input, result
+            "* Debug of `intuicio_function` attribute macro\n- Attributes: {attributes}\n- Input: {input}\n- Result: {result}"
         );
     }
     result
@@ -508,6 +507,6 @@ fn unpack_type(ty: &Type) -> UnpackedType {
                 UnpackedType::Ref(*reference.elem.clone())
             }
         }
-        _ => panic!("Unsupported kind of type to unpack: {:#?}", ty),
+        _ => panic!("Unsupported kind of type to unpack: {ty:#?}"),
     }
 }

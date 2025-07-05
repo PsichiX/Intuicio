@@ -17,7 +17,7 @@ impl MetaParser {
                     rule => unreachable!("{:?}", rule),
                 }
             }
-            Err(error) => Err(format!("{}", error)),
+            Err(error) => Err(format!("{error}")),
         }
     }
 
@@ -129,7 +129,7 @@ impl std::fmt::Display for MetaValue {
             Self::Bool(value) => value.fmt(f),
             Self::Integer(value) => value.fmt(f),
             Self::Float(value) => value.fmt(f),
-            Self::String(value) => f.write_fmt(format_args!("{:?}", value)),
+            Self::String(value) => f.write_fmt(format_args!("{value:?}")),
         }
     }
 }

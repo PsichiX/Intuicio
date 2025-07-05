@@ -4,7 +4,7 @@ use intuicio_derive::*;
 #[intuicio_function(module_name = "test")]
 fn add(a: i32, b: i32) -> i32 {
     let c = a + b;
-    println!("add | {} + {} = {}", a, b, c);
+    println!("add | {a} + {b} = {c}");
     c
 }
 

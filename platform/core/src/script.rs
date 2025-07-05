@@ -693,8 +693,7 @@ impl std::fmt::Display for ExtensionContentProviderError {
             ExtensionContentProviderError::ContentProviderForExtensionNotFound(extension) => {
                 write!(
                     f,
-                    "Could not find content provider for extension: `{}`",
-                    extension
+                    "Could not find content provider for extension: `{extension}`"
                 )
             }
         }
@@ -711,7 +710,7 @@ impl<S> ScriptContentProvider<S> for IgnoreContentProvider {
     }
 
     fn join_paths(&self, parent: &str, relative: &str) -> Result<String, Box<dyn Error>> {
-        Ok(format!("{}/{}", parent, relative))
+        Ok(format!("{parent}/{relative}"))
     }
 }
 

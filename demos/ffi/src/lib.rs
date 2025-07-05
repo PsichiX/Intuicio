@@ -2,13 +2,13 @@ use std::ffi::{CString, c_char};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn add(a: i32, b: i32) -> i32 {
-    println!("* FFI | ADD: {} + {}", a, b);
+    println!("* FFI | ADD: {a} + {b}");
     a + b
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn ensure_42(v: i32) {
-    println!("* FFI | ENSURE 42: {}", v);
+    println!("* FFI | ENSURE 42: {v}");
     assert_eq!(v, 42);
 }
 

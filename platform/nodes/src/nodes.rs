@@ -279,18 +279,18 @@ impl std::fmt::Display for ConnectionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InternalConnection(node) => {
-                write!(f, "Trying to connect node: {} to itself", node)
+                write!(f, "Trying to connect node: {node} to itself")
             }
-            Self::SourceNodeNotFound(node) => write!(f, "Source node: {} not found", node),
-            Self::TargetNodeNotFound(node) => write!(f, "Target node: {} not found", node),
+            Self::SourceNodeNotFound(node) => write!(f, "Source node: {node} not found"),
+            Self::TargetNodeNotFound(node) => write!(f, "Target node: {node} not found"),
             Self::NodesNotFound { from, to } => {
-                write!(f, "Source: {} and target: {} nodes not found", from, to)
+                write!(f, "Source: {from} and target: {to} nodes not found")
             }
             Self::SourcePinNotFound { node, pin } => {
-                write!(f, "Source pin: {} for node: {} not found", pin, node)
+                write!(f, "Source pin: {pin} for node: {node} not found")
             }
             Self::TargetPinNotFound { node, pin } => {
-                write!(f, "Target pin: {} for node: {} not found", pin, node)
+                write!(f, "Target pin: {pin} for node: {node} not found")
             }
             Self::MismatchTypes {
                 from_node,
@@ -302,8 +302,7 @@ impl std::fmt::Display for ConnectionError {
             } => {
                 write!(
                     f,
-                    "Source type: {} of pin: {} for node: {} does not match target type: {} of pin: {} for node: {}",
-                    from_type_info, from_pin, from_node, to_type_info, to_pin, to_node
+                    "Source type: {from_type_info} of pin: {from_pin} for node: {from_node} does not match target type: {to_type_info} of pin: {to_pin} for node: {to_node}"
                 )
             }
             Self::MismatchPins {
@@ -314,11 +313,10 @@ impl std::fmt::Display for ConnectionError {
             } => {
                 write!(
                     f,
-                    "Source pin: {} kind for node: {} does not match target pin: {} kind for node: {}",
-                    from_pin, from_node, to_pin, to_node
+                    "Source pin: {from_pin} kind for node: {from_node} does not match target pin: {to_pin} kind for node: {to_node}"
                 )
             }
-            Self::CycleNodeFound(node) => write!(f, "Found cycle node: {}", node),
+            Self::CycleNodeFound(node) => write!(f, "Found cycle node: {node}"),
             Self::Custom(error) => error.fmt(f),
         }
     }
@@ -340,15 +338,13 @@ impl std::fmt::Display for NodeGraphError {
             Self::DuplicateFunctionInputNames(name) => {
                 write!(
                     f,
-                    "Found duplicate `{}` function input with different types",
-                    name
+                    "Found duplicate `{name}` function input with different types"
                 )
             }
             Self::DuplicateFunctionOutputNames(name) => {
                 write!(
                     f,
-                    "Found duplicate `{}` function output with different types",
-                    name
+                    "Found duplicate `{name}` function output with different types"
                 )
             }
         }
@@ -948,7 +944,7 @@ mod tests {
         type TypeInfo = String;
 
         fn node_label(&self, _: &Registry) -> String {
-            format!("{:?}", self)
+            format!("{self:?}")
         }
 
         fn node_pins_in(&self, _: &Registry) -> Vec<NodePin<Self::TypeInfo>> {

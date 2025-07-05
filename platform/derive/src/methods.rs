@@ -633,6 +633,6 @@ fn unpack_type(ty: &Type) -> UnpackedType {
                 UnpackedType::Ref(*reference.elem.clone())
             }
         }
-        _ => panic!("Unsupported kind of type to unpack: {:#?}", ty),
+        _ => panic!("Unsupported kind of type to unpack: {ty:#?}"),
     }
 }

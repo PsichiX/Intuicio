@@ -20,7 +20,7 @@ pub fn parse(content: &str) -> Result<AsmFile, String> {
                 rule => unreachable!("{:?}", rule),
             }
         }
-        Err(error) => Err(format!("{}", error)),
+        Err(error) => Err(format!("{error}")),
     }
 }
 

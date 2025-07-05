@@ -73,7 +73,7 @@ fn debug_impl(value: &Reference, result: &mut dyn Write, indent: &mut Option<usi
                         debug_indent(result, *indent);
                     }
                 }
-                write!(result, "{}: ", key).unwrap();
+                write!(result, "{key}: ").unwrap();
                 debug_impl(value, result, indent);
             }
             if let Some(indent) = indent {

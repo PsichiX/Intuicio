@@ -65,7 +65,7 @@ pub mod shorthand {
     pub fn string(open: &str, close: &str) -> ParserHandle {
         let open = open.escape_unicode().to_string();
         let close = close.escape_unicode().to_string();
-        let pattern = format!("{0}(?<content>[^{1}]*){1}", open, close);
+        let pattern = format!("{open}(?<content>[^{close}]*){close}");
         map(regex_capture(pattern, "content"), move |value: String| {
             snailquote::unescape(&value).unwrap()
         })

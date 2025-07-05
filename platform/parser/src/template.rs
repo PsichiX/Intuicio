@@ -49,14 +49,11 @@ impl Parser for TemplateParser {
                         let item = list
                             .get(index)
                             .unwrap_or_else(|| {
-                                panic!(
-                                    "Template parsing result list has no item at {} index!",
-                                    index
-                                )
+                                panic!("Template parsing result list has no item at {index} index!")
                             })
                             .read::<String>()
                             .unwrap_or_else(|| {
-                                panic!("Template parsing result list item {} is not String!", index)
+                                panic!("Template parsing result list item {index} is not String!")
                             });
                         result.push_str(item.as_str());
                         result.push_str(suffix);
@@ -67,7 +64,7 @@ impl Parser for TemplateParser {
                             }
                             result.push_str(prefix);
                             let item = item.read::<String>().unwrap_or_else(|| {
-                                panic!("Template parsing result list item {} is not String!", index)
+                                panic!("Template parsing result list item {index} is not String!")
                             });
                             result.push_str(item.as_str());
                             result.push_str(suffix);
@@ -79,7 +76,7 @@ impl Parser for TemplateParser {
                             }
                             result.push_str(prefix);
                             let item = item.read::<String>().unwrap_or_else(|| {
-                                panic!("Template parsing result list item {} is not String!", index)
+                                panic!("Template parsing result list item {index} is not String!")
                             });
                             result.push_str(item.as_str());
                             result.push_str(suffix);

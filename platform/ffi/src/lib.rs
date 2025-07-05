@@ -54,7 +54,7 @@ impl FfiLibrary {
                 .library
                 .get::<unsafe extern "C" fn()>(symbol.as_encoded_bytes())?;
             let Some(function) = symbol.try_as_raw_ptr() else {
-                return Err(format!("Could not get pointer of function: `{}`", signature).into());
+                return Err(format!("Could not get pointer of function: `{signature}`").into());
             };
             let handle = Arc::new(FfiFunction::from_function_signature(
                 FfiCodePtr(function),

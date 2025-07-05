@@ -512,8 +512,7 @@ impl SerializationRegistry {
                     ..Default::default()
                 }) else {
                     return Err(format!(
-                        "Type of DynamicManagedBox object not found. Hash: {}",
-                        type_hash
+                        "Type of DynamicManagedBox object not found. Hash: {type_hash}"
                     )
                     .into());
                 };
@@ -786,11 +785,10 @@ impl SerializationRegistry {
                             }
                             Ok(result)
                         } else {
-                            Err(format!(
-                                "Enum variant with discriminant: {} not found",
-                                discriminant
+                            Err(
+                                format!("Enum variant with discriminant: {discriminant} not found")
+                                    .into(),
                             )
-                            .into())
                         }
                     }
                 },
@@ -853,7 +851,7 @@ impl SerializationRegistry {
                                 if let Some((discriminant, _)) = discriminant_fields(type_, name) {
                                     data.write_unaligned(discriminant);
                                 } else {
-                                    return Err(format!("Enum variant: {} not found", name).into());
+                                    return Err(format!("Enum variant: {name} not found").into());
                                 }
                             }
                             Intermediate::NewTypeVariant(name, value) => {
@@ -870,7 +868,7 @@ impl SerializationRegistry {
                                         registry,
                                     )?;
                                 } else {
-                                    return Err(format!("Enum variant: {} not found", name).into());
+                                    return Err(format!("Enum variant: {name} not found").into());
                                 }
                             }
                             Intermediate::TupleVariant(name, values) => {
@@ -898,7 +896,7 @@ impl SerializationRegistry {
                                         }
                                     }
                                 } else {
-                                    return Err(format!("Enum variant: {} not found", name).into());
+                                    return Err(format!("Enum variant: {name} not found").into());
                                 }
                             }
                             Intermediate::StructVariant(name, values) => {
@@ -925,7 +923,7 @@ impl SerializationRegistry {
                                         }
                                     }
                                 } else {
-                                    return Err(format!("Enum variant: {} not found", name).into());
+                                    return Err(format!("Enum variant: {name} not found").into());
                                 }
                             }
                             _ => return Err("Expected enum variant".into()),

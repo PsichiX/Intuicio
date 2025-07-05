@@ -127,7 +127,7 @@ impl Benchmark {
         mut run: impl FnMut(I) -> O,
         mut outro: impl FnMut(O),
     ) -> BenchmarkResult {
-        println!("* Benchmark for {}:", label);
+        println!("* Benchmark for {label}:");
         let (times, total) = match self {
             Self::Iterations(count) => {
                 let timer = Instant::now();
@@ -193,7 +193,7 @@ impl Benchmark {
         mut run: impl FnMut(&mut S, I) -> O,
         mut outro: impl FnMut(&mut S, O),
     ) -> BenchmarkResult {
-        println!("* Benchmark for {}:", label);
+        println!("* Benchmark for {label}:");
         let (times, total) = match self {
             Self::Iterations(count) => {
                 let timer = Instant::now();

@@ -22,27 +22,25 @@ impl std::fmt::Display for ArenaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidAreaType { type_hash } => {
-                write!(f, "Invalid area type: {:?}", type_hash)
+                write!(f, "Invalid area type: {type_hash:?}")
             }
             Self::IndexNotFound { type_hash, index } => {
-                write!(f, "Index: {} not found in arena: {:?}", index, type_hash)
+                write!(f, "Index: {index} not found in arena: {type_hash:?}")
             }
             Self::CannotReadItem { type_hash, index } => {
                 write!(
                     f,
-                    "Cannot read item at index: {} in arena: {:?}",
-                    index, type_hash
+                    "Cannot read item at index: {index} in arena: {type_hash:?}"
                 )
             }
             Self::CannotWriteItem { type_hash, index } => {
                 write!(
                     f,
-                    "Cannot write item at index: {} in arena: {:?}",
-                    index, type_hash
+                    "Cannot write item at index: {index} in arena: {type_hash:?}"
                 )
             }
             Self::ArenaNotFound { type_hash } => {
-                write!(f, "Arena not found: {:?}", type_hash)
+                write!(f, "Arena not found: {type_hash:?}")
             }
         }
     }

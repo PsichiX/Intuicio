@@ -86,10 +86,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         .types()
                         .find(|handle| query.is_valid(handle))
                         .unwrap_or_else(|| {
-                            panic!(
-                                "Could not define register for non-existent type: {:#?}",
-                                query
-                            )
+                            panic!("Could not define register for non-existent type: {query:#?}")
                         });
                     unsafe {
                         context
@@ -105,7 +102,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         .registers()
                         .access_register(index)
                         .unwrap_or_else(|| {
-                            panic!("Could not access non-existent register: {}", index)
+                            panic!("Could not access non-existent register: {index}")
                         })
                         .free();
                     self.position += 1;
@@ -115,10 +112,10 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                     let index = context.absolute_register_index(*index);
                     let (stack, registers) = context.stack_and_registers();
                     let mut register = registers.access_register(index).unwrap_or_else(|| {
-                        panic!("Could not access non-existent register: {}", index)
+                        panic!("Could not access non-existent register: {index}")
                     });
                     if !stack.push_from_register(&mut register) {
-                        panic!("Could not push data from register: {}", index);
+                        panic!("Could not push data from register: {index}");
                     }
                     self.position += 1;
                     true
@@ -127,10 +124,10 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                     let index = context.absolute_register_index(*index);
                     let (stack, registers) = context.stack_and_registers();
                     let mut register = registers.access_register(index).unwrap_or_else(|| {
-                        panic!("Could not access non-existent register: {}", index)
+                        panic!("Could not access non-existent register: {index}")
                     });
                     if !stack.pop_to_register(&mut register) {
-                        panic!("Could not pop data to register: {}", index);
+                        panic!("Could not pop data to register: {index}");
                     }
                     self.position += 1;
                     true
@@ -142,10 +139,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         .registers()
                         .access_registers_pair(from, to)
                         .unwrap_or_else(|| {
-                            panic!(
-                                "Could not access non-existent registers pair: {} and {}",
-                                from, to
-                            )
+                            panic!("Could not access non-existent registers pair: {from} and {to}")
                         });
                     source.move_to(&mut target);
                     self.position += 1;
@@ -156,7 +150,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         .functions()
                         .find(|handle| query.is_valid(handle.signature()))
                         .unwrap_or_else(|| {
-                            panic!("Could not call non-existent function: {:#?}", query)
+                            panic!("Could not call non-existent function: {query:#?}")
                         });
                     handle.invoke(context, registry);
                     self.position += 1;

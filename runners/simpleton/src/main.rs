@@ -80,7 +80,7 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
     if cli.show_cli {
-        println!("CLI parameters: {:#?}", cli);
+        println!("CLI parameters: {cli:#?}");
     }
 
     let entry = if Path::new(&cli.entry).is_dir() {
@@ -100,7 +100,7 @@ fn main() {
     if let Some(command) = cli.command {
         match command {
             Commands::Code { path } => {
-                std::fs::write(path, format!("{:#?}", package)).unwrap();
+                std::fs::write(path, format!("{package:#?}")).unwrap();
             }
             Commands::Intuicio { path } => {
                 std::fs::write(path, format!("{:#?}", package.compile())).unwrap();

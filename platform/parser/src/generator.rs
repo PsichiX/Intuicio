@@ -44,7 +44,7 @@ impl Parser for SlotExtensionSlotParser {
         {
             Ok((input, ParserOutput::new(result).ok().unwrap()))
         } else {
-            Err(format!("Could not make `{}` slot parser", name).into())
+            Err(format!("Could not make `{name}` slot parser").into())
         }
     }
 }
@@ -64,7 +64,7 @@ impl Parser for SlotExtensionExtWrapParser {
         {
             Ok((input, ParserOutput::new(ext_wrap(item, slot)).ok().unwrap()))
         } else {
-            Err(format!("Could not take `{}` slot parser", name).into())
+            Err(format!("Could not take `{name}` slot parser").into())
         }
     }
 }

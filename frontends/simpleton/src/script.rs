@@ -127,7 +127,7 @@ impl ScriptExpression for SimpletonScriptExpression {
                                 ..Default::default()
                             })
                             .unwrap_or_else(|| {
-                                panic!("Could not find struct: {}::{}", module_name, name)
+                                panic!("Could not find struct: {module_name}::{name}")
                             }),
                     ),
                     registry,
@@ -143,7 +143,7 @@ impl ScriptExpression for SimpletonScriptExpression {
                                 ..Default::default()
                             })
                             .unwrap_or_else(|| {
-                                panic!("Could not find function: {}::{}", module_name, name)
+                                panic!("Could not find function: {module_name}::{name}")
                             }),
                     ),
                     registry,
@@ -199,45 +199,39 @@ impl ScriptExpression for SimpletonScriptExpression {
             }
             Self::GetField { name } => {
                 let object = context.stack().pop::<Reference>().unwrap_or_else(|| {
-                    panic!(
-                        "Could not pop parent object of `{}` field from stack!",
-                        name
-                    )
+                    panic!("Could not pop parent object of `{name}` field from stack!")
                 });
                 if object.is_null() {
-                    panic!("Trying to read `{}` field of null reference!", name);
+                    panic!("Trying to read `{name}` field of null reference!");
                 }
                 let value = object
                     .read_object()
                     .unwrap_or_else(|| {
-                        panic!("Could not read object of `{}` field got from stack!", name)
+                        panic!("Could not read object of `{name}` field got from stack!")
                     })
                     .read_field::<Reference>(name)
                     .unwrap_or_else(|| {
-                        panic!("Could not read `{}` field of object got from stack!", name)
+                        panic!("Could not read `{name}` field of object got from stack!")
                     })
                     .clone();
                 context.stack().push(value);
             }
             Self::SetField { name } => {
                 let mut object = context.stack().pop::<Reference>().unwrap_or_else(|| {
-                    panic!(
-                        "Could not pop parent object of `{}` field from stack!",
-                        name
-                    )
+                    panic!("Could not pop parent object of `{name}` field from stack!")
                 });
                 if object.is_null() {
-                    panic!("Trying to write `{}` field of null reference!", name);
+                    panic!("Trying to write `{name}` field of null reference!");
                 }
                 let value = context.stack().pop::<Reference>().unwrap();
                 *object
                     .write_object()
                     .unwrap_or_else(|| {
-                        panic!("Could not write object of `{}` field got from stack!", name)
+                        panic!("Could not write object of `{name}` field got from stack!")
                     })
                     .write_field::<Reference>(name)
                     .unwrap_or_else(|| {
-                        panic!("Could not write `{}` field of object got from stack!", name)
+                        panic!("Could not write `{name}` field of object got from stack!")
                     }) = value;
             }
         }
@@ -451,7 +445,7 @@ impl SimpletonExpressionStart {
                 let index = registers
                     .iter()
                     .position(|n| n == name.as_str())
-                    .unwrap_or_else(|| panic!("Variable `{}` not found!", name));
+                    .unwrap_or_else(|| panic!("Variable `{name}` not found!"));
                 result.push(ScriptOperation::PushFromRegister { index });
                 result.push(ScriptOperation::Expression {
                     expression: SimpletonScriptExpression::StackDuplicate,
@@ -1257,7 +1251,7 @@ impl SimpletonPackage {
                             continue 'plugin;
                         }
                     }
-                    panic!("Could not load plugin: {:?}", path);
+                    panic!("Could not load plugin: {path:?}");
                 }
             }
         }
@@ -1344,7 +1338,7 @@ impl ScriptContentProvider<SimpletonModule> for SimpletonBinaryFileContentProvid
             .enumerate()
             .map(|(index, module)| ScriptContent {
                 path: path.to_owned(),
-                name: format!("{}#{}", path, index),
+                name: format!("{path}#{index}"),
                 data: Ok(Some(module)),
             })
             .collect())

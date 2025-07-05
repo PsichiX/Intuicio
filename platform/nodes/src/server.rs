@@ -52,15 +52,15 @@ impl std::fmt::Display for NodeGraphServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NodeGraphServerError::NodeGraphDoesNotExists(id) => {
-                write!(f, "Node graph does not exists: {}", id)
+                write!(f, "Node graph does not exists: {id}")
             }
             NodeGraphServerError::NodeNotFound { graph, node } => {
-                write!(f, "Node graph: {} does not have node: {}", graph, node)
+                write!(f, "Node graph: {graph} does not have node: {node}")
             }
             NodeGraphServerError::ValidationErrors { graph, errors } => {
-                write!(f, "Node graph: {} validation errors:", graph)?;
+                write!(f, "Node graph: {graph} validation errors:")?;
                 for error in errors {
-                    write!(f, "{}", error)?;
+                    write!(f, "{error}")?;
                 }
                 Ok(())
             }
@@ -309,7 +309,7 @@ mod tests {
         type TypeInfo = TypeInfo;
 
         fn node_label(&self, _: &Registry) -> String {
-            format!("{:?}", self)
+            format!("{self:?}")
         }
 
         fn node_pins_in(&self, _: &Registry) -> Vec<NodePin<Self::TypeInfo>> {

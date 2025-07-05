@@ -262,7 +262,7 @@ impl Window {
                                         },
                                         registry,
                                     ),
-                                    button: Reference::new_text(format!("{:?}", button), registry),
+                                    button: Reference::new_text(format!("{button:?}"), registry),
                                     x: Reference::new_integer(
                                         mouse_position.x as Integer,
                                         registry,
@@ -299,7 +299,7 @@ impl Window {
                                     keycode: Reference::new_text(
                                         input
                                             .virtual_keycode
-                                            .map(|code| format!("{:?}", code))
+                                            .map(|code| format!("{code:?}"))
                                             .unwrap_or_default(),
                                         registry,
                                     ),

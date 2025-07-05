@@ -249,7 +249,7 @@ pub fn intuicio_enum(input: TokenStream) -> TokenStream {
         is_repr_u8,
     } = parse_enum_attributes!(attrs);
     if !is_repr_u8 {
-        panic!("Enum: {} does not have `repr(u8)` attribute!", ident);
+        panic!("Enum: {ident} does not have `repr(u8)` attribute!");
     }
     let name = if let Some(name) = name {
         quote! { stringify!(#name) }
@@ -292,10 +292,10 @@ pub fn intuicio_enum(input: TokenStream) -> TokenStream {
             };
             if let Some((_, value)) = variant.discriminant.as_ref() {
                 let Expr::Lit(value) = value else {
-                    panic!("Enum: {} variant: {} has non-literal discriminant!", ident, variant_name);
+                    panic!("Enum: {ident} variant: {variant_name} has non-literal discriminant!");
                 };
                 let Lit::Int(value) = &value.lit else {
-                    panic!("Enum: {} variant: {} has non-integer discriminant!", ident, variant_name);
+                    panic!("Enum: {ident} variant: {variant_name} has non-integer discriminant!");
                 };
                 discriminant = value.base10_parse().unwrap();
             }
@@ -315,7 +315,7 @@ pub fn intuicio_enum(input: TokenStream) -> TokenStream {
                             }
                             let field_name = match field.ident.as_ref() {
                                 Some(ident) => ident,
-                                None => panic!("Enum: {} variant: {} has field without a name!", ident, variant_name),
+                                None => panic!("Enum: {ident} variant: {variant_name} has field without a name!"),
                             };
                             let name = if let Some(name) = name {
                                 quote! { stringify!(#name) }
@@ -452,10 +452,7 @@ pub fn intuicio_enum(input: TokenStream) -> TokenStream {
         }
     }.into();
     if debug {
-        println!(
-            "* Debug of `IntuicioEnum` derive macro\n- Input: {}\n- Result: {}",
-            input, result
-        );
+        println!("* Debug of `IntuicioEnum` derive macro\n- Input: {input}\n- Result: {result}");
     }
     result
 }

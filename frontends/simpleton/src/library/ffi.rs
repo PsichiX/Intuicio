@@ -81,7 +81,7 @@ impl DataType {
                 "double" => Self::CDouble,
                 "string" => Self::CString,
                 "pointer" => Self::Pointer,
-                name => panic!("Unsupported data type specifier: {}", name),
+                name => panic!("Unsupported data type specifier: {name}"),
             }
         } else if let Some(type_) = reference.read::<Type>() {
             if allow_non_copy_owned || type_.handle().unwrap().is_copy() {
@@ -385,7 +385,7 @@ pub fn function(
     }
     for (index, argument) in argument_types.iter().enumerate() {
         signature.inputs.push(FunctionParameter::new(
-            format!("arg{}", index),
+            format!("arg{index}"),
             argument.type_handle(false).unwrap(),
         ));
     }

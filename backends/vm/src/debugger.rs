@@ -254,7 +254,7 @@ impl PrintDebugger {
         self.source_map
             .map(location)
             .map(|mapping| mapping.to_owned())
-            .unwrap_or_else(|| format!("{:?}", location))
+            .unwrap_or_else(|| format!("{location:?}"))
     }
 
     pub fn display<T>(&self, data: &T) -> Option<(&'static str, String)> {
@@ -292,13 +292,11 @@ impl PrintDebugger {
                     );
                 } else {
                     println!(
-                        "- stack value #{} of unknown type id {:?} and layout: {:?}",
-                        index, type_hash, layout
+                        "- stack value #{index} of unknown type id {type_hash:?} and layout: {layout:?}"
                     );
                 }
                 println!(
-                    "- stack value #{} bytes in range {:?}:\n{:?}",
-                    index, range, bytes
+                    "- stack value #{index} bytes in range {range:?}:\n{bytes:?}"
                 );
                 index += 1;
             });
@@ -416,7 +414,7 @@ impl<SE: ScriptExpression + std::fmt::Debug> VmDebugger<SE> for PrintDebugger {
             println!(
                 "- operation: {}",
                 if self.operation_details {
-                    format!("{:#?}", operation)
+                    format!("{operation:#?}")
                 } else {
                     operation.label().to_owned()
                 }
@@ -449,7 +447,7 @@ impl<SE: ScriptExpression + std::fmt::Debug> VmDebugger<SE> for PrintDebugger {
             println!(
                 "- operation: {}",
                 if self.operation_details {
-                    format!("{:#?}", operation)
+                    format!("{operation:#?}")
                 } else {
                     operation.label().to_owned()
                 }

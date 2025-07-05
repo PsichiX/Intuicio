@@ -39,9 +39,9 @@ impl Parser for AlternationParser {
                 }
                 Err(error) => {
                     if errors.is_empty() {
-                        write!(&mut errors, "{}", error)?;
+                        write!(&mut errors, "{error}")?;
                     } else {
-                        write!(&mut errors, "\nOr: {}", error)?;
+                        write!(&mut errors, "\nOr: {error}")?;
                     }
                 }
             }

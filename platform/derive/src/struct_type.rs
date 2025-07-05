@@ -212,7 +212,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
             }
             let field_name = match field.ident.as_ref() {
                 Some(ident) => ident,
-                None => panic!("Struct: {} has field without a name!", ident),
+                None => panic!("Struct: {ident} has field without a name!"),
             };
             let name = if let Some(name) = name {
                 quote! { stringify!(#name) }
@@ -291,10 +291,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     }
     .into();
     if debug {
-        println!(
-            "* Debug of `IntuicioStruct` derive macro\n- Input: {}\n- Result: {}",
-            input, result
-        );
+        println!("* Debug of `IntuicioStruct` derive macro\n- Input: {input}\n- Result: {result}");
     }
     result
 }

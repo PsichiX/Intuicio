@@ -28,7 +28,7 @@ impl<'a, SE: ScriptExpression> CustomScope<'a, SE> {
                         .functions()
                         .find(|handle| query.is_valid(handle.signature()))
                         .unwrap_or_else(|| {
-                            panic!("Could not call non-existent function: {:#?}", query)
+                            panic!("Could not call non-existent function: {query:#?}")
                         });
                     handle.invoke(context, registry);
                     self.position += 1;

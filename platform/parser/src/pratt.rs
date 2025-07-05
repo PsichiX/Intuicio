@@ -348,9 +348,9 @@ mod tests {
     impl std::fmt::Display for Expression {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                Self::Number(value) => write!(f, "{}", value),
-                Self::UnaryOperation { value, op } => write!(f, "({} {})", op, value),
-                Self::BinaryOperation { op, lhs, rhs } => write!(f, "({} {} {})", op, lhs, rhs),
+                Self::Number(value) => write!(f, "{value}"),
+                Self::UnaryOperation { value, op } => write!(f, "({op} {value})"),
+                Self::BinaryOperation { op, lhs, rhs } => write!(f, "({op} {lhs} {rhs})"),
             }
         }
     }
