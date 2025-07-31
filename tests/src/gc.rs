@@ -1,7 +1,9 @@
 #![allow(non_local_definitions)]
 
 use gc::{Finalize as GcFinalize, Gc, Trace as GcTrace};
-use intuicio_core::prelude::*;
+use intuicio_core::{
+    IntuicioStruct, context::Context, registry::Registry, types::struct_type::NativeStructBuilder,
+};
 use intuicio_derive::*;
 
 #[intuicio_function(module_name = "test")]

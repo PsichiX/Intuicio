@@ -2,8 +2,15 @@ mod frontend;
 mod library;
 
 use crate::frontend::*;
-use intuicio_backend_vm::prelude::*;
-use intuicio_core::prelude::*;
+use intuicio_backend_vm::scope::VmScope;
+use intuicio_core::{
+    context::Context,
+    function::Function,
+    function_signature,
+    host::Host,
+    registry::Registry,
+    script::{BytesContentParser, ScriptFunctionGenerator},
+};
 
 fn main() {
     let script = b"

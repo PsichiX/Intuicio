@@ -37,8 +37,15 @@ impl BytesContentParser<SerdeFile> for AsmContentParser {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use intuicio_backend_vm::prelude::*;
-    use intuicio_core::prelude::*;
+    use intuicio_backend_vm::scope::VmScope;
+    use intuicio_core::{
+        context::Context,
+        define_function,
+        function::FunctionQuery,
+        host::Host,
+        registry::{Registry, RegistryHandle},
+        script::FileContentProvider,
+    };
 
     #[test]
     fn test_frontend_asm() {

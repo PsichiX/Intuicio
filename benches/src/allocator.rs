@@ -1,5 +1,9 @@
 use crate::{Benchmark, COMPARISON_FORMAT, DURATION, black_box};
-use intuicio_data::prelude::*;
+use intuicio_data::{
+    data_stack::{DataStack, DataStackMode},
+    managed::Managed,
+    managed_box::ManagedBox,
+};
 use std::time::Duration;
 
 pub fn bench() {

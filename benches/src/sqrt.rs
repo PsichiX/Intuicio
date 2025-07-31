@@ -1,6 +1,13 @@
 use crate::{Benchmark, COMPARISON_FORMAT, DURATION, black_box};
-use intuicio_backend_vm::prelude::*;
-use intuicio_core::prelude::*;
+use intuicio_backend_vm::scope::VmScope;
+use intuicio_core::{
+    context::Context,
+    define_function,
+    function::{Function, FunctionQuery},
+    function_signature,
+    registry::Registry,
+    script::{FileContentProvider, ScriptBuilder, ScriptFunctionGenerator},
+};
 use intuicio_frontend_vault::*;
 use std::time::Duration;
 

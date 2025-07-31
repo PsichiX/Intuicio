@@ -1,7 +1,7 @@
 use image::*;
-use intuicio_core::prelude::*;
+use intuicio_core::{IntuicioStruct, registry::Registry};
 use intuicio_derive::*;
-use intuicio_frontend_simpleton::prelude::*;
+use intuicio_frontend_simpleton::{Array, Real, Reference};
 
 #[derive(IntuicioStruct, Default, Clone)]
 #[intuicio(name = "Color", module_name = "color", override_send = true)]

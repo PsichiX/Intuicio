@@ -230,7 +230,7 @@ impl FfiFunction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use intuicio_core::prelude::*;
+    use intuicio_core::{function_signature, registry::Registry, types::TypeQuery};
 
     extern "C" fn add(a: i32, b: i32) -> i32 {
         a + b

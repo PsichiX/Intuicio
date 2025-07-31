@@ -1,6 +1,16 @@
 use crate::ParserHandle;
-use intuicio_core::prelude::*;
-use intuicio_data::prelude::*;
+use intuicio_core::{
+    context::Context,
+    function::{Function, FunctionHandle, FunctionQuery},
+    host::Host,
+    registry::{Registry, RegistryHandle},
+    types::struct_type::NativeStructBuilder,
+};
+use intuicio_data::{
+    lifetime::Lifetime,
+    managed::{DynamicManaged, DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut},
+    managed_box::DynamicManagedBox,
+};
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 pub mod shorthand {

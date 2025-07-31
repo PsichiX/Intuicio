@@ -761,8 +761,8 @@ macro_rules! define_vault_method {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use intuicio_backend_vm::prelude::*;
-    use intuicio_core::prelude::*;
+    use intuicio_backend_vm::scope::VmScope;
+    use intuicio_core::{define_function, host::Host, script::FileContentProvider};
 
     #[test]
     fn test_vault_script() {

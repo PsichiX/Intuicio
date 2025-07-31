@@ -3,10 +3,6 @@ pub mod nodes;
 pub mod parser;
 pub mod script;
 
-pub mod prelude {
-    pub use crate::{library::*, script::*, *};
-}
-
 use intuicio_core::{IntuicioVersion, crate_version};
 
 pub use intuicio_framework_dynamic::{
@@ -24,8 +20,13 @@ mod tests {
         library::{ObjectBuilder, jobs::Jobs},
         script::{SimpletonContentParser, SimpletonPackage, SimpletonScriptExpression},
     };
-    use intuicio_backend_vm::prelude::*;
-    use intuicio_core::prelude::*;
+    use intuicio_backend_vm::scope::VmScope;
+    use intuicio_core::{
+        context::Context,
+        host::{Host, HostProducer},
+        registry::Registry,
+        script::FileContentProvider,
+    };
 
     #[test]
     fn test_simpleton_script() {

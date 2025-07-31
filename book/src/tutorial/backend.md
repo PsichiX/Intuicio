@@ -14,8 +14,6 @@ So yeah, **this part of tutorial is educational only**, there is no need to crea
 Now let's start with creating `backend.rs` as part of our existing project and import dependencies, and create custom VM scope type:
 
 ```rust
-use intuicio_core::prelude::*;
-
 pub struct CustomScope<'a, SE: ScriptExpression> {
     handle: ScriptHandle<'a, SE>,
     position: usize,
@@ -98,7 +96,6 @@ mod library;
 
 use crate::backend::*;
 use crate::frontend::*;
-use intuicio_core::prelude::*;
 ```
 
 We can also remove `intuicio-backend-vm` dependency from `Cargo.toml` since it won't be used anymore.

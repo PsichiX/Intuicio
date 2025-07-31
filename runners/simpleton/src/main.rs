@@ -1,9 +1,21 @@
 mod library;
 
 use clap::{Parser, Subcommand};
-use intuicio_backend_vm::prelude::*;
-use intuicio_core::prelude::*;
-use intuicio_frontend_simpleton::prelude::{jobs::Jobs, *};
+use intuicio_backend_vm::scope::VmScope;
+use intuicio_core::{
+    context::Context,
+    host::{Host, HostProducer},
+    registry::Registry,
+    script::{ExtensionContentProvider, FileContentProvider, IgnoreContentProvider},
+};
+use intuicio_frontend_simpleton::{
+    Integer, Reference,
+    library::jobs::Jobs,
+    script::{
+        SimpletonBinary, SimpletonBinaryFileContentProvider, SimpletonContentParser,
+        SimpletonModule, SimpletonPackage, SimpletonScriptExpression,
+    },
+};
 use std::path::{Path, PathBuf};
 
 const ENTRY_DIR: &str = "entry-dir";

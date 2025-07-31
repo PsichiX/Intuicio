@@ -251,7 +251,12 @@ impl<SE: ScriptExpression + 'static> ScriptFunctionGenerator<SE> for VmScope<'st
 #[cfg(test)]
 mod tests {
     use crate::scope::*;
-    use intuicio_core::prelude::*;
+    use intuicio_core::{
+        Visibility,
+        function::{Function, FunctionParameter, FunctionQuery, FunctionSignature},
+        script::{ScriptBuilder, ScriptFunction, ScriptFunctionParameter, ScriptFunctionSignature},
+        types::{TypeQuery, struct_type::NativeStructBuilder},
+    };
 
     #[test]
     fn test_vm_scope() {

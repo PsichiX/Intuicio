@@ -906,8 +906,11 @@ pub trait NodeGraphVisitor<T: NodeDefinition> {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
-    use intuicio_core::prelude::*;
+    use crate::nodes::{
+        Node, NodeConnection, NodeDefinition, NodeGraph, NodeGraphVisitor, NodePin, NodeSuggestion,
+        NodeTypeInfo, PropertyValue, ResponseSuggestionNode,
+    };
+    use intuicio_core::{registry::Registry, types::TypeQuery};
     use std::collections::HashMap;
 
     #[derive(Debug, Clone, PartialEq)]

@@ -6,10 +6,12 @@ use glow::{
     UNSIGNED_BYTE, UNSIGNED_INT, UniformLocation, VERTEX_SHADER, VertexArray,
 };
 use image::ImageReader;
-use intuicio_core::{core_version, prelude::*};
-use intuicio_data::prelude::*;
+use intuicio_core::{IntuicioStruct, IntuicioVersion, core_version, registry::Registry};
+use intuicio_data::managed::ManagedRef;
 use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
-use intuicio_frontend_simpleton::prelude::{bytes::Bytes, *};
+use intuicio_frontend_simpleton::{
+    Array, Boolean, Integer, Map, Real, Reference, Text, library::bytes::Bytes,
+};
 use std::{collections::HashMap, io::Cursor};
 use vek::{FrustumPlanes, Mat4, Quaternion, Transform as VekTransform, Vec3};
 

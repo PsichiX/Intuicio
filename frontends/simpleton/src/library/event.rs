@@ -1,8 +1,9 @@
-use crate::{Array, Function, Reference};
+use crate::{
+    Array, Function, Reference,
+    library::{closure::Closure, promise::Promise},
+};
 use intuicio_core::{IntuicioStruct, context::Context, registry::Registry};
 use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
-
-use super::{closure::Closure, promise::Promise};
 
 #[derive(IntuicioStruct, Default)]
 #[intuicio(name = "Event", module_name = "event", override_send = false)]

@@ -1,13 +1,20 @@
-use super::{color::Color, image::Image};
 use image::{Rgba, Rgba32FImage};
-use intuicio_core::prelude::*;
+use intuicio_core::{
+    IntuicioStruct, context::Context, function::FunctionQuery, host::HostProducer,
+    registry::Registry,
+};
 use intuicio_derive::*;
-use intuicio_frontend_simpleton::prelude::{closure::Closure, jobs::Jobs, *};
+use intuicio_frontend_simpleton::{
+    Array, Boolean, Integer, Map, Real, Reference,
+    library::{closure::Closure, jobs::Jobs},
+};
 use std::{
     collections::HashMap,
     sync::Arc,
     thread::{available_parallelism, spawn},
 };
+
+use crate::library::{color::Color, image::Image};
 
 #[derive(Default, Clone)]
 enum Primitive {

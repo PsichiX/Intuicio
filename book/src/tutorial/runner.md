@@ -13,7 +13,6 @@ mod library;
 
 use crate::backend::*;
 use crate::frontend::*;
-use intuicio_core::prelude::*;
 use std::str::FromStr;
 ```
 

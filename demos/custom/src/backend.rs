@@ -1,4 +1,9 @@
-use intuicio_core::prelude::*;
+use intuicio_core::{
+    context::Context,
+    function::FunctionBody,
+    registry::Registry,
+    script::{ScriptExpression, ScriptFunctionGenerator, ScriptHandle, ScriptOperation},
+};
 
 pub struct CustomScope<'a, SE: ScriptExpression> {
     handle: ScriptHandle<'a, SE>,

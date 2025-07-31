@@ -4,7 +4,11 @@ mod library;
 
 use crate::backend::*;
 use crate::frontend::*;
-use intuicio_core::prelude::*;
+use intuicio_core::context::Context;
+use intuicio_core::host::Host;
+use intuicio_core::script::BytesContentParser;
+use intuicio_core::script::ScriptFunctionGenerator;
+use intuicio_core::{function::Function, function_signature, registry::Registry};
 
 fn main() {
     let script = b"

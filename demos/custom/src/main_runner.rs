@@ -4,7 +4,12 @@ mod library;
 
 use crate::backend::*;
 use crate::frontend::*;
-use intuicio_core::prelude::*;
+use intuicio_core::context::Context;
+use intuicio_core::function::Function;
+use intuicio_core::function_signature;
+use intuicio_core::host::Host;
+use intuicio_core::registry::Registry;
+use intuicio_core::script::ScriptFunctionGenerator;
 use std::str::FromStr;
 
 struct Repl {

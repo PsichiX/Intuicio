@@ -61,24 +61,6 @@ macro_rules! __internal__offset_of_enum__ {
     }};
 }
 
-pub mod prelude {
-    pub use crate::{
-        IntuicioEnum, IntuicioStruct, IntuicioVersion, Visibility,
-        context::*,
-        function::*,
-        host::*,
-        object::*,
-        registry::*,
-        script::*,
-        transformer::*,
-        types::{enum_type::*, struct_type::*, *},
-    };
-    pub use crate::{
-        define_function, define_native_enum, define_native_struct, define_runtime_enum,
-        define_runtime_struct, function_signature,
-    };
-}
-
 use crate::{
     registry::Registry,
     types::{enum_type::Enum, struct_type::Struct},

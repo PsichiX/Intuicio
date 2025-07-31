@@ -1,9 +1,21 @@
 mod library;
 
 use clap::Parser;
-use intuicio_backend_vm::prelude::*;
-use intuicio_core::prelude::*;
-use intuicio_frontend_simpleton::prelude::{jobs::Jobs, *};
+use intuicio_backend_vm::scope::VmScope;
+use intuicio_core::{
+    context::Context,
+    host::{Host, HostProducer},
+    registry::Registry,
+    script::{ExtensionContentProvider, FileContentProvider, IgnoreContentProvider},
+};
+use intuicio_frontend_simpleton::{
+    Reference,
+    library::jobs::Jobs,
+    script::{
+        SimpletonBinaryFileContentProvider, SimpletonContentParser, SimpletonModule,
+        SimpletonPackage, SimpletonScriptExpression,
+    },
+};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]

@@ -5,13 +5,6 @@ pub mod managed_box;
 pub mod shared;
 pub mod type_hash;
 
-pub mod prelude {
-    pub use crate::{
-        Finalize, Initialize, data_stack::*, lifetime::*, managed::*, managed_box::*, shared::*,
-        type_hash::*,
-    };
-}
-
 pub trait Initialize: Sized {
     fn initialize() -> Self;
 

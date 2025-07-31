@@ -1,9 +1,7 @@
-use crate::{Array, Boolean, Integer, Reference, Text};
+use crate::{Array, Boolean, Integer, Reference, Text, library::bytes::Bytes};
 use intuicio_core::{define_native_struct, registry::Registry};
 use intuicio_derive::intuicio_function;
 use regex::{Captures, Regex};
-
-use super::bytes::Bytes;
 
 thread_local! {
     static FORMAT_REGEX: Regex = Regex::new(r#"\{(\d+)\}"#).unwrap();

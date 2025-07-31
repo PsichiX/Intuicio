@@ -1,11 +1,13 @@
-use super::color::Color;
+use crate::library::color::Color;
 use image::{
     imageops::{FilterType, crop_imm, resize},
     *,
 };
-use intuicio_core::prelude::*;
+use intuicio_core::{IntuicioStruct, context::Context, registry::Registry};
 use intuicio_derive::*;
-use intuicio_frontend_simpleton::prelude::{closure::Closure, *};
+use intuicio_frontend_simpleton::{
+    Array, Boolean, Integer, Real, Reference, Text, library::closure::Closure,
+};
 
 #[derive(IntuicioStruct, Default, Clone)]
 #[intuicio(

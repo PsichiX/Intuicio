@@ -1,4 +1,4 @@
-use intuicio_core::prelude::*;
+use intuicio_core::registry::Registry;
 use intuicio_derive::*;
 
 #[intuicio_function(module_name = "lib")]

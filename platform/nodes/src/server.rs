@@ -274,8 +274,14 @@ impl<T: NodeDefinition + Clone> NodeGraphServer<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
-    use intuicio_core::prelude::*;
+    use crate::{
+        nodes::{
+            Node, NodeConnection, NodeDefinition, NodePin, NodeSuggestion, NodeTypeInfo,
+            ResponseSuggestionNode,
+        },
+        server::{NodeGraphServer, NodeGraphServerError, RequestAdd, RequestRemove, RequestUpdate},
+    };
+    use intuicio_core::{registry::Registry, types::TypeQuery};
     use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

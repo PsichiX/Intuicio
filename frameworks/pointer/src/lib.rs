@@ -201,7 +201,7 @@ impl<T: Default + Clone + 'static> ValueTransformer for PtrValueTransformer<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use intuicio_core::prelude::*;
+    use intuicio_core::{context::Context, define_native_struct};
     use intuicio_derive::intuicio_function;
 
     #[test]

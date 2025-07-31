@@ -1,6 +1,6 @@
-use intuicio_core::prelude::*;
+use intuicio_core::{IntuicioStruct, registry::Registry};
 use intuicio_derive::*;
-use intuicio_frontend_simpleton::prelude::*;
+use intuicio_frontend_simpleton::{Array, Real, Reference};
 
 type VekVec2 = vek::vec::repr_c::vec2::Vec2<f64>;
 

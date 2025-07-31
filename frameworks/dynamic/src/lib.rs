@@ -604,7 +604,7 @@ pub fn install(registry: &mut Registry) {
 #[cfg(test)]
 mod tests {
     use crate::{Integer, Reference, Transferable};
-    use intuicio_core::prelude::*;
+    use intuicio_core::{IntuicioEnum, IntuicioStruct, registry::Registry};
     use intuicio_derive::*;
     use std::thread::spawn;
 

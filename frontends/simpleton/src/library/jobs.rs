@@ -1,5 +1,4 @@
-use super::closure::Closure;
-use crate::{Array, Function, Integer, Real, Reference, Transferable};
+use crate::{Array, Function, Integer, Real, Reference, Transferable, library::closure::Closure};
 use intuicio_core::{
     IntuicioStruct, context::Context, function::FunctionQuery, host::HostProducer,
     registry::Registry,

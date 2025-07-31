@@ -1,5 +1,4 @@
-use super::bytes::Bytes;
-use crate::{Boolean, Integer, Reference, Text};
+use crate::{Boolean, Integer, Reference, Text, library::bytes::Bytes};
 use intuicio_core::{IntuicioStruct, registry::Registry};
 use intuicio_derive::{IntuicioStruct, intuicio_method, intuicio_methods};
 use std::{

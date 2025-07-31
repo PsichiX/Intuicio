@@ -1,6 +1,6 @@
 use intuicio_core::{IntuicioStruct, IntuicioVersion, core_version, registry::Registry};
 use intuicio_derive::*;
-use intuicio_frontend_simpleton::prelude::{bytes::Bytes, *};
+use intuicio_frontend_simpleton::{Integer, Map, Reference, Text, library::bytes::Bytes};
 use reqwest::blocking::Client;
 use std::collections::HashMap;
 

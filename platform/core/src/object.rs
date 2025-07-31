@@ -451,7 +451,10 @@ mod tests {
         types::struct_type::*,
         utils::{object_pop_from_stack, object_push_to_stack},
     };
-    use intuicio_data::prelude::*;
+    use intuicio_data::{
+        data_stack::{DataStack, DataStackMode},
+        lifetime::{Lifetime, LifetimeRefMut},
+    };
     use std::{
         alloc::Layout,
         rc::{Rc, Weak},

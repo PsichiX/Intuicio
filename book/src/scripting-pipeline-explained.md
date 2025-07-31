@@ -17,18 +17,7 @@ intuicio-backend-vm = "*"
 intuicio-frontend-assembler = "*"
 ```
 
-Once we have created new project, now in `main.rs` import these:
-
-```rust
-use intuicio_backend_vm::prelude::*;
-use intuicio_core::prelude::*;
-use intuicio_derive::*;
-use intuicio_frontend_assembler::*;
-```
-
----
-
-Now let's define a simple native function that our script will call:
+Now let's define a simple native function that our script will call in `main.rs`:
 
 ```rust
 #[intuicio_function(module_name = "lib")]

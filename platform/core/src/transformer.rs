@@ -395,8 +395,7 @@ impl ValueDependency<DynamicManagedRefMut> for ManagedValueDependency {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate as intuicio_core;
-    use crate::prelude::*;
+    use crate::{self as intuicio_core, IntuicioStruct, context::Context, define_native_struct};
     use intuicio_derive::*;
 
     #[intuicio_function(transformer = "ManagedValueTransformer")]

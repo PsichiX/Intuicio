@@ -40,17 +40,7 @@ intuicio-derive = "*"
 intuicio-backend-vm = "*"
 ```
 
-Then create `frontend.rs` file, where we will heep all frontend-related code, and first import these dependencies:
-
-```rust
-use intuicio_core::prelude::*;
-use std::{error::Error, str::FromStr};
-```
-
-`intuicio_core` holds types related to script information, we use `Error` trait for errors propagation and `FromStr` for parsing.
-
----
-
+Then create `frontend.rs` file, where we will heep all frontend-related code.
 The most important thing to make is custom Intuiocio expression:
 
 ```rust
@@ -204,8 +194,6 @@ mod frontend;
 mod library;
 
 use crate::frontend::*;
-use intuicio_backend_vm::prelude::*;
-use intuicio_core::prelude::*;
 
 fn main() {
     // next steps go here.

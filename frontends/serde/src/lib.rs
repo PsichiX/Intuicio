@@ -1193,8 +1193,13 @@ impl NodeGraphVisitor<SerdeNodes> for CompileSerdeNodeGraphVisitor {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use intuicio_backend_vm::prelude::*;
-    use intuicio_core::prelude::*;
+    use intuicio_backend_vm::scope::VmScope;
+    use intuicio_core::{
+        define_function,
+        host::Host,
+        registry::RegistryHandle,
+        script::{BytesContentParser, FileContentProvider},
+    };
     use intuicio_nodes::nodes::*;
 
     pub struct LexprContentParser;

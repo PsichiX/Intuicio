@@ -1,7 +1,7 @@
 use crate::ENTRY_DIR;
-use intuicio_core::prelude::*;
+use intuicio_core::{context::Context, registry::Registry};
 use intuicio_derive::intuicio_function;
-use intuicio_frontend_simpleton::prelude::*;
+use intuicio_frontend_simpleton::Reference;
 
 #[intuicio_function(module_name = "simpleton", use_context, use_registry)]
 pub fn get_entry_dir(context: &mut Context, registry: &Registry) -> Reference {

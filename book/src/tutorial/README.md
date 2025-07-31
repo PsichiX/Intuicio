@@ -15,9 +15,6 @@ We have choosen this particular order because each next part uses things made in
 Before we start tutorials, let's provide native-side library of functions we will use in the scripts right away, as `library.rs` file:
 
 ```rust
-use intuicio_core::prelude::*;
-use intuicio_derive::*;
-
 #[intuicio_function(module_name = "lib")]
 fn add(a: i32, b: i32) -> i32 {
     a + b
