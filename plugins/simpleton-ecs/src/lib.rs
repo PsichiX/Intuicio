@@ -176,14 +176,12 @@ impl World {
                 .entitity_components
                 .iter()
                 .find(|(e, _)| *entity == *e)
-            {
-                if let Some(index) = bucket
+                && let Some(index) = bucket
                     .types
                     .iter()
                     .position(|ty| component_type.is_same_as(ty))
-                {
-                    return components.1[index].clone();
-                }
+            {
+                return components.1[index].clone();
             }
         }
         Reference::null()
@@ -333,14 +331,13 @@ impl World {
                 &mut bucket.entitity_components[index].1
             };
             for component in original.into_iter().chain(components.into_iter()) {
-                if let Some(component_type) = component.type_of() {
-                    if let Some(index) = bucket
+                if let Some(component_type) = component.type_of()
+                    && let Some(index) = bucket
                         .types
                         .iter()
                         .position(|ty| component_type.is_same_as(ty))
-                    {
-                        bucket_components[index] = component;
-                    }
+                {
+                    bucket_components[index] = component;
                 }
             }
         }

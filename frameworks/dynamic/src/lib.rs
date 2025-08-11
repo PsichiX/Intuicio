@@ -207,7 +207,7 @@ impl Reference {
         Some(Type::new(self.data.as_ref()?.read()?.type_handle().clone()))
     }
 
-    pub fn read<T: 'static>(&self) -> Option<Ref<T>> {
+    pub fn read<T: 'static>(&'_ self) -> Option<Ref<'_, T>> {
         let result = self.data.as_ref()?.read()?;
         if result.type_handle().type_hash() == TypeHash::of::<T>() {
             Some(Ref::map(result, |data| data.read::<T>().unwrap()))
@@ -216,7 +216,7 @@ impl Reference {
         }
     }
 
-    pub fn write<T: 'static>(&mut self) -> Option<RefMut<T>> {
+    pub fn write<T: 'static>(&'_ mut self) -> Option<RefMut<'_, T>> {
         let result = self.data.as_mut()?.write()?;
         if result.type_handle().type_hash() == TypeHash::of::<T>() {
             Some(RefMut::map(result, |data| data.write::<T>().unwrap()))
@@ -225,11 +225,11 @@ impl Reference {
         }
     }
 
-    pub fn read_object(&self) -> Option<Ref<Object>> {
+    pub fn read_object(&'_ self) -> Option<Ref<'_, Object>> {
         self.data.as_ref()?.read()
     }
 
-    pub fn write_object(&mut self) -> Option<RefMut<Object>> {
+    pub fn write_object(&'_ mut self) -> Option<RefMut<'_, Object>> {
         self.data.as_mut()?.write()
     }
 

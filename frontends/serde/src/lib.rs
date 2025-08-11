@@ -471,7 +471,7 @@ impl SerdeNodeTypeInfo {
 }
 
 impl NodeTypeInfo for SerdeNodeTypeInfo {
-    fn type_query(&self) -> TypeQuery {
+    fn type_query(&'_ self) -> TypeQuery<'_> {
         TypeQuery {
             name: Some(self.name.as_str().into()),
             module_name: self.module_name.as_ref().map(|name| name.into()),
@@ -1094,24 +1094,24 @@ impl NodeDefinition for SerdeNodes {
                     _ => {}
                 },
                 SerdeOperation::DropRegister { index } => {
-                    if property_name == "Index" {
-                        if let Ok(v) = property_value.get_exact::<usize>() {
-                            *index = v;
-                        }
+                    if property_name == "Index"
+                        && let Ok(v) = property_value.get_exact::<usize>()
+                    {
+                        *index = v;
                     }
                 }
                 SerdeOperation::PushFromRegister { index } => {
-                    if property_name == "Index" {
-                        if let Ok(v) = property_value.get_exact::<usize>() {
-                            *index = v;
-                        }
+                    if property_name == "Index"
+                        && let Ok(v) = property_value.get_exact::<usize>()
+                    {
+                        *index = v;
                     }
                 }
                 SerdeOperation::PopToRegister { index } => {
-                    if property_name == "Index" {
-                        if let Ok(v) = property_value.get_exact::<usize>() {
-                            *index = v;
-                        }
+                    if property_name == "Index"
+                        && let Ok(v) = property_value.get_exact::<usize>()
+                    {
+                        *index = v;
                     }
                 }
                 SerdeOperation::CallFunction {

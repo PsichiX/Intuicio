@@ -563,13 +563,13 @@ impl DataStack {
         if self.position + tag.layout.size() + type_layout.size() > self.size() {
             return false;
         }
-        if let Entry::Vacant(e) = self.finalizers.entry(tag.type_hash) {
-            if let Some(finalizer) = tag.finalizer {
-                e.insert(DataStackFinalizer {
-                    callback: finalizer,
-                    layout: tag.layout,
-                });
-            }
+        if let Entry::Vacant(e) = self.finalizers.entry(tag.type_hash)
+            && let Some(finalizer) = tag.finalizer
+        {
+            e.insert(DataStackFinalizer {
+                callback: finalizer,
+                layout: tag.layout,
+            });
         }
         tag.finalizer = None;
         unsafe {
@@ -938,7 +938,7 @@ impl DataStack {
         self.registers.len()
     }
 
-    pub fn access_register(&mut self, index: usize) -> Option<DataStackRegisterAccess> {
+    pub fn access_register(&'_ mut self, index: usize) -> Option<DataStackRegisterAccess<'_>> {
         let position = *self.registers.get(index)?;
         Some(DataStackRegisterAccess {
             stack: self,
@@ -947,10 +947,10 @@ impl DataStack {
     }
 
     pub fn access_registers_pair(
-        &mut self,
+        &'_ mut self,
         a: usize,
         b: usize,
-    ) -> Option<(DataStackRegisterAccess, DataStackRegisterAccess)> {
+    ) -> Option<(DataStackRegisterAccess<'_>, DataStackRegisterAccess<'_>)> {
         if a == b {
             return None;
         }

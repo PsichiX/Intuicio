@@ -294,7 +294,7 @@ mod tests {
     }
 
     impl NodeTypeInfo for TypeInfo {
-        fn type_query(&self) -> TypeQuery {
+        fn type_query(&'_ self) -> TypeQuery<'_> {
             Default::default()
         }
 

@@ -337,10 +337,10 @@ pub fn to_boolean(registry: &Registry, value: Reference) -> Reference {
     if let Some(value) = value.read::<Real>() {
         return Reference::new_boolean(*value != 0.0, registry);
     }
-    if let Some(value) = value.read::<Text>() {
-        if let Ok(value) = value.parse::<Boolean>() {
-            return Reference::new_boolean(value, registry);
-        }
+    if let Some(value) = value.read::<Text>()
+        && let Ok(value) = value.parse::<Boolean>()
+    {
+        return Reference::new_boolean(value, registry);
     }
     if let Some(value) = value.read::<Array>() {
         return Reference::new_boolean(!value.is_empty(), registry);
@@ -362,10 +362,10 @@ pub fn to_integer(registry: &Registry, value: Reference) -> Reference {
     if let Some(value) = value.read::<Real>() {
         return Reference::new_integer(*value as Integer, registry);
     }
-    if let Some(value) = value.read::<Text>() {
-        if let Ok(value) = value.parse::<Integer>() {
-            return Reference::new_integer(value, registry);
-        }
+    if let Some(value) = value.read::<Text>()
+        && let Ok(value) = value.parse::<Integer>()
+    {
+        return Reference::new_integer(value, registry);
     }
     Reference::null()
 }
@@ -381,10 +381,10 @@ pub fn to_real(registry: &Registry, value: Reference) -> Reference {
     if let Some(value) = value.read::<Integer>() {
         return Reference::new_real(*value as Real, registry);
     }
-    if let Some(value) = value.read::<Text>() {
-        if let Ok(value) = value.parse::<Real>() {
-            return Reference::new_real(value, registry);
-        }
+    if let Some(value) = value.read::<Text>()
+        && let Ok(value) = value.parse::<Real>()
+    {
+        return Reference::new_real(value, registry);
     }
     Reference::null()
 }

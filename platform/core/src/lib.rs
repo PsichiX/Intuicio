@@ -156,13 +156,16 @@ impl std::fmt::Debug for IntuicioVersion {
 #[macro_export]
 macro_rules! crate_version {
     () => {{
-        let major = env!("CARGO_PKG_VERSION_MAJOR", "0")
+        let major = option_env!("CARGO_PKG_VERSION_MAJOR")
+            .unwrap_or("0")
             .parse::<usize>()
             .unwrap();
-        let minor = env!("CARGO_PKG_VERSION_MINOR", "0")
+        let minor = option_env!("CARGO_PKG_VERSION_MINOR")
+            .unwrap_or("0")
             .parse::<usize>()
             .unwrap();
-        let patch = env!("CARGO_PKG_VERSION_PATCH", "0")
+        let patch = option_env!("CARGO_PKG_VERSION_PATCH")
+            .unwrap_or("0")
             .parse::<usize>()
             .unwrap();
         $crate::IntuicioVersion::new(major, minor, patch)

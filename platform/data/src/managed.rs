@@ -43,19 +43,19 @@ impl<T> Managed<T> {
         &self.lifetime
     }
 
-    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         self.lifetime.read(&self.data)
     }
 
-    pub async fn read_async(&self) -> ValueReadAccess<T> {
+    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
         self.lifetime.read_async(&self.data).await
     }
 
-    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         self.lifetime.write(&mut self.data)
     }
 
-    pub async fn write_async(&mut self) -> ValueWriteAccess<T> {
+    pub async fn write_async(&'_ mut self) -> ValueWriteAccess<'_, T> {
         self.lifetime.write_async(&mut self.data).await
     }
 
@@ -213,11 +213,11 @@ impl<T: ?Sized> ManagedRef<T> {
         }
     }
 
-    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         unsafe { self.lifetime.read_ptr(self.data) }
     }
 
-    pub async fn read_async(&self) -> ValueReadAccess<T> {
+    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
         unsafe { self.lifetime.read_ptr_async(self.data).await }
     }
 
@@ -345,19 +345,19 @@ impl<T: ?Sized> ManagedRefMut<T> {
         }
     }
 
-    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         unsafe { self.lifetime.read_ptr(self.data) }
     }
 
-    pub async fn read_async(&self) -> ValueReadAccess<T> {
+    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
         unsafe { self.lifetime.read_ptr_async(self.data).await }
     }
 
-    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         unsafe { self.lifetime.write_ptr(self.data) }
     }
 
-    pub async fn write_async(&mut self) -> ValueWriteAccess<T> {
+    pub async fn write_async(&'_ mut self) -> ValueWriteAccess<'_, T> {
         unsafe { self.lifetime.write_ptr_async(self.data).await }
     }
 
@@ -503,19 +503,19 @@ impl<T: ?Sized> ManagedLazy<T> {
         }
     }
 
-    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         unsafe { self.lifetime.read_ptr(self.data) }
     }
 
-    pub async fn read_async(&self) -> ValueReadAccess<T> {
+    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
         unsafe { self.lifetime.read_ptr_async(self.data).await }
     }
 
-    pub fn write(&self) -> Option<ValueWriteAccess<T>> {
+    pub fn write(&'_ self) -> Option<ValueWriteAccess<'_, T>> {
         unsafe { self.lifetime.write_ptr(self.data) }
     }
 
-    pub async fn write_async(&self) -> ValueWriteAccess<T> {
+    pub async fn write_async(&'_ self) -> ValueWriteAccess<'_, T> {
         unsafe { self.lifetime.write_ptr_async(self.data).await }
     }
 
@@ -637,7 +637,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
-    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         match self {
             Self::Owned(value) => value.read(),
             Self::Ref(value) => value.read(),
@@ -646,7 +646,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
-    pub async fn read_async(&self) -> ValueReadAccess<T> {
+    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
         match self {
             Self::Owned(value) => value.read_async().await,
             Self::Ref(value) => value.read_async().await,
@@ -655,7 +655,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
-    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         match self {
             Self::Owned(value) => value.write(),
             Self::RefMut(value) => value.write(),
@@ -664,7 +664,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
-    pub async fn write_async(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub async fn write_async(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         match self {
             Self::Owned(value) => Some(value.write_async().await),
             Self::RefMut(value) => Some(value.write_async().await),
@@ -899,7 +899,7 @@ impl DynamicManaged {
         self.type_hash == TypeHash::of::<T>()
     }
 
-    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.read_ptr(self.memory.cast::<T>()) }
         } else {
@@ -915,7 +915,7 @@ impl DynamicManaged {
         }
     }
 
-    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.write_ptr(self.memory.cast::<T>()) }
         } else {
@@ -1153,7 +1153,7 @@ impl DynamicManagedRef {
         self.type_hash == TypeHash::of::<T>()
     }
 
-    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.read_ptr(self.data.cast::<T>()) }
         } else {
@@ -1327,7 +1327,7 @@ impl DynamicManagedRefMut {
         self.type_hash == TypeHash::of::<T>()
     }
 
-    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.read_ptr(self.data.cast::<T>()) }
         } else {
@@ -1343,7 +1343,7 @@ impl DynamicManagedRefMut {
         }
     }
 
-    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.write_ptr(self.data.cast::<T>()) }
         } else {
@@ -1513,7 +1513,7 @@ impl DynamicManagedLazy {
         self.type_hash == TypeHash::of::<T>()
     }
 
-    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.read_ptr(self.data.cast::<T>()) }
         } else {
@@ -1529,7 +1529,7 @@ impl DynamicManagedLazy {
         }
     }
 
-    pub fn write<T>(&self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&'_ self) -> Option<ValueWriteAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.write_ptr(self.data.cast::<T>()) }
         } else {
@@ -1721,7 +1721,7 @@ impl DynamicManagedValue {
         }
     }
 
-    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         match self {
             Self::Owned(value) => value.read::<T>(),
             Self::Ref(value) => value.read::<T>(),
@@ -1739,7 +1739,7 @@ impl DynamicManagedValue {
         }
     }
 
-    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         match self {
             Self::Owned(value) => value.write::<T>(),
             Self::RefMut(value) => value.write::<T>(),

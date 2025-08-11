@@ -199,10 +199,10 @@ impl Rtree {
             if let Some(function) = callback.read::<Function>() {
                 context.stack().push(item);
                 function.invoke(context, registry);
-                if let Some(status) = context.stack().pop::<Reference>() {
-                    if let Some(status) = status.read::<Boolean>() {
-                        iterate = *status;
-                    }
+                if let Some(status) = context.stack().pop::<Reference>()
+                    && let Some(status) = status.read::<Boolean>()
+                {
+                    iterate = *status;
                 }
             } else if let Some(closure) = callback.read::<Closure>() {
                 let status = closure.invoke(context, registry, &[item]);

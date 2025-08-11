@@ -1,3 +1,5 @@
+#![allow(unpredictable_function_pointer_comparisons)]
+
 //! NOTE: For now only acceptable enums are ones with `repr(u8)`,
 //! because those have stable discriminant offset and size.
 use crate::{

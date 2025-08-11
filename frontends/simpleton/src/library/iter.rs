@@ -290,7 +290,7 @@ pub fn find(
             return value;
         }
         let closure = closure.read::<Closure>().unwrap();
-        let result = closure.invoke(context, registry, &[value.clone()]);
+        let result = closure.invoke(context, registry, std::slice::from_ref(&value));
         if *result.read::<Boolean>().unwrap() {
             return value;
         }
@@ -500,7 +500,7 @@ impl IterFilter {
                 return value;
             }
             let closure = iterator.closure.read::<Closure>().unwrap();
-            let result = closure.invoke(context, registry, &[value.clone()]);
+            let result = closure.invoke(context, registry, std::slice::from_ref(&value));
             if *result.read::<Boolean>().unwrap() {
                 return value;
             }

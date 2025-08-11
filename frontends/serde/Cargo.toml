@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-serde"
-version = "0.47.0"
+version = "0.47.1"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Serde frontend module for Intuicio scripting platform"

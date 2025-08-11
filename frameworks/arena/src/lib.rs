@@ -321,7 +321,7 @@ impl Arena {
         })
     }
 
-    pub fn read<T>(&self, index: Index) -> Result<ValueReadAccess<T>, ArenaError> {
+    pub fn read<T>(&'_ self, index: Index) -> Result<ValueReadAccess<'_, T>, ArenaError> {
         self.lifetime.read_lock().using(|| unsafe {
             let type_hash = TypeHash::of::<T>();
             if self.type_hash != type_hash {
@@ -353,7 +353,7 @@ impl Arena {
         })
     }
 
-    pub fn write<T>(&self, index: Index) -> Result<ValueWriteAccess<T>, ArenaError> {
+    pub fn write<T>(&'_ self, index: Index) -> Result<ValueWriteAccess<'_, T>, ArenaError> {
         self.lifetime.read_lock().using(|| unsafe {
             let type_hash = TypeHash::of::<T>();
             if self.type_hash != type_hash {
@@ -672,7 +672,7 @@ impl AnyArena {
         }
     }
 
-    pub fn read<T>(&self, index: AnyIndex) -> Result<ValueReadAccess<T>, ArenaError> {
+    pub fn read<T>(&'_ self, index: AnyIndex) -> Result<ValueReadAccess<'_, T>, ArenaError> {
         if let Some(arena) = self
             .arenas
             .iter()
@@ -686,7 +686,7 @@ impl AnyArena {
         }
     }
 
-    pub fn write<T>(&self, index: AnyIndex) -> Result<ValueWriteAccess<T>, ArenaError> {
+    pub fn write<T>(&'_ self, index: AnyIndex) -> Result<ValueWriteAccess<'_, T>, ArenaError> {
         if let Some(arena) = self
             .arenas
             .iter()

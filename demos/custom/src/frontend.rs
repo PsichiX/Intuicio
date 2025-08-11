@@ -112,6 +112,7 @@ impl CustomOperation {
     }
 }
 
+#[allow(dead_code)]
 pub struct CustomContentParser;
 
 impl BytesContentParser<CustomScript> for CustomContentParser {

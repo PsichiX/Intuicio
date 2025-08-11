@@ -66,7 +66,7 @@ impl Context {
             .unwrap_or(index)
     }
 
-    pub fn access_register(&mut self, index: usize) -> Option<DataStackRegisterAccess> {
+    pub fn access_register(&'_ mut self, index: usize) -> Option<DataStackRegisterAccess<'_>> {
         let index = self.absolute_register_index(index);
         self.registers.access_register(index)
     }

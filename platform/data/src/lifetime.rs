@@ -55,7 +55,7 @@ impl LifetimeState {
         self.inner.locked.load(Ordering::Acquire)
     }
 
-    pub fn try_lock(&self) -> Option<LifetimeStateAccess> {
+    pub fn try_lock(&'_ self) -> Option<LifetimeStateAccess<'_>> {
         if !self.inner.locked.load(Ordering::Acquire) {
             self.inner.locked.store(true, Ordering::Release);
             Some(LifetimeStateAccess {
@@ -67,7 +67,7 @@ impl LifetimeState {
         }
     }
 
-    pub fn lock(&self) -> LifetimeStateAccess {
+    pub fn lock(&'_ self) -> LifetimeStateAccess<'_> {
         while self.inner.locked.load(Ordering::Acquire) {
             std::hint::spin_loop();
         }
@@ -79,7 +79,7 @@ impl LifetimeState {
     }
 
     /// # Safety
-    pub unsafe fn lock_unchecked(&self) -> LifetimeStateAccess {
+    pub unsafe fn lock_unchecked(&'_ self) -> LifetimeStateAccess<'_> {
         LifetimeStateAccess {
             state: self,
             unlock: true,
@@ -300,7 +300,7 @@ impl Lifetime {
     }
 
     /// # Safety
-    pub unsafe fn read_ptr<T: ?Sized>(&self, data: *const T) -> Option<ValueReadAccess<T>> {
+    pub unsafe fn read_ptr<T: ?Sized>(&'_ self, data: *const T) -> Option<ValueReadAccess<'_, T>> {
         unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
@@ -352,7 +352,7 @@ impl Lifetime {
     }
 
     /// # Safety
-    pub unsafe fn write_ptr<T: ?Sized>(&self, data: *mut T) -> Option<ValueWriteAccess<T>> {
+    pub unsafe fn write_ptr<T: ?Sized>(&'_ self, data: *mut T) -> Option<ValueWriteAccess<'_, T>> {
         unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
@@ -479,10 +479,10 @@ pub struct LifetimeRef(LifetimeWeakState);
 
 impl Drop for LifetimeRef {
     fn drop(&mut self) {
-        if let Some(owner) = unsafe { self.0.upgrade_unchecked() } {
-            if let Some(mut access) = owner.try_lock() {
-                access.release_reader();
-            }
+        if let Some(owner) = unsafe { self.0.upgrade_unchecked() }
+            && let Some(mut access) = owner.try_lock()
+        {
+            access.release_reader();
         }
     }
 }
@@ -579,7 +579,7 @@ impl LifetimeRef {
     }
 
     /// # Safety
-    pub unsafe fn read_ptr<T: ?Sized>(&self, data: *const T) -> Option<ValueReadAccess<T>> {
+    pub unsafe fn read_ptr<T: ?Sized>(&'_ self, data: *const T) -> Option<ValueReadAccess<'_, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -638,7 +638,7 @@ impl LifetimeRef {
         }
     }
 
-    pub fn consume<T: ?Sized>(self, data: &T) -> Result<ValueReadAccess<T>, Self> {
+    pub fn consume<T: ?Sized>(self, data: &'_ T) -> Result<ValueReadAccess<'_, T>, Self> {
         let state = match self.0.upgrade() {
             Some(state) => state,
             None => return Err(self),
@@ -697,10 +697,10 @@ pub struct LifetimeRefMut(LifetimeWeakState, usize);
 
 impl Drop for LifetimeRefMut {
     fn drop(&mut self) {
-        if let Some(state) = unsafe { self.0.upgrade_unchecked() } {
-            if let Some(mut access) = state.try_lock() {
-                access.release_writer(self.1);
-            }
+        if let Some(state) = unsafe { self.0.upgrade_unchecked() }
+            && let Some(mut access) = state.try_lock()
+        {
+            access.release_writer(self.1);
         }
     }
 }
@@ -839,7 +839,7 @@ impl LifetimeRefMut {
     }
 
     /// # Safety
-    pub unsafe fn read_ptr<T: ?Sized>(&self, data: *const T) -> Option<ValueReadAccess<T>> {
+    pub unsafe fn read_ptr<T: ?Sized>(&'_ self, data: *const T) -> Option<ValueReadAccess<'_, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -893,7 +893,7 @@ impl LifetimeRefMut {
     }
 
     /// # Safety
-    pub unsafe fn write_ptr<T: ?Sized>(&self, data: *mut T) -> Option<ValueWriteAccess<T>> {
+    pub unsafe fn write_ptr<T: ?Sized>(&'_ self, data: *mut T) -> Option<ValueWriteAccess<'_, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_write_accessible() {
@@ -978,7 +978,7 @@ impl LifetimeRefMut {
         }
     }
 
-    pub fn consume<T: ?Sized>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
+    pub fn consume<T: ?Sized>(self, data: &'_ mut T) -> Result<ValueWriteAccess<'_, T>, Self> {
         let state = match self.0.upgrade() {
             Some(state) => state,
             None => return Err(self),
@@ -1152,7 +1152,7 @@ impl LifetimeLazy {
     }
 
     /// # Safety
-    pub unsafe fn read_ptr<T: ?Sized>(&self, data: *const T) -> Option<ValueReadAccess<T>> {
+    pub unsafe fn read_ptr<T: ?Sized>(&'_ self, data: *const T) -> Option<ValueReadAccess<'_, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -1206,7 +1206,7 @@ impl LifetimeLazy {
     }
 
     /// # Safety
-    pub unsafe fn write_ptr<T: ?Sized>(&self, data: *mut T) -> Option<ValueWriteAccess<T>> {
+    pub unsafe fn write_ptr<T: ?Sized>(&'_ self, data: *mut T) -> Option<ValueWriteAccess<'_, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_write_accessible() {
@@ -1239,7 +1239,7 @@ impl LifetimeLazy {
         }
     }
 
-    pub fn consume<T: ?Sized>(self, data: &mut T) -> Result<ValueWriteAccess<T>, Self> {
+    pub fn consume<T: ?Sized>(self, data: &'_ mut T) -> Result<ValueWriteAccess<'_, T>, Self> {
         let state = match self.0.upgrade() {
             Some(state) => state,
             None => return Err(self),

@@ -203,7 +203,7 @@ impl Value {
             .unwrap_or_default()
     }
 
-    pub fn as_object<T>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn as_object<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         if let ValueContent::Object(value) = &self.inner {
             value.read::<T>()
         } else {
@@ -211,7 +211,7 @@ impl Value {
         }
     }
 
-    pub fn as_object_mut<T>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn as_object_mut<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         if let ValueContent::Object(value) = &mut self.inner {
             value.write::<T>()
         } else {

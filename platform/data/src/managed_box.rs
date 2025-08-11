@@ -461,12 +461,11 @@ impl ManagedStorage {
             object
         } else {
             for (page_id, page) in &mut self.pages {
-                if matches!(page, ManagedMemoryPage::Chunked { .. }) {
-                    if let Some(object) =
+                if matches!(page, ManagedMemoryPage::Chunked { .. })
+                    && let Some(object) =
                         page.alloc_uninitialized(id, *page_id, type_hash, layout, finalizer)
-                    {
-                        return object;
-                    }
+                {
+                    return object;
                 }
             }
             let page_id = self.generate_page_id();
@@ -480,75 +479,72 @@ impl ManagedStorage {
     }
 
     fn increment(&mut self, object_id: usize, page_id: usize, pointer: *mut u8) {
-        if let Some(page) = self.pages.get(&page_id) {
-            if page.owns_pointer(pointer) {
-                unsafe {
-                    let header = pointer.cast::<ManagedObjectHeader>().as_mut().unwrap();
-                    if let ManagedObjectHeader::Occupied {
-                        id,
-                        instances_count,
-                        ..
-                    } = header
-                    {
-                        if object_id == *id {
-                            *instances_count += 1;
-                        }
-                    }
+        if let Some(page) = self.pages.get(&page_id)
+            && page.owns_pointer(pointer)
+        {
+            unsafe {
+                let header = pointer.cast::<ManagedObjectHeader>().as_mut().unwrap();
+                if let ManagedObjectHeader::Occupied {
+                    id,
+                    instances_count,
+                    ..
+                } = header
+                    && object_id == *id
+                {
+                    *instances_count += 1;
                 }
             }
         }
     }
 
     fn decrement(&mut self, object_id: usize, page_id: usize, pointer: *mut u8) {
-        if let Some(page) = self.pages.get_mut(&page_id) {
-            if page.owns_pointer(pointer) {
-                let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
-                unsafe {
-                    let header = pointer.cast::<ManagedObjectHeader>().as_mut().unwrap();
-                    if let ManagedObjectHeader::Occupied {
-                        id,
-                        layout,
-                        finalizer,
-                        instances_count,
-                        padding,
-                        ..
-                    } = header
-                    {
-                        if object_id == *id && *instances_count > 0 {
-                            *instances_count -= 1;
-                            if *instances_count == 0 {
-                                (finalizer)(
-                                    pointer.add(header_size + *padding as usize).cast::<()>(),
+        if let Some(page) = self.pages.get_mut(&page_id)
+            && page.owns_pointer(pointer)
+        {
+            let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
+            unsafe {
+                let header = pointer.cast::<ManagedObjectHeader>().as_mut().unwrap();
+                if let ManagedObjectHeader::Occupied {
+                    id,
+                    layout,
+                    finalizer,
+                    instances_count,
+                    padding,
+                    ..
+                } = header
+                    && object_id == *id
+                    && *instances_count > 0
+                {
+                    *instances_count -= 1;
+                    if *instances_count == 0 {
+                        (finalizer)(pointer.add(header_size + *padding as usize).cast::<()>());
+                        match page {
+                            ManagedMemoryPage::Chunked {
+                                memory,
+                                occupancy,
+                                padding,
+                                ..
+                            } => {
+                                let range = OccupancyRange::from_pointer_size(
+                                    memory.add(*padding as usize),
+                                    pointer,
+                                    header_size + layout.size(),
                                 );
-                                match page {
-                                    ManagedMemoryPage::Chunked {
-                                        memory,
-                                        occupancy,
-                                        padding,
-                                        ..
-                                    } => {
-                                        let range = OccupancyRange::from_pointer_size(
-                                            memory.add(*padding as usize),
-                                            pointer,
-                                            header_size + layout.size(),
-                                        );
-                                        occupancy.free(range);
-                                        *header = ManagedObjectHeader::Free;
-                                        for index in range.range().skip(1) {
-                                            memory
-                                                .add(*padding as usize + index * MEMORY_CHUNK_SIZE)
-                                                .cast::<ManagedObjectHeader>()
-                                                .write(ManagedObjectHeader::Free);
-                                        }
-                                        if occupancy.is_free(OccupancyRange::default()) {
-                                            self.pages.remove(&page_id);
-                                        }
-                                    }
-                                    ManagedMemoryPage::Exclusive { .. } => {
-                                        *header = ManagedObjectHeader::Free;
-                                        self.pages.remove(&page_id);
-                                    }
+                                occupancy.free(range);
+                                *header = ManagedObjectHeader::Free;
+                                for index in range.range().skip(1) {
+                                    memory
+                                        .add(*padding as usize + index * MEMORY_CHUNK_SIZE)
+                                        .cast::<ManagedObjectHeader>()
+                                        .write(ManagedObjectHeader::Free);
                                 }
+                                if occupancy.is_free(OccupancyRange::default()) {
+                                    self.pages.remove(&page_id);
+                                }
+                            }
+                            ManagedMemoryPage::Exclusive { .. } => {
+                                *header = ManagedObjectHeader::Free;
+                                self.pages.remove(&page_id);
                             }
                         }
                     }
@@ -564,30 +560,28 @@ impl ManagedStorage {
         page_id: usize,
         type_check: bool,
     ) -> Option<(*mut T, *mut Lifetime, TypeHash)> {
-        if let Some(page) = self.pages.get(&page_id) {
-            if page.owns_pointer(pointer) {
-                let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
-                let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
-                if let ManagedObjectHeader::Occupied {
-                    id,
-                    type_hash,
+        if let Some(page) = self.pages.get(&page_id)
+            && page.owns_pointer(pointer)
+        {
+            let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
+            let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
+            if let ManagedObjectHeader::Occupied {
+                id,
+                type_hash,
+                lifetime,
+                instances_count,
+                padding,
+                ..
+            } = header
+                && object_id == *id
+                && *instances_count > 0
+                && (!type_check || *type_hash == TypeHash::of::<T>())
+            {
+                return Some((
+                    unsafe { pointer.add(header_size + *padding as usize).cast::<T>() },
                     lifetime,
-                    instances_count,
-                    padding,
-                    ..
-                } = header
-                {
-                    if object_id == *id
-                        && *instances_count > 0
-                        && (!type_check || *type_hash == TypeHash::of::<T>())
-                    {
-                        return Some((
-                            unsafe { pointer.add(header_size + *padding as usize).cast::<T>() },
-                            lifetime,
-                            *type_hash,
-                        ));
-                    }
-                }
+                    *type_hash,
+                ));
             }
         }
         None
@@ -599,20 +593,20 @@ impl ManagedStorage {
         object_id: usize,
         page_id: usize,
     ) -> Option<TypeHash> {
-        if let Some(page) = self.pages.get(&page_id) {
-            if page.owns_pointer(pointer) {
-                let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
-                if let ManagedObjectHeader::Occupied {
-                    id,
-                    type_hash,
-                    instances_count,
-                    ..
-                } = header
-                {
-                    if object_id == *id && *instances_count > 0 {
-                        return Some(*type_hash);
-                    }
-                }
+        if let Some(page) = self.pages.get(&page_id)
+            && page.owns_pointer(pointer)
+        {
+            let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
+            if let ManagedObjectHeader::Occupied {
+                id,
+                type_hash,
+                instances_count,
+                ..
+            } = header
+                && object_id == *id
+                && *instances_count > 0
+            {
+                return Some(*type_hash);
             }
         }
         None
@@ -624,41 +618,40 @@ impl ManagedStorage {
         object_id: usize,
         page_id: usize,
     ) -> Option<(Layout, usize)> {
-        if let Some(page) = self.pages.get(&page_id) {
-            if page.owns_pointer(pointer) {
-                let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
-                let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
-                if let ManagedObjectHeader::Occupied {
-                    id,
-                    layout,
-                    instances_count,
-                    padding,
-                    ..
-                } = header
-                {
-                    if object_id == *id && *instances_count > 0 {
-                        return Some((*layout, header_size + *padding as usize));
-                    }
-                }
+        if let Some(page) = self.pages.get(&page_id)
+            && page.owns_pointer(pointer)
+        {
+            let header_size = Layout::new::<ManagedObjectHeader>().pad_to_align().size();
+            let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
+            if let ManagedObjectHeader::Occupied {
+                id,
+                layout,
+                instances_count,
+                padding,
+                ..
+            } = header
+                && object_id == *id
+                && *instances_count > 0
+            {
+                return Some((*layout, header_size + *padding as usize));
             }
         }
         None
     }
 
     fn object_instances_count(&self, pointer: *mut u8, object_id: usize, page_id: usize) -> usize {
-        if let Some(page) = self.pages.get(&page_id) {
-            if page.owns_pointer(pointer) {
-                let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
-                if let ManagedObjectHeader::Occupied {
-                    id,
-                    instances_count,
-                    ..
-                } = header
-                {
-                    if object_id == *id {
-                        return *instances_count;
-                    }
-                }
+        if let Some(page) = self.pages.get(&page_id)
+            && page.owns_pointer(pointer)
+        {
+            let header = unsafe { pointer.cast::<ManagedObjectHeader>().as_mut().unwrap() };
+            if let ManagedObjectHeader::Occupied {
+                id,
+                instances_count,
+                ..
+            } = header
+                && object_id == *id
+            {
+                return *instances_count;
             }
         }
         0
@@ -764,7 +757,7 @@ impl<T> ManagedBox<T> {
         })
     }
 
-    pub fn read(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
                 self.memory.cast(),
@@ -776,7 +769,7 @@ impl<T> ManagedBox<T> {
         })
     }
 
-    pub async fn read_async(&self) -> ValueReadAccess<T> {
+    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
         loop {
             if let Some(access) = self.read() {
                 return access;
@@ -789,7 +782,7 @@ impl<T> ManagedBox<T> {
         }
     }
 
-    pub fn write(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
                 self.memory.cast(),
@@ -801,7 +794,7 @@ impl<T> ManagedBox<T> {
         })
     }
 
-    pub async fn write_async(&mut self) -> ValueWriteAccess<T> {
+    pub async fn write_async(&'_ mut self) -> ValueWriteAccess<'_, T> {
         loop {
             let result = STORAGE.with_borrow(|storage| {
                 let (pointer, lifetime, _) = storage.access_object_lifetime_type::<T>(
@@ -1126,7 +1119,7 @@ impl DynamicManagedBox {
         })
     }
 
-    pub fn read<T>(&self) -> Option<ValueReadAccess<T>> {
+    pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, _) =
                 storage.access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)?;
@@ -1147,7 +1140,7 @@ impl DynamicManagedBox {
         }
     }
 
-    pub fn write<T>(&mut self) -> Option<ValueWriteAccess<T>> {
+    pub fn write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         STORAGE.with_borrow(|storage| {
             let (pointer, lifetime, _) =
                 storage.access_object_lifetime_type::<T>(self.memory, self.id, self.page, true)?;

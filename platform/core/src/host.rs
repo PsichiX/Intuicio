@@ -110,11 +110,11 @@ impl Host {
     }
 
     pub fn call_function<O: DataStackPack, I: DataStackPack>(
-        &mut self,
+        &'_ mut self,
         name: &str,
         module_name: &str,
         type_name: Option<&str>,
-    ) -> Option<HostFunctionCall<I, O>> {
+    ) -> Option<HostFunctionCall<'_, I, O>> {
         let inputs_query = I::pack_types()
             .into_iter()
             .map(|type_hash| FunctionQueryParameter {

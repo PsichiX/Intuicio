@@ -202,12 +202,11 @@ impl Worker {
         running_job_result: &Arc<RwLock<Option<JobResult>>>,
     ) {
         is_running.store(false, Ordering::SeqCst);
-        if let Ok(mut result) = running_job_result.write() {
-            if let Some(result) = result.as_mut() {
-                if let Ok(mut result) = result.write() {
-                    *result = JobState::Consumed;
-                }
-            }
+        if let Ok(mut result) = running_job_result.write()
+            && let Some(result) = result.as_mut()
+            && let Ok(mut result) = result.write()
+        {
+            *result = JobState::Consumed;
         }
         if let Ok(mut queue) = queue.write() {
             while let Some(request) = queue.pop_front() {

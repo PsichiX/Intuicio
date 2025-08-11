@@ -217,7 +217,7 @@ impl Meta {
         }
     }
 
-    pub fn extract_by_id(&self, name: &str) -> Option<MetaExtract> {
+    pub fn extract_by_id(&'_ self, name: &str) -> Option<MetaExtract<'_>> {
         match self {
             Self::Identifier(value) => {
                 if value == name {
@@ -257,7 +257,7 @@ impl Meta {
         }
     }
 
-    pub fn items_iter(&self) -> MetaExtractIter {
+    pub fn items_iter(&'_ self) -> MetaExtractIter<'_> {
         match self {
             Self::Identifier(name) => {
                 MetaExtractIter::new(std::iter::once(MetaExtract::Identifier(name.as_str())))

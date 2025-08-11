@@ -598,10 +598,10 @@ fn inheritance_offset_inner(
         {
             continue;
         }
-        if let Some(limit) = limit {
-            if field.type_handle().type_hash() == limit {
-                return None;
-            }
+        if let Some(limit) = limit
+            && field.type_handle().type_hash() == limit
+        {
+            return None;
         }
         if field.type_handle().type_hash() == target {
             return Some(field.address_offset());

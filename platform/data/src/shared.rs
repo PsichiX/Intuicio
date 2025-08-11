@@ -31,11 +31,11 @@ impl<T> Shared<T> {
         }
     }
 
-    pub fn read(&self) -> Option<Ref<T>> {
+    pub fn read(&'_ self) -> Option<Ref<'_, T>> {
         self.data.try_borrow().ok()
     }
 
-    pub fn write(&self) -> Option<RefMut<T>> {
+    pub fn write(&'_ self) -> Option<RefMut<'_, T>> {
         self.data.try_borrow_mut().ok()
     }
 
@@ -80,11 +80,11 @@ impl<T> AsyncShared<T> {
         }
     }
 
-    pub fn read(&self) -> Option<RwLockReadGuard<T>> {
+    pub fn read(&'_ self) -> Option<RwLockReadGuard<'_, T>> {
         self.data.read().ok()
     }
 
-    pub fn write(&self) -> Option<RwLockWriteGuard<T>> {
+    pub fn write(&'_ self) -> Option<RwLockWriteGuard<'_, T>> {
         self.data.write().ok()
     }
 

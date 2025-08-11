@@ -47,7 +47,7 @@ impl PropertyValue {
 pub trait NodeTypeInfo:
     Clone + std::fmt::Debug + Display + PartialEq + Serialize + for<'de> Deserialize<'de>
 {
-    fn type_query(&self) -> TypeQuery;
+    fn type_query(&'_ self) -> TypeQuery<'_>;
     fn are_compatible(&self, other: &Self) -> bool;
 }
 
@@ -454,20 +454,19 @@ impl<T: NodeDefinition> NodeGraph<T> {
         name: &str,
         registry: &Registry,
     ) -> Vec<ResponseSuggestionNode<T>> {
-        if let Some(node) = self.node(id) {
-            if let Some(pin) = node
+        if let Some(node) = self.node(id)
+            && let Some(pin) = node
                 .data
                 .node_pins_in(registry)
                 .into_iter()
                 .find(|pin| pin.name() == name)
-            {
-                return T::node_suggestions(
-                    x,
-                    y,
-                    NodeSuggestion::NodeInputPin(&node.data, &pin),
-                    registry,
-                );
-            }
+        {
+            return T::node_suggestions(
+                x,
+                y,
+                NodeSuggestion::NodeInputPin(&node.data, &pin),
+                registry,
+            );
         }
         vec![]
     }
@@ -480,20 +479,19 @@ impl<T: NodeDefinition> NodeGraph<T> {
         name: &str,
         registry: &Registry,
     ) -> Vec<ResponseSuggestionNode<T>> {
-        if let Some(node) = self.node(id) {
-            if let Some(pin) = node
+        if let Some(node) = self.node(id)
+            && let Some(pin) = node
                 .data
                 .node_pins_out(registry)
                 .into_iter()
                 .find(|pin| pin.name() == name)
-            {
-                return T::node_suggestions(
-                    x,
-                    y,
-                    NodeSuggestion::NodeOutputPin(&node.data, &pin),
-                    registry,
-                );
-            }
+        {
+            return T::node_suggestions(
+                x,
+                y,
+                NodeSuggestion::NodeOutputPin(&node.data, &pin),
+                registry,
+            );
         }
         vec![]
     }
@@ -922,7 +920,7 @@ mod tests {
     }
 
     impl NodeTypeInfo for String {
-        fn type_query(&self) -> TypeQuery {
+        fn type_query(&'_ self) -> TypeQuery<'_> {
             TypeQuery {
                 name: Some(self.into()),
                 ..Default::default()

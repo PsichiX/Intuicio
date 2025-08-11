@@ -1,3 +1,5 @@
+#![allow(unpredictable_function_pointer_comparisons)]
+
 pub mod enum_type;
 pub mod struct_type;
 

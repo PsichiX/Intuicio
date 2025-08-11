@@ -12,7 +12,7 @@ pub struct SimpletonNodeTypeInfo;
 impl SimpletonNodeTypeInfo {}
 
 impl NodeTypeInfo for SimpletonNodeTypeInfo {
-    fn type_query(&self) -> TypeQuery {
+    fn type_query(&'_ self) -> TypeQuery<'_> {
         TypeQuery::of::<Reference>()
     }
 
@@ -546,10 +546,10 @@ impl NodeDefinition for SimpletonNodes {
     fn set_property(&mut self, property_name: &str, property_value: PropertyValue) {
         match self {
             SimpletonNodes::CreateVariable { name } => {
-                if property_name == "Name" {
-                    if let Ok(v) = property_value.get_exact() {
-                        *name = v;
-                    }
+                if property_name == "Name"
+                    && let Ok(v) = property_value.get_exact()
+                {
+                    *name = v;
                 }
             }
             SimpletonNodes::Expression(expression) => match expression {
@@ -589,45 +589,43 @@ impl NodeDefinition for SimpletonNodes {
                 SimpletonExpressionNodes::Literal(literal) => match literal {
                     SimpletonLiteral::Null => {}
                     SimpletonLiteral::Boolean(value) => {
-                        if property_name == "Value" {
-                            if let Ok(v) = property_value.get_exact() {
-                                *value = v;
-                            }
+                        if property_name == "Value"
+                            && let Ok(v) = property_value.get_exact()
+                        {
+                            *value = v;
                         }
                     }
                     SimpletonLiteral::Integer(value) => {
-                        if property_name == "Value" {
-                            if let Ok(v) = property_value.get_exact() {
-                                *value = v;
-                            }
+                        if property_name == "Value"
+                            && let Ok(v) = property_value.get_exact()
+                        {
+                            *value = v;
                         }
                     }
                     SimpletonLiteral::Real(value) => {
-                        if property_name == "Value" {
-                            if let Ok(v) = property_value.get_exact() {
-                                *value = v;
-                            }
+                        if property_name == "Value"
+                            && let Ok(v) = property_value.get_exact()
+                        {
+                            *value = v;
                         }
                     }
                     SimpletonLiteral::Text(value) => {
-                        if property_name == "Value" {
-                            if let Ok(v) = property_value.get_exact() {
-                                *value = v;
-                            }
+                        if property_name == "Value"
+                            && let Ok(v) = property_value.get_exact()
+                        {
+                            *value = v;
                         }
                     }
                     SimpletonLiteral::Array { .. } => {}
                     SimpletonLiteral::Map { items } => {
-                        if let Some(property_name) = property_name.strip_prefix("Key #") {
-                            if let Ok(v) = property_value.get_exact() {
-                                if let Some((value, _)) = property_name
-                                    .parse::<usize>()
-                                    .ok()
-                                    .and_then(|index| items.get_mut(index))
-                                {
-                                    *value = v;
-                                }
-                            }
+                        if let Some(property_name) = property_name.strip_prefix("Key #")
+                            && let Ok(v) = property_value.get_exact()
+                            && let Some((value, _)) = property_name
+                                .parse::<usize>()
+                                .ok()
+                                .and_then(|index| items.get_mut(index))
+                        {
+                            *value = v;
                         }
                     }
                     SimpletonLiteral::Object {
@@ -646,35 +644,33 @@ impl NodeDefinition for SimpletonNodes {
                             }
                         }
                         _ => {
-                            if let Some(property_name) = property_name.strip_prefix("Field #") {
-                                if let Ok(v) = property_value.get_exact() {
-                                    if let Some((value, _)) = property_name
-                                        .parse::<usize>()
-                                        .ok()
-                                        .and_then(|index| fields.get_mut(index))
-                                    {
-                                        *value = v;
-                                    }
-                                }
+                            if let Some(property_name) = property_name.strip_prefix("Field #")
+                                && let Ok(v) = property_value.get_exact()
+                                && let Some((value, _)) = property_name
+                                    .parse::<usize>()
+                                    .ok()
+                                    .and_then(|index| fields.get_mut(index))
+                            {
+                                *value = v;
                             }
                         }
                     },
                 },
                 SimpletonExpressionNodes::GetVariable { name }
                 | SimpletonExpressionNodes::GetField { name } => {
-                    if property_name == "Name" {
-                        if let Ok(v) = property_value.get_exact::<String>() {
-                            *name = v;
-                        }
+                    if property_name == "Name"
+                        && let Ok(v) = property_value.get_exact::<String>()
+                    {
+                        *name = v;
                     }
                 }
                 _ => {}
             },
             SimpletonNodes::For { variable } => {
-                if property_name == "Variable" {
-                    if let Ok(v) = property_value.get_exact::<String>() {
-                        *variable = v;
-                    }
+                if property_name == "Variable"
+                    && let Ok(v) = property_value.get_exact::<String>()
+                {
+                    *variable = v;
                 }
             }
             _ => {}

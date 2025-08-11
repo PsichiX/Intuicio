@@ -57,18 +57,17 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                 self.child = None;
             }
         }
-        if self.position == 0 {
-            if let Some(debugger) = self.debugger.as_ref() {
-                if let Ok(mut debugger) = debugger.try_write() {
-                    debugger.on_enter_scope(self, context, registry);
-                }
-            }
+        if self.position == 0
+            && let Some(debugger) = self.debugger.as_ref()
+            && let Ok(mut debugger) = debugger.try_write()
+        {
+            debugger.on_enter_scope(self, context, registry);
         }
         let result = if let Some(operation) = self.handle.get(self.position) {
-            if let Some(debugger) = self.debugger.as_ref() {
-                if let Ok(mut debugger) = debugger.try_write() {
-                    debugger.on_enter_operation(self, operation, self.position, context, registry);
-                }
+            if let Some(debugger) = self.debugger.as_ref()
+                && let Ok(mut debugger) = debugger.try_write()
+            {
+                debugger.on_enter_operation(self, operation, self.position, context, registry);
             }
             let position = self.position;
             let result = match operation {
@@ -208,21 +207,20 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                     result
                 }
             };
-            if let Some(debugger) = self.debugger.as_ref() {
-                if let Ok(mut debugger) = debugger.try_write() {
-                    debugger.on_exit_operation(self, operation, position, context, registry);
-                }
+            if let Some(debugger) = self.debugger.as_ref()
+                && let Ok(mut debugger) = debugger.try_write()
+            {
+                debugger.on_exit_operation(self, operation, position, context, registry);
             }
             result
         } else {
             false
         };
-        if !result || self.position >= self.handle.len() {
-            if let Some(debugger) = self.debugger.as_ref() {
-                if let Ok(mut debugger) = debugger.try_write() {
-                    debugger.on_exit_scope(self, context, registry);
-                }
-            }
+        if (!result || self.position >= self.handle.len())
+            && let Some(debugger) = self.debugger.as_ref()
+            && let Ok(mut debugger) = debugger.try_write()
+        {
+            debugger.on_exit_scope(self, context, registry);
         }
         result
     }
