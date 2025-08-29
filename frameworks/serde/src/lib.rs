@@ -501,12 +501,8 @@ impl SerializationRegistry {
         );
         self.register::<DynamicManagedBox>(
             |data, serializer, registry| unsafe {
-                let Some(type_hash) = data.type_hash() else {
-                    return Err("DynamicManagedBox type hash not found".into());
-                };
-                let Some(ptr) = data.as_ptr_raw() else {
-                    return Err("DynamicManagedBox pointer not found".into());
-                };
+                let type_hash = data.type_hash();
+                let ptr = data.as_ptr_raw();
                 let Some(type_handle) = registry.find_type(TypeQuery {
                     type_hash: Some(type_hash),
                     ..Default::default()
@@ -587,7 +583,7 @@ impl SerializationRegistry {
                 );
                 serializer.dynamic_deserialize_to(
                     type_handle.type_hash(),
-                    data.as_mut_ptr_raw().unwrap(),
+                    data.as_mut_ptr_raw(),
                     value,
                     false,
                     registry,

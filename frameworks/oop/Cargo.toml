@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-oop"
-version = "0.47.1"
+version = "0.48.0"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "OOP framework module for Intuicio scripting platform"
@@ -11,8 +11,8 @@ documentation = "https://docs.rs/intuicio-framework-oop"
 readme = "../../README.md"
 
 [dependencies]
-intuicio-data = { version = "0.47", path = "../../platform/data" }
-intuicio-core = { version = "0.47", path = "../../platform/core" }
+intuicio-data = { version = "0.48", path = "../../platform/data" }
+intuicio-core = { version = "0.48", path = "../../platform/core" }
 
 [dev-dependencies]
-intuicio-derive = { version = "0.47", path = "../../platform/derive" }
+intuicio-derive = { version = "0.48", path = "../../platform/derive" }

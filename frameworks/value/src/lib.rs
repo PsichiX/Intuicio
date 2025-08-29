@@ -26,7 +26,7 @@ impl ValueContent {
     fn type_hash(&self) -> Option<TypeHash> {
         match self {
             Self::Null => None,
-            Self::Object(data) => data.type_hash(),
+            Self::Object(data) => Some(data.type_hash()),
             Self::Primitive { type_hash, .. } => Some(*type_hash),
             Self::String(_) => Some(TypeHash::of::<String>()),
             Self::Array(_) => Some(TypeHash::of::<Vec<Value>>()),
@@ -100,7 +100,7 @@ impl Ord for ValueContent {
             .then_with(|| match (self, other) {
                 (Self::Null, Self::Null) => Ordering::Equal,
                 (Self::Object(me), Self::Object(other)) => unsafe {
-                    me.memory().as_slice().cmp(other.memory().as_slice())
+                    me.memory().cmp(other.memory())
                 },
                 (
                     Self::Primitive {
@@ -152,7 +152,7 @@ impl Value {
             }
         } else {
             Self {
-                inner: ValueContent::Object(DynamicManagedBox::new(value)),
+                inner: ValueContent::Object(DynamicManagedBox::new(value).ok().unwrap()),
             }
         }
     }
@@ -278,8 +278,8 @@ mod tests {
 
     #[test]
     fn test_value() {
-        assert_eq!(std::mem::size_of::<Value>(), 48);
-        assert_eq!(SIZE, 32);
+        assert_eq!(std::mem::size_of::<Value>(), 32);
+        assert_eq!(SIZE, 8);
         let a = Value::primitive_or_object(42u8);
         let b = Value::primitive_or_object(10u16);
         let c = Value::primitive_or_object(4.2f32);

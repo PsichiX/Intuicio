@@ -427,7 +427,7 @@ impl DynamicExtensionCall<'_> {
     }
 
     pub fn arg_box<T>(mut self, value: T) -> Self {
-        let value = DynamicManagedBox::new(value);
+        let value = DynamicManagedBox::new(value).ok().unwrap();
         self.args.push(Value::Box(value));
         self
     }

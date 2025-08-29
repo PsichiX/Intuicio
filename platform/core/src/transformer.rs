@@ -283,7 +283,7 @@ impl<T: Clone + 'static> ValueTransformer for DynamicManagedBoxValueTransformer<
     type RefMut = DynamicManagedRefMut;
 
     fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
-        DynamicManagedBox::new(value)
+        DynamicManagedBox::new(value).ok().unwrap()
     }
 
     fn from_ref(
@@ -597,8 +597,8 @@ mod tests {
         );
         assert_eq!(mul(&40, &mut 2), 80);
 
-        let a = DynamicManagedBox::new(40);
-        let mut b = DynamicManagedBox::new(2);
+        let a = DynamicManagedBox::new(40).ok().unwrap();
+        let mut b = DynamicManagedBox::new(2).ok().unwrap();
         context.stack().push(b.borrow_mut().unwrap());
         context.stack().push(a.borrow().unwrap());
         div::intuicio_function(&mut context, &registry);
