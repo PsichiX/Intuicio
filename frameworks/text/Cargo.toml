@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-text"
-version = "0.48.1"
+version = "0.48.2"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Text types framework module for Intuicio scripting platform"

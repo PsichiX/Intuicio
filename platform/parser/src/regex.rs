@@ -1,3 +1,5 @@
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
+
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
@@ -92,27 +94,56 @@ pub mod shorthand {
     }
 }
 
+thread_local! {
+    static REGEX_CACHE: RefCell<HashMap<String, Arc<regex::Regex>>> = Default::default();
+}
+
 #[derive(Clone)]
 pub struct RegexParser {
-    regex: regex::Regex,
+    regex: Arc<regex::Regex>,
     capture: Option<String>,
 }
 
 impl RegexParser {
     pub fn new(pattern: impl AsRef<str>) -> Self {
-        let pattern = format!(r"^{}", pattern.as_ref());
-        Self {
-            regex: regex::Regex::new(&pattern).expect("Expected valid regex"),
-            capture: None,
-        }
+        let pattern = pattern.as_ref();
+        REGEX_CACHE.with_borrow_mut(|cache| {
+            if let Some(cached) = cache.get(pattern) {
+                return Self {
+                    regex: cached.clone(),
+                    capture: None,
+                };
+            }
+            let regex = Arc::new(
+                regex::Regex::new(&format!(r"^{}", pattern)).expect("Expected valid regex"),
+            );
+            cache.insert(pattern.to_string(), regex.clone());
+            Self {
+                regex,
+                capture: None,
+            }
+        })
     }
 
     pub fn new_capture(pattern: impl AsRef<str>, capture: impl ToString) -> Self {
-        let pattern = format!(r"^{}", pattern.as_ref());
-        Self {
-            regex: regex::Regex::new(&pattern).expect("Expected valid regex"),
-            capture: Some(capture.to_string()),
-        }
+        let pattern = pattern.as_ref();
+        let capture = capture.to_string();
+        REGEX_CACHE.with_borrow_mut(|cache| {
+            if let Some(cached) = cache.get(pattern) {
+                return Self {
+                    regex: cached.clone(),
+                    capture: Some(capture),
+                };
+            }
+            let regex = Arc::new(
+                regex::Regex::new(&format!(r"^{}", pattern)).expect("Expected valid regex"),
+            );
+            cache.insert(pattern.to_string(), regex.clone());
+            Self {
+                regex,
+                capture: Some(capture),
+            }
+        })
     }
 }
 
