@@ -55,7 +55,7 @@ use std::{
     any::{Any, TypeId},
     collections::HashMap,
     error::Error,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 pub type ParserOutput = DynamicManaged;
@@ -168,31 +168,37 @@ impl Parser for DebugParser {
 
 #[derive(Default)]
 pub struct ParserRegistry {
-    parsers: HashMap<String, ParserHandle>,
-    extensions: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
+    parsers: RwLock<HashMap<String, ParserHandle>>,
+    extensions: RwLock<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
 }
 
 impl ParserRegistry {
-    pub fn with_parser(mut self, id: impl ToString, parser: ParserHandle) -> Self {
+    pub fn with_parser(self, id: impl ToString, parser: ParserHandle) -> Self {
         self.add_parser(id, parser);
         self
     }
 
-    pub fn with_extension<T: Send + Sync + 'static>(mut self, data: T) -> Self {
+    pub fn with_extension<T: Send + Sync + 'static>(self, data: T) -> Self {
         self.add_extension::<T>(data);
         self
     }
 
-    pub fn add_parser(&mut self, id: impl ToString, parser: ParserHandle) {
-        self.parsers.insert(id.to_string(), parser);
+    pub fn add_parser(&self, id: impl ToString, parser: ParserHandle) {
+        if let Ok(mut parsers) = self.parsers.try_write() {
+            parsers.insert(id.to_string(), parser);
+        }
     }
 
-    pub fn remove_parser(&mut self, id: impl AsRef<str>) -> Option<ParserHandle> {
-        self.parsers.remove(id.as_ref())
+    pub fn remove_parser(&self, id: impl AsRef<str>) -> Option<ParserHandle> {
+        if let Ok(mut parsers) = self.parsers.try_write() {
+            parsers.remove(id.as_ref())
+        } else {
+            None
+        }
     }
 
     pub fn get_parser(&self, id: impl AsRef<str>) -> Option<ParserHandle> {
-        self.parsers.get(id.as_ref()).cloned()
+        self.parsers.try_read().ok()?.get(id.as_ref()).cloned()
     }
 
     pub fn parse<'a>(&self, id: impl AsRef<str>, input: &'a str) -> ParseResult<'a> {
@@ -212,18 +218,28 @@ impl ParserRegistry {
         }
     }
 
-    pub fn add_extension<T: Send + Sync + 'static>(&mut self, data: T) -> bool {
-        self.extensions.insert(TypeId::of::<T>(), Arc::new(data));
-        true
+    pub fn add_extension<T: Send + Sync + 'static>(&self, data: T) -> bool {
+        if let Ok(mut extensions) = self.extensions.try_write() {
+            extensions.insert(TypeId::of::<T>(), Arc::new(data));
+            true
+        } else {
+            false
+        }
     }
 
-    pub fn remove_extension<T: 'static>(&mut self) -> bool {
-        self.extensions.remove(&TypeId::of::<T>());
-        true
+    pub fn remove_extension<T: 'static>(&self) -> bool {
+        if let Ok(mut extensions) = self.extensions.try_write() {
+            extensions.remove(&TypeId::of::<T>());
+            true
+        } else {
+            false
+        }
     }
 
     pub fn extension<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
         self.extensions
+            .try_read()
+            .ok()?
             .get(&TypeId::of::<T>())?
             .clone()
             .downcast::<T>()

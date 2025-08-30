@@ -70,6 +70,7 @@ impl Parser for SlotExtensionExtWrapParser {
 }
 
 pub struct Generator {
+    /// [parser id, parser handle, extender id?]
     parsers: Vec<(String, ParserHandle, Option<String>)>,
 }
 
@@ -86,7 +87,7 @@ impl Generator {
         })
     }
 
-    pub fn install(&self, registry: &mut ParserRegistry) -> Result<(), Box<dyn Error>> {
+    pub fn install(&self, registry: &ParserRegistry) -> Result<(), Box<dyn Error>> {
         for (id, parser, extender) in &self.parsers {
             registry.add_parser(id, parser.clone());
             if let Some(id) = extender.as_ref() {
@@ -100,6 +101,12 @@ impl Generator {
         self.parsers
             .iter()
             .find_map(|(k, v, _)| if k == id { Some(v.clone()) } else { None })
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, ParserHandle, Option<&str>)> {
+        self.parsers
+            .iter()
+            .map(|(id, parser, extender)| (id.as_str(), parser.clone(), extender.as_deref()))
     }
 
     fn registry() -> ParserRegistry {
@@ -1043,7 +1050,11 @@ mod tests {
         let (rest, result) = main()
             .parse(
                 &registry,
-                "//foo => any\r\nlist => {\"foo\" ws true}\r\n/*bar => any*/",
+                "
+                //foo => any
+                list => {\"foo\" ws true}
+                /*bar => any*/
+                ",
             )
             .unwrap();
         assert_eq!(rest, "");
@@ -1173,7 +1184,7 @@ mod tests {
             ]
         );
 
-        let mut registry = ParserRegistry::default()
+        let registry = ParserRegistry::default()
             .with_parser(
                 "value",
                 map(prefix(number_int(), lit("value:")), |value: String| {
@@ -1202,7 +1213,7 @@ mod tests {
                     },
                 ),
             );
-        generator.install(&mut registry).unwrap();
+        generator.install(&registry).unwrap();
 
         let (rest, result) = registry.parse("template_value", "42").unwrap();
         assert_eq!(rest, "");
@@ -1270,7 +1281,7 @@ mod tests {
             ]
         );
 
-        let mut registry = ParserRegistry::default().with_extension(
+        let registry = ParserRegistry::default().with_extension(
             DynamicExtensionBuilder::default()
                 .with(map_value::define_function)
                 .with(map_value_error::define_function)
@@ -1280,7 +1291,7 @@ mod tests {
                 .with(map_op_div::define_function)
                 .build(),
         );
-        generator.install(&mut registry).unwrap();
+        generator.install(&registry).unwrap();
 
         let (rest, result) = registry.parse("value", "42").unwrap();
         assert_eq!(rest, "");
@@ -1338,8 +1349,8 @@ mod tests {
             vec!["main", "main2", "main3"]
         );
 
-        let mut registry = ParserRegistry::default();
-        generator.install(&mut registry).unwrap();
+        let registry = ParserRegistry::default();
+        generator.install(&registry).unwrap();
 
         let (rest, result) = registry.parse("main", "bar").unwrap();
         assert_eq!(rest, "");
