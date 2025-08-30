@@ -1,6 +1,6 @@
 [package]
 name = "benches"
-version = "0.48.2"
+version = "0.48.3"
 edition = "2024"
 publish = false
 

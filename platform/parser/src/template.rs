@@ -13,6 +13,10 @@ pub mod shorthand {
     }
 }
 
+thread_local! {
+    static REGEX: Regex = Regex::new(r"@(>|<)\{([^\}]*)\}\[([^\]@]*)\]\{([^\}]*)\}(\[(\d+)\])?@").unwrap();
+}
+
 pub struct TemplateParser {
     parser: ParserHandle,
     rule: Option<String>,
@@ -32,21 +36,22 @@ impl TemplateParser {
 impl Parser for TemplateParser {
     fn parse<'a>(&self, registry: &ParserRegistry, input: &'a str) -> ParseResult<'a> {
         let (input, result) = self.parser.parse(registry, input)?;
-        let content = if let Some(value) = result.read::<String>() {
-            self.content.replace("@{}@", &value)
-        } else if let Some(list) = result.read::<Vec<ParserOutput>>() {
-            Regex::new(r"@(>|<)\{([^\}]*)\}\[([^\]@]*)\]\{([^\}]*)\}(\[(\d+)\])?@")
-                .expect("Expected valid regex")
-                .replace_all(&self.content, |caps: &Captures| -> String {
-                    let ordering = caps.get(1).unwrap().as_str();
-                    let prefix = caps.get(2).unwrap().as_str();
-                    let delimiter = caps.get(3).unwrap().as_str();
-                    let suffix = caps.get(4).unwrap().as_str();
-                    let mut result = String::default();
-                    if let Some(index) = caps.get(6) {
-                        let index = index.as_str().parse::<usize>().unwrap();
-                        result.push_str(prefix);
-                        let item = list
+        let content =
+            if let Some(value) = result.read::<String>() {
+                self.content.replace("@{}@", &value)
+            } else if let Some(list) = result.read::<Vec<ParserOutput>>() {
+                REGEX.with(|regex| {
+                    regex
+                        .replace_all(&self.content, |caps: &Captures| -> String {
+                            let ordering = caps.get(1).unwrap().as_str();
+                            let prefix = caps.get(2).unwrap().as_str();
+                            let delimiter = caps.get(3).unwrap().as_str();
+                            let suffix = caps.get(4).unwrap().as_str();
+                            let mut result = String::default();
+                            if let Some(index) = caps.get(6) {
+                                let index = index.as_str().parse::<usize>().unwrap();
+                                result.push_str(prefix);
+                                let item = list
                             .get(index)
                             .unwrap_or_else(|| {
                                 panic!("Template parsing result list has no item at {index} index!")
@@ -55,39 +60,40 @@ impl Parser for TemplateParser {
                             .unwrap_or_else(|| {
                                 panic!("Template parsing result list item {index} is not String!")
                             });
-                        result.push_str(item.as_str());
-                        result.push_str(suffix);
-                    } else if ordering == ">" {
-                        for (index, item) in list.iter().enumerate() {
-                            if index > 0 {
-                                result.push_str(delimiter);
-                            }
-                            result.push_str(prefix);
-                            let item = item.read::<String>().unwrap_or_else(|| {
+                                result.push_str(item.as_str());
+                                result.push_str(suffix);
+                            } else if ordering == ">" {
+                                for (index, item) in list.iter().enumerate() {
+                                    if index > 0 {
+                                        result.push_str(delimiter);
+                                    }
+                                    result.push_str(prefix);
+                                    let item = item.read::<String>().unwrap_or_else(|| {
                                 panic!("Template parsing result list item {index} is not String!")
                             });
-                            result.push_str(item.as_str());
-                            result.push_str(suffix);
-                        }
-                    } else if ordering == "<" {
-                        for (index, item) in list.iter().rev().enumerate() {
-                            if index > 0 {
-                                result.push_str(delimiter);
-                            }
-                            result.push_str(prefix);
-                            let item = item.read::<String>().unwrap_or_else(|| {
+                                    result.push_str(item.as_str());
+                                    result.push_str(suffix);
+                                }
+                            } else if ordering == "<" {
+                                for (index, item) in list.iter().rev().enumerate() {
+                                    if index > 0 {
+                                        result.push_str(delimiter);
+                                    }
+                                    result.push_str(prefix);
+                                    let item = item.read::<String>().unwrap_or_else(|| {
                                 panic!("Template parsing result list item {index} is not String!")
                             });
-                            result.push_str(item.as_str());
-                            result.push_str(suffix);
-                        }
-                    }
-                    result
+                                    result.push_str(item.as_str());
+                                    result.push_str(suffix);
+                                }
+                            }
+                            result
+                        })
+                        .to_string()
                 })
-                .to_string()
-        } else {
-            return Err("Template parsing result is not String or Vec<ParserOutput>!".into());
-        };
+            } else {
+                return Err("Template parsing result is not String or Vec<ParserOutput>!".into());
+            };
         if let Some(rule) = self.rule.as_ref() {
             let (rest, result) = registry.parse(rule, &content)?;
             if rest.is_empty() {
