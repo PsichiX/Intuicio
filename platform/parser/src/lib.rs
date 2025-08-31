@@ -45,6 +45,10 @@ pub mod shorthand {
         DebugParser::new(id, parser).into_handle()
     }
 
+    pub fn erase(parser: ParserHandle) -> ParserHandle {
+        EraseParser::new(parser).into_handle()
+    }
+
     pub fn ignore() -> ParserHandle {
         ().into_handle()
     }
@@ -96,6 +100,23 @@ impl Parser for EndOfSourceParser {
         } else {
             Err("Expected end of source".into())
         }
+    }
+}
+
+pub struct EraseParser {
+    parser: ParserHandle,
+}
+
+impl EraseParser {
+    pub fn new(parser: ParserHandle) -> Self {
+        Self { parser }
+    }
+}
+
+impl Parser for EraseParser {
+    fn parse<'a>(&self, registry: &ParserRegistry, input: &'a str) -> ParseResult<'a> {
+        let (new_input, _) = self.parser.parse(registry, input)?;
+        Ok((new_input, ParserOutput::new(ParserNoValue).ok().unwrap()))
     }
 }
 
@@ -250,8 +271,8 @@ impl ParserRegistry {
 #[cfg(test)]
 mod tests {
     use crate::{
-        EndOfSourceParser, ParserRegistry, SourceParser,
-        shorthand::{eos, ignore, lit, number_int, seq, source},
+        EndOfSourceParser, ParserNoValue, ParserRegistry, SourceParser,
+        shorthand::{eos, erase, ignore, lit, number_int, seq, source},
     };
 
     fn is_async<T: Send + Sync>() {}
@@ -277,6 +298,17 @@ mod tests {
         let (rest, result) = sentence.parse(&registry, "42 bar").unwrap();
         assert_eq!(rest, " bar");
         assert_eq!(result.read::<String>().unwrap().as_str(), "42");
+    }
+
+    #[test]
+    fn test_erase() {
+        is_async::<()>();
+
+        let registry = ParserRegistry::default();
+        let sentence = erase(number_int());
+        let (rest, result) = sentence.parse(&registry, "42 foo").unwrap();
+        assert_eq!(rest, " foo");
+        assert!(result.is::<ParserNoValue>());
     }
 
     #[test]

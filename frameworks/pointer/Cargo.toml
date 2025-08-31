@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-pointer"
-version = "0.48.3"
+version = "0.48.4"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Raw pointer framework module for Intuicio scripting platform"

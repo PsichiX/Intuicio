@@ -1,10 +1,18 @@
-use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
+use crate::{
+    ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
+};
 
 pub mod shorthand {
     use super::*;
 
     pub fn list(item: ParserHandle, delimiter: ParserHandle, permissive: bool) -> ParserHandle {
         ListParser::new(item, delimiter, permissive).into_handle()
+    }
+
+    pub fn list_inv(item: ParserHandle, delimiter: ParserHandle, permissive: bool) -> ParserHandle {
+        ListParser::new(item, delimiter, permissive)
+            .ignore_no_value(true)
+            .into_handle()
     }
 }
 
@@ -13,6 +21,7 @@ pub struct ListParser {
     item: ParserHandle,
     delimiter: ParserHandle,
     permissive: bool,
+    ignore_no_value: bool,
 }
 
 impl ListParser {
@@ -21,7 +30,13 @@ impl ListParser {
             item,
             delimiter,
             permissive,
+            ignore_no_value: false,
         }
+    }
+
+    pub fn ignore_no_value(mut self, ignore: bool) -> Self {
+        self.ignore_no_value = ignore;
+        self
     }
 }
 
@@ -30,12 +45,16 @@ impl Parser for ListParser {
         let mut result = vec![];
         if let Ok((new_input, value)) = self.item.parse(registry, input) {
             input = new_input;
-            result.push(value);
+            if !self.ignore_no_value || !value.is::<ParserNoValue>() {
+                result.push(value);
+            }
             while let Ok((new_input, _)) = self.delimiter.parse(registry, input) {
                 match self.item.parse(registry, new_input) {
                     Ok((new_input, value)) => {
                         input = new_input;
-                        result.push(value);
+                        if !self.ignore_no_value || !value.is::<ParserNoValue>() {
+                            result.push(value);
+                        }
                     }
                     Err(error) => {
                         if self.permissive {

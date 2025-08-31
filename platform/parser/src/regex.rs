@@ -1,8 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
-
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 pub mod shorthand {
     use super::*;

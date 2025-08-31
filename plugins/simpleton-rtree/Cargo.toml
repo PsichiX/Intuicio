@@ -1,6 +1,6 @@
 [package]
 name = "simpleton-rtree"
-version = "0.48.3"
+version = "0.48.4"
 edition = "2024"
 publish = false
 
