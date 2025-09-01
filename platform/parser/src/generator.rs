@@ -11,6 +11,14 @@ use crate::{
 };
 use std::{collections::HashMap, error::Error, sync::RwLock};
 
+pub mod shorthand {
+    use super::*;
+
+    pub fn generator() -> ParserHandle {
+        GeneratorParser::default().into_handle()
+    }
+}
+
 #[derive(Default)]
 struct SlotsExtension {
     slots: RwLock<HashMap<String, ParserHandle>>,
@@ -69,6 +77,34 @@ impl Parser for SlotExtensionExtWrapParser {
     }
 }
 
+pub struct GeneratorParser {
+    registry: ParserRegistry,
+    parser: ParserHandle,
+}
+
+impl Default for GeneratorParser {
+    fn default() -> Self {
+        Self {
+            registry: Generator::registry(),
+            parser: main(),
+        }
+    }
+}
+
+impl Parser for GeneratorParser {
+    fn parse<'a>(&self, _: &ParserRegistry, input: &'a str) -> ParseResult<'a> {
+        let (new_input, grammar) = self.parser.parse(&self.registry, input)?;
+        let parsers = grammar
+            .consume::<Vec<(String, ParserHandle, Option<String>)>>()
+            .ok()
+            .unwrap();
+        Ok((
+            new_input,
+            ParserOutput::new(Generator { parsers }).ok().unwrap(),
+        ))
+    }
+}
+
 pub struct Generator {
     /// [parser id, parser handle, extender id?]
     parsers: Vec<(String, ParserHandle, Option<String>)>,
@@ -109,7 +145,7 @@ impl Generator {
             .map(|(id, parser, extender)| (id.as_str(), parser.clone(), extender.as_deref()))
     }
 
-    fn registry() -> ParserRegistry {
+    pub fn registry() -> ParserRegistry {
         ParserRegistry::default()
             .with_extension(SlotsExtension::default())
             .with_parser("item", item())
@@ -1039,7 +1075,7 @@ fn parser_ignore() -> ParserHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dynamic::DynamicExtensionBuilder;
+    use crate::{dynamic::DynamicExtensionBuilder, generator::shorthand::generator};
     use intuicio_core::transformer::*;
     use intuicio_derive::intuicio_function;
 
@@ -1047,7 +1083,7 @@ mod tests {
     fn test_parsers() {
         let registry = Generator::registry();
 
-        let (rest, result) = main()
+        let (rest, result) = generator()
             .parse(
                 &registry,
                 "
@@ -1058,12 +1094,9 @@ mod tests {
             )
             .unwrap();
         assert_eq!(rest, "");
-        let result = result
-            .consume::<Vec<(String, ParserHandle, Option<String>)>>()
-            .ok()
-            .unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].0.as_str(), "list");
+        let generator = result.consume::<Generator>().ok().unwrap();
+        assert_eq!(generator.parsers.len(), 1);
+        assert_eq!(generator.parsers[0].0.as_str(), "list");
 
         assert_eq!(comment().parse(&registry, "//foo\r\n").unwrap().0, "");
         assert_eq!(comment().parse(&registry, "/*bar*/").unwrap().0, "");
