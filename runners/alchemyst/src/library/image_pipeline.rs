@@ -186,7 +186,7 @@ impl Pipeline {
         let function_name = signature.name.to_owned();
         let function_module_name = signature.module_name.to_owned();
         let pixels_count = width * height;
-        let pixels_per_thread = if pixels_count % threads_count == 0 {
+        let pixels_per_thread = if pixels_count.is_multiple_of(threads_count) {
             pixels_count / threads_count
         } else {
             1 + pixels_count / threads_count

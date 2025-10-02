@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-simpleton"
-version = "0.48.5"
+version = "0.48.6"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Simpleton frontend module for Intuicio scripting platform"
@@ -37,11 +37,11 @@ toml = "0.9"
 bincode = { version = "2.0", features = ["std", "serde"] }
 byteorder = "1.4"
 snailquote = "0.3"
-rand = "0.8"
+rand = "0.9"
 typid = "1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 intuicio-backend-vm = { version = "0.48", path = "../../backends/vm" }

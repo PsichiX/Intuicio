@@ -1,6 +1,6 @@
 [package]
 name = "simpleton-http"
-version = "0.48.5"
+version = "0.48.6"
 edition = "2024"
 publish = false
 

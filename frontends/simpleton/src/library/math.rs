@@ -316,7 +316,7 @@ pub fn shift_right(registry: &Registry, a: Reference, b: Reference) -> Reference
 
 #[intuicio_function(module_name = "math", use_registry)]
 pub fn random_boolean(registry: &Registry) -> Reference {
-    Reference::new_boolean(rand::thread_rng().r#gen::<Boolean>(), registry)
+    Reference::new_boolean(rand::rng().random::<Boolean>(), registry)
 }
 
 #[intuicio_function(module_name = "math", use_registry)]
@@ -329,7 +329,7 @@ pub fn random_integer(registry: &Registry, from: Reference, to: Reference) -> Re
         .read::<Integer>()
         .map(|value| *value)
         .unwrap_or(Integer::MAX);
-    let result = rand::thread_rng().gen_range(from..to);
+    let result = rand::rng().random_range(from..to);
     Reference::new_integer(result, registry)
 }
 
@@ -337,7 +337,7 @@ pub fn random_integer(registry: &Registry, from: Reference, to: Reference) -> Re
 pub fn random_real(registry: &Registry, from: Reference, to: Reference) -> Reference {
     let from = from.read::<Real>().map(|value| *value).unwrap_or(Real::MIN);
     let to = to.read::<Real>().map(|value| *value).unwrap_or(Real::MAX);
-    let result = rand::thread_rng().gen_range(from..to);
+    let result = rand::rng().random_range(from..to);
     Reference::new_real(result, registry)
 }
 
