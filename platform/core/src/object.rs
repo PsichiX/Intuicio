@@ -644,7 +644,14 @@ mod tests {
         assert_eq!(*handle.layout(), Layout::new::<usize>().pad_to_align());
         let object = unsafe { Object::new_raw(handle, data) };
         assert!(object_push_to_stack(object, &mut stack));
-        assert_eq!(stack.position(), 16);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                32
+            } else {
+                16
+            }
+        );
         let object = object_pop_from_stack(&mut stack, &registry).unwrap();
         assert_eq!(*object.read::<usize>().unwrap(), 42);
         assert_eq!(stack.position(), 0);

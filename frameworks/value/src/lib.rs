@@ -278,7 +278,14 @@ mod tests {
 
     #[test]
     fn test_value() {
-        assert_eq!(std::mem::size_of::<Value>(), 32);
+        assert_eq!(
+            std::mem::size_of::<Value>(),
+            if cfg!(feature = "typehash_debug_name") {
+                40
+            } else {
+                32
+            }
+        );
         assert_eq!(SIZE, 8);
         let a = Value::primitive_or_object(42u8);
         let b = Value::primitive_or_object(10u16);

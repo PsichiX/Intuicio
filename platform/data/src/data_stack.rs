@@ -1075,48 +1075,160 @@ mod tests {
         assert_eq!(stack.size(), 16384);
         assert_eq!(stack.position(), 0);
         stack.push(Droppable(dropped.clone()));
-        assert_eq!(stack.position(), 16);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                32
+            } else {
+                16
+            }
+        );
         let token = stack.store();
         stack.push(42_usize);
-        assert_eq!(stack.position(), 32);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                64
+            } else {
+                32
+            }
+        );
         stack.push(true);
-        assert_eq!(stack.position(), 41);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                89
+            } else {
+                41
+            }
+        );
         stack.push(4.2_f32);
-        assert_eq!(stack.position(), 53);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                117
+            } else {
+                53
+            }
+        );
         assert!(!*dropped.borrow());
         assert!(stack.pop::<()>().is_none());
         stack.push(());
-        assert_eq!(stack.position(), 61);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                141
+            } else {
+                61
+            }
+        );
         stack.reverse(token);
         let mut stack2 = stack.pop_stack(2, None);
-        assert_eq!(stack.position(), 36);
-        assert_eq!(stack2.size(), 32);
-        assert_eq!(stack2.position(), 25);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                84
+            } else {
+                36
+            }
+        );
+        assert_eq!(
+            stack2.size(),
+            if cfg!(feature = "typehash_debug_name") {
+                64
+            } else {
+                32
+            }
+        );
+        assert_eq!(
+            stack2.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                57
+            } else {
+                25
+            }
+        );
         assert_eq!(stack2.pop::<usize>().unwrap(), 42_usize);
-        assert_eq!(stack2.position(), 9);
+        assert_eq!(
+            stack2.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                25
+            } else {
+                9
+            }
+        );
         assert!(stack2.pop::<bool>().unwrap());
         assert_eq!(stack2.position(), 0);
         stack2.push(true);
         stack2.push(42_usize);
         stack.push_stack(stack2).ok().unwrap();
-        assert_eq!(stack.position(), 61);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                141
+            } else {
+                61
+            }
+        );
         assert_eq!(stack.pop::<usize>().unwrap(), 42_usize);
-        assert_eq!(stack.position(), 45);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                109
+            } else {
+                45
+            }
+        );
         assert!(stack.pop::<bool>().unwrap());
-        assert_eq!(stack.position(), 36);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                84
+            } else {
+                36
+            }
+        );
         assert_eq!(stack.pop::<f32>().unwrap(), 4.2_f32);
-        assert_eq!(stack.position(), 24);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                56
+            } else {
+                24
+            }
+        );
         stack.pop::<()>().unwrap();
-        assert_eq!(stack.position(), 16);
+        assert_eq!(
+            stack.position(),
+            if cfg!(feature = "typehash_debug_name") {
+                32
+            } else {
+                16
+            }
+        );
         stack.push(42_usize);
         unsafe {
             let (layout, type_hash, finalizer, data) = stack.pop_raw().unwrap();
             assert_eq!(layout, Layout::new::<usize>().pad_to_align());
             assert_eq!(type_hash, TypeHash::of::<usize>());
             assert!(stack.push_raw(layout, type_hash, finalizer, &data));
-            assert_eq!(stack.position(), 32);
+            assert_eq!(
+                stack.position(),
+                if cfg!(feature = "typehash_debug_name") {
+                    64
+                } else {
+                    32
+                }
+            );
             assert_eq!(stack.pop::<usize>().unwrap(), 42_usize);
-            assert_eq!(stack.position(), 16);
+            assert_eq!(
+                stack.position(),
+                if cfg!(feature = "typehash_debug_name") {
+                    32
+                } else {
+                    16
+                }
+            );
         }
         drop(stack);
         assert!(*dropped.borrow());

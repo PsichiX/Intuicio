@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-essentials"
-version = "0.48.6"
+version = "0.48.7"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Essentials module for Intuicio scripting platform"
@@ -14,6 +14,7 @@ readme = "../README.md"
 default = ["plugins", "vm"]
 plugins = ["intuicio-plugins"]
 vm = ["intuicio-backend-vm"]
+typehash_debug_name = ["intuicio-data/typehash_debug_name"]
 
 [dependencies]
 intuicio-data = { version = "0.48", path = "../platform/data" }

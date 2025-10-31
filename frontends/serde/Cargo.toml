@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-frontend-serde"
-version = "0.48.6"
+version = "0.48.7"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Serde frontend module for Intuicio scripting platform"
@@ -9,6 +9,9 @@ homepage = "https://github.com/PsichiX/intuicio"
 repository = "https://github.com/PsichiX/intuicio"
 documentation = "https://docs.rs/intuicio-frontend-serde"
 readme = "../../README.md"
+
+[features]
+typehash_debug_name = ["intuicio-data/typehash_debug_name"]
 
 [dependencies]
 intuicio-data = { version = "0.48", path = "../../platform/data" }
