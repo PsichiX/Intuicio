@@ -1,6 +1,6 @@
 [package]
 name = "custom"
-version = "0.48.7"
+version = "0.48.8"
 edition = "2024"
 publish = false
 

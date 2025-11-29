@@ -384,13 +384,24 @@ impl Lifetime {
         }
     }
 
+    pub fn try_read_lock(&self) -> Option<ReadLock> {
+        unsafe { self.0.update_tag(self) };
+        let mut access = self.0.lock();
+        if !access.state.is_read_accessible() {
+            return None;
+        }
+        access.acquire_read_access();
+        Some(ReadLock {
+            lifetime: self.0.clone(),
+        })
+    }
+
     pub fn read_lock(&self) -> ReadLock {
         unsafe { self.0.update_tag(self) };
         let mut access = self.0.lock();
         while !access.state.is_read_accessible() {
             std::hint::spin_loop();
         }
-        access.unlock = false;
         access.acquire_read_access();
         ReadLock {
             lifetime: self.0.clone(),
@@ -402,7 +413,6 @@ impl Lifetime {
             unsafe { self.0.update_tag(self) };
             let mut access = self.0.lock();
             if access.state.is_read_accessible() {
-                access.unlock = false;
                 access.acquire_read_access();
                 return ReadLock {
                     lifetime: self.0.clone(),
@@ -416,13 +426,24 @@ impl Lifetime {
         }
     }
 
+    pub fn try_write_lock(&self) -> Option<WriteLock> {
+        unsafe { self.0.update_tag(self) };
+        let mut access = self.0.lock();
+        if !access.state.is_write_accessible() {
+            return None;
+        }
+        access.acquire_write_access();
+        Some(WriteLock {
+            lifetime: self.0.clone(),
+        })
+    }
+
     pub fn write_lock(&self) -> WriteLock {
         unsafe { self.0.update_tag(self) };
         let mut access = self.0.lock();
         while !access.state.is_write_accessible() {
             std::hint::spin_loop();
         }
-        access.unlock = false;
         access.acquire_write_access();
         WriteLock {
             lifetime: self.0.clone(),
@@ -434,7 +455,6 @@ impl Lifetime {
             unsafe { self.0.update_tag(self) };
             let mut access = self.0.lock();
             if access.state.is_write_accessible() {
-                access.unlock = false;
                 access.acquire_write_access();
                 return WriteLock {
                     lifetime: self.0.clone(),
@@ -612,13 +632,24 @@ impl LifetimeRef {
         }
     }
 
+    pub fn try_read_lock(&self) -> Option<ReadLock> {
+        let state = self.0.upgrade()?;
+        let mut access = state.lock();
+        if !access.state.is_read_accessible() {
+            return None;
+        }
+        access.acquire_read_access();
+        Some(ReadLock {
+            lifetime: state.clone(),
+        })
+    }
+
     pub fn read_lock(&self) -> Option<ReadLock> {
         let state = self.0.upgrade()?;
         let mut access = state.lock();
         while !access.state.is_read_accessible() {
             std::hint::spin_loop();
         }
-        access.unlock = false;
         access.acquire_read_access();
         Some(ReadLock {
             lifetime: state.clone(),
@@ -926,13 +957,24 @@ impl LifetimeRefMut {
         }
     }
 
+    pub fn try_read_lock(&self) -> Option<ReadLock> {
+        let state = self.0.upgrade()?;
+        let mut access = state.lock();
+        if !access.state.is_read_accessible() {
+            return None;
+        }
+        access.acquire_read_access();
+        Some(ReadLock {
+            lifetime: state.clone(),
+        })
+    }
+
     pub fn read_lock(&self) -> Option<ReadLock> {
         let state = self.0.upgrade()?;
         let mut access = state.lock();
         while !access.state.is_read_accessible() {
             std::hint::spin_loop();
         }
-        access.unlock = false;
         access.acquire_read_access();
         Some(ReadLock {
             lifetime: state.clone(),
@@ -952,13 +994,24 @@ impl LifetimeRefMut {
         }
     }
 
+    pub fn try_write_lock(&self) -> Option<WriteLock> {
+        let state = self.0.upgrade()?;
+        let mut access = state.lock();
+        if !access.state.is_write_accessible() {
+            return None;
+        }
+        access.acquire_write_access();
+        Some(WriteLock {
+            lifetime: state.clone(),
+        })
+    }
+
     pub fn write_lock(&self) -> Option<WriteLock> {
         let state = self.0.upgrade()?;
         let mut access = state.lock();
         while !access.state.is_write_accessible() {
             std::hint::spin_loop();
         }
-        access.unlock = false;
         access.acquire_write_access();
         Some(WriteLock {
             lifetime: state.clone(),
@@ -1604,5 +1657,57 @@ mod tests {
             let access = lifetime.read_async(&value).await;
             assert_eq!(*access, 84);
         }
+    }
+
+    #[test]
+    fn test_lifetime_locks() {
+        let lifetime = Lifetime::default();
+        assert!(lifetime.state().is_read_accessible());
+        assert!(lifetime.state().is_write_accessible());
+
+        let read_lock = lifetime.read_lock();
+        assert!(lifetime.state().is_read_accessible());
+        assert!(!lifetime.state().is_write_accessible());
+
+        drop(read_lock);
+        assert!(lifetime.state().is_read_accessible());
+        assert!(lifetime.state().is_write_accessible());
+
+        let read_lock = lifetime.read_lock();
+        assert!(lifetime.state().is_read_accessible());
+        assert!(!lifetime.state().is_write_accessible());
+
+        let read_lock2 = lifetime.read_lock();
+        assert!(lifetime.state().is_read_accessible());
+        assert!(!lifetime.state().is_write_accessible());
+
+        drop(read_lock);
+        assert!(lifetime.state().is_read_accessible());
+        assert!(!lifetime.state().is_write_accessible());
+
+        drop(read_lock2);
+        assert!(lifetime.state().is_read_accessible());
+        assert!(lifetime.state().is_write_accessible());
+
+        let write_lock = lifetime.write_lock();
+        assert!(!lifetime.state().is_read_accessible());
+        assert!(!lifetime.state().is_write_accessible());
+
+        assert!(lifetime.try_read_lock().is_none());
+        assert!(lifetime.try_write_lock().is_none());
+
+        drop(write_lock);
+        assert!(lifetime.state().is_read_accessible());
+        assert!(lifetime.state().is_write_accessible());
+
+        let data = ();
+        let read_access = lifetime.read(&data).unwrap();
+        assert!(lifetime.state().is_read_accessible());
+        assert!(!lifetime.state().is_write_accessible());
+        assert!(lifetime.state().is_locked());
+
+        drop(read_access);
+        assert!(lifetime.try_read_lock().is_some());
+        assert!(lifetime.try_write_lock().is_some());
     }
 }
