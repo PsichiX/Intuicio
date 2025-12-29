@@ -4,7 +4,7 @@ use intuicio_core::{
     registry::Registry,
     script::{ScriptExpression, ScriptOperation},
 };
-use intuicio_data::type_hash::TypeHash;
+use intuicio_data::{data_stack::DataStackVisitedItem, type_hash::TypeHash};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -281,7 +281,15 @@ impl PrintDebugger {
         }
         if self.visit_stack {
             let mut index = 0;
-            context.stack().visit(|type_hash, layout, bytes, range, _| {
+            context.stack().visit(|item| {
+                let DataStackVisitedItem::Value {
+                    type_hash,
+                    layout,
+                    data: bytes,
+                    range,
+                } = item else {
+                    return true;
+                };
                 assert_eq!(bytes.len(), layout.size());
                 if let Some((type_name, callback)) = self.printable.get(&type_hash) {
                     println!(
@@ -299,6 +307,7 @@ impl PrintDebugger {
                     "- stack value #{index} bytes in range {range:?}:\n{bytes:?}"
                 );
                 index += 1;
+                true
             });
         }
         if self.registers {
@@ -315,40 +324,49 @@ impl PrintDebugger {
         if self.visit_registers {
             let mut index = 0;
             let registers_count = context.registers().registers_count();
-            context
-                .registers()
-                .visit(|type_hash, layout, bytes, range, valid| {
-                    if let Some((type_name, callback)) = self.printable.get(&type_hash) {
-                        if valid {
-                            println!(
-                                "- register value #{} of type {}:\n{}",
-                                registers_count - index - 1,
-                                type_name,
-                                callback(self, bytes.as_ptr().cast::<()>())
-                            );
-                        } else {
-                            println!(
-                                "- invalid register value #{} of type {}",
-                                registers_count - index - 1,
-                                type_name
-                            );
-                        }
+            context.registers().visit(|item| {
+                let DataStackVisitedItem::Register {
+                    type_hash,
+                    layout,
+                    data: bytes,
+                    range,
+                    valid,
+                } = item
+                else {
+                    return true;
+                };
+                if let Some((type_name, callback)) = self.printable.get(&type_hash) {
+                    if valid {
+                        println!(
+                            "- register value #{} of type {}:\n{}",
+                            registers_count - index - 1,
+                            type_name,
+                            callback(self, bytes.as_ptr().cast::<()>())
+                        );
                     } else {
                         println!(
-                            "- register value #{} of unknown type id {:?} and layout: {:?}",
+                            "- invalid register value #{} of type {}",
                             registers_count - index - 1,
-                            type_hash,
-                            layout
+                            type_name
                         );
                     }
+                } else {
                     println!(
-                        "- register value #{} bytes in range: {:?}:\n{:?}",
+                        "- register value #{} of unknown type id {:?} and layout: {:?}",
                         registers_count - index - 1,
-                        range,
-                        bytes
+                        type_hash,
+                        layout
                     );
-                    index += 1;
-                });
+                }
+                println!(
+                    "- register value #{} bytes in range: {:?}:\n{:?}",
+                    registers_count - index - 1,
+                    range,
+                    bytes
+                );
+                index += 1;
+                true
+            });
         }
     }
 

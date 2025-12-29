@@ -94,6 +94,12 @@ Intuicio scripts by default have a very limited set of operations, because of be
 
     Does what pop scope does, but first takes `bool` from the stack and if it is `false`, scope gets dropped.
 
+- **Suspend**
+
+    While stepping through operations, returns suspended mode result instead of completed or continue.
+    This is useful for frontends that are implementing async primitives like futures or coroutines.
+    If frontend wants to yield some value or suspension result, data should be put on stack for host to take it.
+
 Usually we leave producing script operations to frontends, but one can create them at any time by any means. One can even create them at runtime and call newly created function in place, without adding it to registry:
 
 ```rust

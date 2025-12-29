@@ -2,12 +2,38 @@ use crate::debugger::VmDebuggerHandle;
 use intuicio_core::{
     context::Context,
     function::FunctionBody,
-    registry::Registry,
+    registry::{Registry, RegistryHandle},
     script::{ScriptExpression, ScriptFunctionGenerator, ScriptHandle, ScriptOperation},
 };
+use intuicio_data::managed::{ManagedLazy, ManagedRefMut};
 use typid::ID;
 
 pub type VmScopeSymbol = ID<()>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VmScopeResult {
+    Continue,
+    Completed,
+    Suspended,
+}
+
+impl VmScopeResult {
+    pub fn can_continue(self) -> bool {
+        self == VmScopeResult::Continue
+    }
+
+    pub fn is_completed(self) -> bool {
+        self == VmScopeResult::Completed
+    }
+
+    pub fn is_suspended(self) -> bool {
+        self == VmScopeResult::Suspended
+    }
+
+    pub fn can_progress(self) -> bool {
+        !self.is_completed()
+    }
+}
 
 pub struct VmScope<'a, SE: ScriptExpression> {
     handle: ScriptHandle<'a, SE>,
@@ -28,9 +54,35 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
         }
     }
 
+    /// # Safety
+    pub unsafe fn restore(mut self, position: usize, child: Option<Self>) -> Self {
+        self.position = position;
+        self.child = child.map(Box::new);
+        self
+    }
+
     pub fn with_debugger(mut self, debugger: Option<VmDebuggerHandle<SE>>) -> Self {
         self.debugger = debugger;
         self
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn into_inner(
+        self,
+    ) -> (
+        ScriptHandle<'a, SE>,
+        VmScopeSymbol,
+        usize,
+        Option<Box<Self>>,
+        Option<VmDebuggerHandle<SE>>,
+    ) {
+        (
+            self.handle,
+            self.symbol,
+            self.position,
+            self.child,
+            self.debugger,
+        )
     }
 
     pub fn symbol(&self) -> VmScopeSymbol {
@@ -45,16 +97,34 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
         self.position >= self.handle.len()
     }
 
-    pub fn run(&mut self, context: &mut Context, registry: &Registry) {
-        while self.step(context, registry) {}
+    pub fn child(&self) -> Option<&Self> {
+        self.child.as_deref()
     }
 
-    pub fn step(&mut self, context: &mut Context, registry: &Registry) -> bool {
+    pub fn run(&mut self, context: &mut Context, registry: &Registry) {
+        while self.step(context, registry).can_progress() {}
+    }
+
+    pub fn run_until_suspended(
+        &mut self,
+        context: &mut Context,
+        registry: &Registry,
+    ) -> VmScopeResult {
+        loop {
+            match self.step(context, registry) {
+                VmScopeResult::Continue => {}
+                result => return result,
+            }
+        }
+    }
+
+    pub fn step(&mut self, context: &mut Context, registry: &Registry) -> VmScopeResult {
         if let Some(child) = &mut self.child {
-            if child.step(context, registry) {
-                return true;
-            } else {
-                self.child = None;
+            match child.step(context, registry) {
+                VmScopeResult::Completed => {
+                    self.child = None;
+                }
+                result => return result,
             }
         }
         if self.position == 0
@@ -73,12 +143,12 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
             let result = match operation {
                 ScriptOperation::None => {
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::Expression { expression } => {
                     expression.evaluate(context, registry);
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::DefineRegister { query } => {
                     let handle = registry
@@ -93,7 +163,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                             .push_register_raw(handle.type_hash(), *handle.layout())
                     };
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::DropRegister { index } => {
                     let index = context.absolute_register_index(*index);
@@ -105,7 +175,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         })
                         .free();
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::PushFromRegister { index } => {
                     let index = context.absolute_register_index(*index);
@@ -117,7 +187,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         panic!("Could not push data from register: {index}");
                     }
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::PopToRegister { index } => {
                     let index = context.absolute_register_index(*index);
@@ -129,7 +199,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         panic!("Could not pop data to register: {index}");
                     }
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::MoveRegister { from, to } => {
                     let from = context.absolute_register_index(*from);
@@ -142,7 +212,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         });
                     source.move_to(&mut target);
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::CallFunction { query } => {
                     let handle = registry
@@ -153,7 +223,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         });
                     handle.invoke(context, registry);
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::BranchScope {
                     scope_success,
@@ -171,7 +241,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         ));
                     }
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::LoopScope { scope } => {
                     if !context.stack().pop::<bool>().unwrap() {
@@ -182,7 +252,7 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                                 .with_debugger(self.debugger.clone()),
                         ));
                     }
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::PushScope { scope } => {
                     context.store_registers();
@@ -190,21 +260,25 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
                         Self::new(scope.clone(), self.symbol).with_debugger(self.debugger.clone()),
                     ));
                     self.position += 1;
-                    true
+                    VmScopeResult::Continue
                 }
                 ScriptOperation::PopScope => {
                     context.restore_registers();
                     self.position = self.handle.len();
-                    false
+                    VmScopeResult::Completed
                 }
                 ScriptOperation::ContinueScopeConditionally => {
-                    let result = context.stack().pop::<bool>().unwrap();
-                    if result {
+                    if context.stack().pop::<bool>().unwrap() {
                         self.position += 1;
+                        VmScopeResult::Continue
                     } else {
                         self.position = self.handle.len();
+                        VmScopeResult::Completed
                     }
-                    result
+                }
+                ScriptOperation::Suspend => {
+                    self.position += 1;
+                    VmScopeResult::Suspended
                 }
             };
             if let Some(debugger) = self.debugger.as_ref()
@@ -214,9 +288,9 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
             }
             result
         } else {
-            false
+            VmScopeResult::Completed
         };
-        if (!result || self.position >= self.handle.len())
+        if (!result.can_progress() || self.position >= self.handle.len())
             && let Some(debugger) = self.debugger.as_ref()
             && let Ok(mut debugger) = debugger.try_write()
         {
@@ -246,6 +320,110 @@ impl<SE: ScriptExpression + 'static> ScriptFunctionGenerator<SE> for VmScope<'st
     }
 }
 
+impl<SE: ScriptExpression> Clone for VmScope<'_, SE> {
+    fn clone(&self) -> Self {
+        Self {
+            handle: self.handle.clone(),
+            symbol: self.symbol,
+            position: self.position,
+            child: self.child.as_ref().map(|child| Box::new((**child).clone())),
+            debugger: self.debugger.clone(),
+        }
+    }
+}
+
+pub enum VmScopeFutureContext {
+    Owned(Box<Context>),
+    RefMut(ManagedRefMut<Context>),
+    Lazy(ManagedLazy<Context>),
+}
+
+impl From<Box<Context>> for VmScopeFutureContext {
+    fn from(value: Box<Context>) -> Self {
+        Self::Owned(value)
+    }
+}
+
+impl From<Context> for VmScopeFutureContext {
+    fn from(value: Context) -> Self {
+        Self::Owned(Box::new(value))
+    }
+}
+
+impl From<ManagedRefMut<Context>> for VmScopeFutureContext {
+    fn from(value: ManagedRefMut<Context>) -> Self {
+        Self::RefMut(value)
+    }
+}
+
+impl From<ManagedLazy<Context>> for VmScopeFutureContext {
+    fn from(value: ManagedLazy<Context>) -> Self {
+        Self::Lazy(value)
+    }
+}
+
+pub struct VmScopeFuture<'a, SE: ScriptExpression> {
+    pub scope: VmScope<'a, SE>,
+    pub context: VmScopeFutureContext,
+    pub registry: RegistryHandle,
+    pub operations_per_poll: usize,
+}
+
+impl<'a, SE: ScriptExpression> VmScopeFuture<'a, SE> {
+    pub fn new(
+        scope: VmScope<'a, SE>,
+        context: impl Into<VmScopeFutureContext>,
+        registry: RegistryHandle,
+    ) -> Self {
+        Self {
+            scope,
+            context: context.into(),
+            registry,
+            operations_per_poll: usize::MAX,
+        }
+    }
+
+    pub fn operations_per_poll(mut self, value: usize) -> Self {
+        self.operations_per_poll = value;
+        self
+    }
+
+    fn step(&mut self) -> Option<VmScopeResult> {
+        match &mut self.context {
+            VmScopeFutureContext::Owned(context) => {
+                Some(self.scope.step(&mut *context, &self.registry))
+            }
+            VmScopeFutureContext::RefMut(context) => {
+                let mut context = context.write()?;
+                Some(self.scope.step(&mut context, &self.registry))
+            }
+            VmScopeFutureContext::Lazy(context) => {
+                let mut context = context.write()?;
+                Some(self.scope.step(&mut context, &self.registry))
+            }
+        }
+    }
+}
+
+impl<SE: ScriptExpression> Future for VmScopeFuture<'_, SE> {
+    type Output = ();
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        for _ in 0..self.operations_per_poll {
+            match self.step() {
+                None => return std::task::Poll::Pending,
+                Some(VmScopeResult::Completed) => return std::task::Poll::Ready(()),
+                Some(VmScopeResult::Suspended) => return std::task::Poll::Pending,
+                Some(VmScopeResult::Continue) => {}
+            }
+        }
+        std::task::Poll::Pending
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::scope::*;
@@ -255,6 +433,16 @@ mod tests {
         script::{ScriptBuilder, ScriptFunction, ScriptFunctionParameter, ScriptFunctionSignature},
         types::{TypeQuery, struct_type::NativeStructBuilder},
     };
+    use intuicio_data::managed::Managed;
+
+    #[test]
+    fn test_async() {
+        fn is_async<T: Send + Sync>() {}
+
+        is_async::<VmScope<()>>();
+        is_async::<VmScopeFuture<()>>();
+        is_async::<VmScopeFutureContext>();
+    }
 
     #[test]
     fn test_vm_scope() {
@@ -339,5 +527,56 @@ mod tests {
         assert_eq!(result, 42);
         assert_eq!(context.stack().position(), 0);
         assert_eq!(context.registers().position(), 0);
+    }
+
+    #[test]
+    fn test_vm_scope_future() {
+        enum Expression {
+            Literal(i32),
+            Increment,
+        }
+
+        impl ScriptExpression for Expression {
+            fn evaluate(&self, context: &mut Context, _registry: &Registry) {
+                match self {
+                    Expression::Literal(value) => {
+                        context.stack().push(*value);
+                    }
+                    Expression::Increment => {
+                        let value = context.stack().pop::<i32>().unwrap();
+                        context.stack().push(value + 1);
+                    }
+                }
+            }
+        }
+
+        let mut context = Managed::new(Context::new(10240, 10240));
+        let registry = RegistryHandle::default();
+
+        let script = ScriptBuilder::<Expression>::default()
+            .expression(Expression::Literal(42))
+            .suspend()
+            .expression(Expression::Increment)
+            .build();
+        let scope = VmScope::new(script, VmScopeSymbol::new());
+        let mut future = VmScopeFuture::new(scope, context.lazy(), registry);
+        let mut future = std::pin::Pin::new(&mut future);
+        let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
+        assert_eq!(context.write().unwrap().stack().position(), 0);
+
+        assert_eq!(future.as_mut().poll(&mut cx), std::task::Poll::Pending);
+        assert_eq!(
+            context.write().unwrap().stack().position(),
+            if cfg!(feature = "typehash_debug_name") {
+                28
+            } else {
+                12
+            }
+        );
+        assert_eq!(context.write().unwrap().stack().pop::<i32>().unwrap(), 42);
+        context.write().unwrap().stack().push(1);
+
+        assert_eq!(future.as_mut().poll(&mut cx), std::task::Poll::Ready(()));
+        assert_eq!(context.write().unwrap().stack().pop::<i32>().unwrap(), 2);
     }
 }

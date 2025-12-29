@@ -1,3 +1,6 @@
+# matching 1.92 stable release
+nightly := "+nightly-2025-10-24"
+
 list:
   just --list
 
@@ -32,8 +35,8 @@ test:
   cd ./runners/alchemyst && just run
 
 miri:
-  cargo +nightly miri test --manifest-path ./platform/data/Cargo.toml
-  cargo +nightly miri test --manifest-path ./platform/core/Cargo.toml
+  cargo {{nightly}} miri test --manifest-path ./platform/data/Cargo.toml
+  cargo {{nightly}} miri test --manifest-path ./platform/core/Cargo.toml
 
 bench NAME="all":
   cargo run --manifest-path ./benches/Cargo.toml --no-default-features --features=bench_{{NAME}} --release

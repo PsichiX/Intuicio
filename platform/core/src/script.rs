@@ -92,6 +92,7 @@ pub enum ScriptOperation<'a, SE: ScriptExpression> {
     },
     PopScope,
     ContinueScopeConditionally,
+    Suspend,
 }
 
 impl<SE: ScriptExpression> ScriptOperation<'_, SE> {
@@ -110,6 +111,7 @@ impl<SE: ScriptExpression> ScriptOperation<'_, SE> {
             Self::PushScope { .. } => "PushScope",
             Self::PopScope => "PopScope",
             Self::ContinueScopeConditionally => "ContinueScopeConditionally",
+            Self::Suspend => "Suspend",
         }
     }
 }
@@ -191,6 +193,11 @@ impl<'a, SE: ScriptExpression> ScriptBuilder<'a, SE> {
 
     pub fn continue_scope_conditionally(mut self) -> Self {
         self.0.push(ScriptOperation::ContinueScopeConditionally);
+        self
+    }
+
+    pub fn suspend(mut self) -> Self {
+        self.0.push(ScriptOperation::Suspend);
         self
     }
 }

@@ -20,7 +20,7 @@ macro_rules! __internal__offset_of_enum__ {
         #[allow(clippy::macro_metavars_in_unsafe)]
         unsafe {
             ptr.write($discriminant);
-            #[allow(unused_variables)]
+            #[allow(unused)]
             match data.assume_init_ref() {
                 $type::$variant( $( $field ),* ) => {
                     ($used_field as *const _ as *const u8).offset_from(ptr) as usize
@@ -35,7 +35,7 @@ macro_rules! __internal__offset_of_enum__ {
         #[allow(clippy::macro_metavars_in_unsafe)]
         unsafe {
             ptr.write($discriminant);
-            #[allow(unused_variables)]
+            #[allow(unused)]
             match data.assume_init_ref() {
                 $type::$variant {
                     $index: __value__, ..
@@ -50,7 +50,7 @@ macro_rules! __internal__offset_of_enum__ {
         #[allow(clippy::macro_metavars_in_unsafe)]
         unsafe {
             ptr.write($discriminant);
-            #[allow(unused_variables)]
+            #[allow(unused)]
             match data.assume_init_ref() {
                 $type::$variant { $field, .. } => {
                     ($field as *const _ as *const u8).offset_from(ptr) as usize

@@ -298,6 +298,22 @@ impl DataStackMode {
     }
 }
 
+pub enum DataStackVisitedItem<'a> {
+    Value {
+        type_hash: TypeHash,
+        layout: Layout,
+        data: &'a [u8],
+        range: Range<usize>,
+    },
+    Register {
+        type_hash: TypeHash,
+        layout: Layout,
+        data: &'a [u8],
+        range: Range<usize>,
+        valid: bool,
+    },
+}
+
 pub struct DataStack {
     memory: Vec<u8>,
     position: usize,
@@ -344,7 +360,7 @@ impl DataStack {
         &self.memory[0..self.position]
     }
 
-    pub fn visit(&self, mut f: impl FnMut(TypeHash, Layout, &[u8], Range<usize>, bool)) {
+    pub fn visit(&self, mut f: impl FnMut(DataStackVisitedItem) -> bool) {
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
         let mut position = self.position;
@@ -377,13 +393,16 @@ impl DataStack {
                 }
                 position -= tag.layout.size();
                 let range = position..(position + tag.layout.size());
-                f(
-                    tag.type_hash,
-                    tag.layout,
-                    &self.memory[range.clone()],
+                let status = f(DataStackVisitedItem::Register {
+                    type_hash: tag.type_hash,
+                    layout: tag.layout,
+                    data: &self.memory[range.clone()],
                     range,
-                    tag.finalizer.is_some(),
-                );
+                    valid: tag.finalizer.is_some(),
+                });
+                if !status {
+                    return;
+                }
                 position -= tag.padding as usize;
             } else if let Some(finalizer) = self.finalizers.get(&type_hash) {
                 if position < finalizer.layout.size() {
@@ -391,13 +410,15 @@ impl DataStack {
                 }
                 position -= finalizer.layout.size();
                 let range = position..(position + finalizer.layout.size());
-                f(
+                let status = f(DataStackVisitedItem::Value {
                     type_hash,
-                    finalizer.layout,
-                    &self.memory[range.clone()],
+                    layout: finalizer.layout,
+                    data: &self.memory[range.clone()],
                     range,
-                    true,
-                );
+                });
+                if !status {
+                    return;
+                }
             }
         }
     }
