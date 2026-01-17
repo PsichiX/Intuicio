@@ -96,6 +96,11 @@ impl LifetimeState {
         self.inner.tag.store(tag, Ordering::Release);
     }
 
+    /// # Safety
+    pub unsafe fn invalidate_tag(&self) {
+        self.inner.tag.store(0, Ordering::Release);
+    }
+
     pub fn tag(&self) -> usize {
         self.inner.tag.load(Ordering::Acquire)
     }
@@ -217,6 +222,11 @@ impl LifetimeStateAccess<'_> {
 pub struct Lifetime(LifetimeState);
 
 impl Lifetime {
+    pub fn invalidate(&mut self) {
+        unsafe { self.0.invalidate_tag() };
+        self.0 = Default::default();
+    }
+
     pub fn state(&self) -> &LifetimeState {
         unsafe { self.0.update_tag(self) };
         &self.0

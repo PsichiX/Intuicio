@@ -14,14 +14,14 @@ use std::{
     mem::MaybeUninit,
 };
 
-enum Kind<T> {
+enum Kind {
     Owned {
         lifetime: Lifetime,
-        data: *mut T,
+        data: *mut u8,
     },
     Referenced {
         lifetime: LifetimeLazy,
-        data: *mut T,
+        data: *mut u8,
     },
 }
 
@@ -91,6 +91,14 @@ impl<T> ManagedGc<T> {
         self.dynamic.is_owned_by(&other.dynamic)
     }
 
+    pub fn try_read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
+        self.dynamic.try_read::<T>()
+    }
+
+    pub fn try_write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
+        self.dynamic.try_write::<T>()
+    }
+
     pub fn read<const LOCKING: bool>(&'_ self) -> ValueReadAccess<'_, T> {
         self.dynamic.read::<LOCKING, T>()
     }
@@ -145,7 +153,7 @@ impl<T> Clone for ManagedGc<T> {
 
 pub struct DynamicManagedGc {
     type_hash: TypeHash,
-    kind: Kind<u8>,
+    kind: Kind,
     layout: Layout,
     finalizer: unsafe fn(*mut ()),
     drop: bool,
@@ -156,15 +164,19 @@ unsafe impl Sync for DynamicManagedGc {}
 
 impl Drop for DynamicManagedGc {
     fn drop(&mut self) {
-        if let Kind::Owned { data, .. } = self.kind
+        if let Kind::Owned { lifetime, data } = &mut self.kind
             && self.drop
         {
+            while lifetime.state().is_in_use() {
+                std::hint::spin_loop();
+            }
+            lifetime.invalidate();
             unsafe {
                 if data.is_null() {
                     return;
                 }
                 (self.finalizer)(data.cast::<()>());
-                non_zero_dealloc(data, self.layout);
+                non_zero_dealloc(*data, self.layout);
             }
         }
     }
@@ -309,9 +321,62 @@ impl DynamicManagedGc {
         self.type_hash == TypeHash::of::<T>()
     }
 
+    pub fn try_read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
+        if !self.is::<T>() {
+            panic!(
+                "DynamicManagedGc is not of the requested type: {}",
+                std::any::type_name::<T>()
+            );
+        }
+        unsafe {
+            match &self.kind {
+                Kind::Owned { lifetime, data } => {
+                    let data = data.cast::<T>().as_ref()?;
+                    lifetime.read(data)
+                }
+                Kind::Referenced { lifetime, data } => {
+                    if lifetime.exists() {
+                        let data = data.cast::<T>().as_ref()?;
+                        lifetime.read(data)
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn try_write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
+        if !self.is::<T>() {
+            panic!(
+                "DynamicManagedGc is not of the requested type: {}",
+                std::any::type_name::<T>()
+            );
+        }
+        unsafe {
+            match &self.kind {
+                Kind::Owned { lifetime, data } => {
+                    let data = data.cast::<T>().as_mut()?;
+                    lifetime.write(data)
+                }
+                Kind::Referenced { lifetime, data } => {
+                    if lifetime.exists() {
+                        let data = data.cast::<T>().as_mut()?;
+                        lifetime.write(data)
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+    }
+
     pub fn read<const LOCKING: bool, T>(&'_ self) -> ValueReadAccess<'_, T> {
         if !self.is::<T>() {
-            panic!("DynamicManagedGc is not of the requested type");
+            panic!(
+                "DynamicManagedGc is not of the requested type: {}",
+                std::any::type_name::<T>()
+            );
         }
         unsafe {
             if LOCKING {
@@ -327,6 +392,9 @@ impl DynamicManagedGc {
                         std::hint::spin_loop();
                     },
                     Kind::Referenced { lifetime, data } => loop {
+                        if !lifetime.exists() {
+                            panic!("DynamicManagedGc owner is dead");
+                        }
                         let data = data
                             .cast::<T>()
                             .as_ref()
@@ -364,7 +432,10 @@ impl DynamicManagedGc {
 
     pub fn write<const LOCKING: bool, T>(&'_ mut self) -> ValueWriteAccess<'_, T> {
         if !self.is::<T>() {
-            panic!("DynamicManagedGc is not of the requested type");
+            panic!(
+                "DynamicManagedGc is not of the requested type: {}",
+                std::any::type_name::<T>()
+            );
         }
         unsafe {
             if LOCKING {
@@ -380,6 +451,9 @@ impl DynamicManagedGc {
                         std::hint::spin_loop();
                     },
                     Kind::Referenced { lifetime, data } => loop {
+                        if !lifetime.exists() {
+                            panic!("DynamicManagedGc owner is dead");
+                        }
                         let data = data
                             .cast::<T>()
                             .as_mut()
@@ -427,6 +501,9 @@ impl DynamicManagedGc {
                         std::hint::spin_loop();
                     },
                     Kind::Referenced { lifetime, data } => loop {
+                        if !lifetime.exists() {
+                            panic!("DynamicManagedGc owner is dead");
+                        }
                         if let Some(lifetime) = lifetime.borrow() {
                             return DynamicManagedRef::new_raw(self.type_hash, lifetime, *data)
                                 .expect("DynamicManagedGc cannot be immutably borrowed");
@@ -469,6 +546,9 @@ impl DynamicManagedGc {
                         std::hint::spin_loop();
                     },
                     Kind::Referenced { lifetime, data } => loop {
+                        if !lifetime.exists() {
+                            panic!("DynamicManagedGc owner is dead");
+                        }
                         if let Some(lifetime) = lifetime.borrow_mut() {
                             return DynamicManagedRefMut::new_raw(self.type_hash, lifetime, *data)
                                 .expect("DynamicManagedGc cannot be mutably borrowed");
@@ -726,5 +806,34 @@ mod tests {
 
         let managed = dynamic.into_typed::<i32>();
         assert_eq!(*managed.read::<true>(), 100);
+    }
+
+    #[test]
+    fn test_gc_dead_owner() {
+        let a = ManagedGc::new(42);
+        let mut b = a.clone();
+
+        assert!(a.exists());
+        assert!(b.exists());
+        assert_eq!(*b.read::<true>(), 42);
+
+        drop(a);
+        assert!(!b.exists());
+        assert!(b.try_write().is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_gc_dead_owner_panic() {
+        let a = ManagedGc::new(42);
+        let mut b = a.clone();
+
+        assert!(a.exists());
+        assert!(b.exists());
+        assert_eq!(*b.read::<true>(), 42);
+
+        drop(a);
+        assert!(!b.exists());
+        assert_eq!(*b.write::<true>(), 42);
     }
 }
