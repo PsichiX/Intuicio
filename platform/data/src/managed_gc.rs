@@ -16,7 +16,7 @@ use std::{
 
 enum Kind {
     Owned {
-        lifetime: Lifetime,
+        lifetime: Box<Lifetime>,
         data: *mut u8,
     },
     Referenced {
@@ -48,6 +48,21 @@ impl<T> ManagedGc<T> {
     pub fn new(data: T) -> Self {
         Self {
             dynamic: DynamicManagedGc::new(data),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// # Safety
+    pub unsafe fn new_cyclic(f: impl FnOnce(Self) -> T) -> Self {
+        Self {
+            dynamic: unsafe { DynamicManagedGc::new_cyclic(|dynamic| f(dynamic.into_typed())) },
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn reference(&self) -> Self {
+        Self {
+            dynamic: self.dynamic.reference(),
             _phantom: PhantomData,
         }
     }
@@ -142,12 +157,11 @@ impl<T> ManagedGc<T> {
     }
 }
 
+#[allow(useless_deprecated)]
+#[deprecated(note = "Use ManagedGc::reference() instead")]
 impl<T> Clone for ManagedGc<T> {
     fn clone(&self) -> Self {
-        Self {
-            dynamic: self.dynamic.clone(),
-            _phantom: PhantomData,
-        }
+        self.reference()
     }
 }
 
@@ -204,6 +218,30 @@ impl DynamicManagedGc {
         }
     }
 
+    /// # Safety
+    pub unsafe fn new_cyclic<T: Finalize>(f: impl FnOnce(Self) -> T) -> Self {
+        let layout = Layout::new::<T>().pad_to_align();
+        unsafe {
+            let memory = non_zero_alloc(layout) as *mut T;
+            if memory.is_null() {
+                handle_alloc_error(layout);
+            }
+            let result = Self {
+                type_hash: TypeHash::of::<T>(),
+                kind: Kind::Owned {
+                    lifetime: Default::default(),
+                    data: memory.cast::<u8>(),
+                },
+                layout,
+                finalizer: T::finalize_raw,
+                drop: true,
+            };
+            let data = f(result.reference());
+            memory.cast::<T>().write(data);
+            result
+        }
+    }
+
     pub fn new_raw(
         type_hash: TypeHash,
         lifetime: Lifetime,
@@ -217,7 +255,7 @@ impl DynamicManagedGc {
         Self {
             type_hash,
             kind: Kind::Owned {
-                lifetime,
+                lifetime: Box::new(lifetime),
                 data: memory,
             },
             layout,
@@ -244,6 +282,31 @@ impl DynamicManagedGc {
             layout,
             finalizer,
             drop: true,
+        }
+    }
+
+    pub fn reference(&self) -> Self {
+        match &self.kind {
+            Kind::Owned { lifetime, data } => Self {
+                type_hash: self.type_hash,
+                kind: Kind::Referenced {
+                    lifetime: lifetime.lazy(),
+                    data: *data,
+                },
+                layout: self.layout,
+                finalizer: self.finalizer,
+                drop: true,
+            },
+            Kind::Referenced { lifetime, data } => Self {
+                type_hash: self.type_hash,
+                kind: Kind::Referenced {
+                    lifetime: lifetime.clone(),
+                    data: *data,
+                },
+                layout: self.layout,
+                finalizer: self.finalizer,
+                drop: true,
+            },
         }
     }
 
@@ -277,7 +340,7 @@ impl DynamicManagedGc {
 
     pub fn renew(&mut self) {
         if let Kind::Owned { lifetime, .. } = &mut self.kind {
-            *lifetime = Default::default();
+            **lifetime = Default::default();
         }
     }
 
@@ -611,30 +674,11 @@ impl DynamicManagedGc {
     }
 }
 
+#[allow(useless_deprecated)]
+#[deprecated(note = "Use DynamicManagedGc::reference() instead")]
 impl Clone for DynamicManagedGc {
     fn clone(&self) -> Self {
-        match &self.kind {
-            Kind::Owned { lifetime, data } => Self {
-                type_hash: self.type_hash,
-                kind: Kind::Referenced {
-                    lifetime: lifetime.lazy(),
-                    data: *data,
-                },
-                layout: self.layout,
-                finalizer: self.finalizer,
-                drop: true,
-            },
-            Kind::Referenced { lifetime, data } => Self {
-                type_hash: self.type_hash,
-                kind: Kind::Referenced {
-                    lifetime: lifetime.clone(),
-                    data: *data,
-                },
-                layout: self.layout,
-                finalizer: self.finalizer,
-                drop: true,
-            },
-        }
+        self.reference()
     }
 }
 
@@ -668,6 +712,47 @@ mod tests {
     }
 
     #[test]
+    #[allow(unused)]
+    fn test_managed_gc_lifetimes() {
+        struct Car {
+            gear: i32,
+            engine: Option<ManagedGc<Engine>>,
+        }
+
+        struct Engine {
+            owning_car: Option<ManagedGc<Car>>,
+            horsepower: i32,
+        }
+
+        let mut car = ManagedGc::new(Car {
+            gear: 1,
+            engine: None,
+        });
+        let engine = ManagedGc::new(Engine {
+            owning_car: Some(car.reference()),
+            horsepower: 200,
+        });
+        let engine2 = engine.reference();
+        car.write::<true>().engine = Some(engine);
+
+        assert!(car.exists());
+        assert!(car.is_owning());
+        assert!(engine2.exists());
+        assert!(engine2.is_referencing());
+        assert!(engine2.is_owned_by(car.read::<true>().engine.as_ref().unwrap()));
+
+        let car2 = car.reference();
+        assert!(car2.exists());
+        assert!(car2.is_referencing());
+
+        drop(car);
+        assert!(!car2.exists());
+        assert!(car2.try_read().is_none());
+        assert!(!engine2.exists());
+        assert!(engine2.try_read().is_none());
+    }
+
+    #[test]
     fn test_managed_gc_cycles() {
         #[derive(Default)]
         struct Foo {
@@ -677,8 +762,8 @@ mod tests {
         {
             let mut a = ManagedGc::<Foo>::default();
             let mut b = ManagedGc::<Foo>::default();
-            a.write::<true>().other = Some(b.clone());
-            b.write::<true>().other = Some(a.clone());
+            a.write::<true>().other = Some(b.reference());
+            b.write::<true>().other = Some(a.reference());
 
             assert!(a.exists());
             assert!(a.is_owning());
@@ -696,7 +781,7 @@ mod tests {
 
         {
             let mut a = ManagedGc::<Foo>::default();
-            a.write::<true>().other = Some(a.clone());
+            a.write::<true>().other = Some(a.reference());
 
             assert!(a.exists());
             assert!(a.is_owning());
@@ -732,8 +817,8 @@ mod tests {
         {
             let mut a = DynamicManagedGc::new(Foo::default());
             let mut b = DynamicManagedGc::new(Foo::default());
-            a.write::<true, Foo>().other = Some(b.clone());
-            b.write::<true, Foo>().other = Some(a.clone());
+            a.write::<true, Foo>().other = Some(b.reference());
+            b.write::<true, Foo>().other = Some(a.reference());
 
             assert!(a.exists());
             assert!(a.is_owning());
@@ -775,7 +860,7 @@ mod tests {
 
         {
             let mut a = DynamicManagedGc::new(Foo::default());
-            a.write::<true, Foo>().other = Some(a.clone());
+            a.write::<true, Foo>().other = Some(a.reference());
 
             assert!(a.exists());
             assert!(a.is_owning());
@@ -797,7 +882,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gc_conversions() {
+    fn test_managed_gc_conversions() {
         let managed = ManagedGc::new(42);
         assert_eq!(*managed.read::<true>(), 42);
 
@@ -809,9 +894,9 @@ mod tests {
     }
 
     #[test]
-    fn test_gc_dead_owner() {
+    fn test_managed_gc_dead_owner() {
         let a = ManagedGc::new(42);
-        let mut b = a.clone();
+        let mut b = a.reference();
 
         assert!(a.exists());
         assert!(b.exists());
@@ -824,9 +909,9 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_gc_dead_owner_panic() {
+    fn test_managed_gc_dead_owner_panic() {
         let a = ManagedGc::new(42);
-        let mut b = a.clone();
+        let mut b = a.reference();
 
         assert!(a.exists());
         assert!(b.exists());
@@ -835,5 +920,18 @@ mod tests {
         drop(a);
         assert!(!b.exists());
         assert_eq!(*b.write::<true>(), 42);
+    }
+
+    #[test]
+    fn test_managed_gc_cyclic() {
+        struct SelfReferencial {
+            value: i32,
+            this: ManagedGc<SelfReferencial>,
+        }
+
+        let v = unsafe { ManagedGc::new_cyclic(|this| SelfReferencial { value: 42, this }) };
+        assert_eq!(v.read::<true>().value, 42);
+        let this = v.read::<true>().this.reference();
+        assert_eq!(this.read::<true>().value, 42);
     }
 }
