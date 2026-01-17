@@ -1,18 +1,18 @@
 use intuicio_data::{
     is_copy,
     lifetime::{ValueReadAccess, ValueWriteAccess},
-    managed_box::DynamicManagedBox,
+    managed_gc::DynamicManagedGc,
     type_hash::TypeHash,
 };
 use std::{cmp::Ordering, collections::BTreeMap};
 
-const SIZE: usize = std::mem::size_of::<DynamicManagedBox>();
+const SIZE: usize = std::mem::size_of::<DynamicManagedGc>();
 
 #[derive(Default)]
 enum ValueContent {
     #[default]
     Null,
-    Object(DynamicManagedBox),
+    Gc(DynamicManagedGc),
     Primitive {
         type_hash: TypeHash,
         data: [u8; SIZE],
@@ -26,7 +26,7 @@ impl ValueContent {
     fn type_hash(&self) -> Option<TypeHash> {
         match self {
             Self::Null => None,
-            Self::Object(data) => Some(data.type_hash()),
+            Self::Gc(data) => Some(data.type_hash()),
             Self::Primitive { type_hash, .. } => Some(*type_hash),
             Self::String(_) => Some(TypeHash::of::<String>()),
             Self::Array(_) => Some(TypeHash::of::<Vec<Value>>()),
@@ -37,7 +37,7 @@ impl ValueContent {
     fn order(&self) -> u8 {
         match self {
             Self::Null => 0,
-            Self::Object(_) => 1,
+            Self::Gc(_) => 1,
             Self::Primitive { .. } => 2,
             Self::String(_) => 3,
             Self::Array(_) => 4,
@@ -50,7 +50,7 @@ impl Clone for ValueContent {
     fn clone(&self) -> Self {
         match self {
             Self::Null => Self::Null,
-            Self::Object(value) => Self::Object(value.clone()),
+            Self::Gc(value) => Self::Gc(value.reference()),
             Self::Primitive { type_hash, data } => Self::Primitive {
                 type_hash: *type_hash,
                 data: *data,
@@ -66,7 +66,7 @@ impl PartialEq for ValueContent {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Null, Self::Null) => true,
-            (Self::Object(me), Self::Object(other)) => unsafe { me.memory() == other.memory() },
+            (Self::Gc(me), Self::Gc(other)) => unsafe { me.memory() == other.memory() },
             (
                 Self::Primitive {
                     type_hash: my_type_hash,
@@ -99,9 +99,7 @@ impl Ord for ValueContent {
             .cmp(&other.order())
             .then_with(|| match (self, other) {
                 (Self::Null, Self::Null) => Ordering::Equal,
-                (Self::Object(me), Self::Object(other)) => unsafe {
-                    me.memory().cmp(other.memory())
-                },
+                (Self::Gc(me), Self::Gc(other)) => unsafe { me.memory().cmp(other.memory()) },
                 (
                     Self::Primitive {
                         type_hash: my_type_hash,
@@ -138,7 +136,7 @@ impl Value {
         }
     }
 
-    pub fn primitive_or_object<T>(value: T) -> Self {
+    pub fn primitive_or_gc<T>(value: T) -> Self {
         if is_copy::<T>() && std::mem::size_of::<T>() <= SIZE {
             let mut data = [0; SIZE];
             unsafe {
@@ -152,14 +150,14 @@ impl Value {
             }
         } else {
             Self {
-                inner: ValueContent::Object(DynamicManagedBox::new(value).ok().unwrap()),
+                inner: ValueContent::Gc(DynamicManagedGc::new(value)),
             }
         }
     }
 
-    pub fn object_raw(value: DynamicManagedBox) -> Self {
+    pub fn gc_raw(value: DynamicManagedGc) -> Self {
         Self {
-            inner: ValueContent::Object(value),
+            inner: ValueContent::Gc(value),
         }
     }
 
@@ -203,17 +201,17 @@ impl Value {
             .unwrap_or_default()
     }
 
-    pub fn as_object<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
-        if let ValueContent::Object(value) = &self.inner {
-            value.read::<T>()
+    pub fn as_gc<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
+        if let ValueContent::Gc(value) = &self.inner {
+            value.try_read::<T>()
         } else {
             None
         }
     }
 
-    pub fn as_object_mut<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
-        if let ValueContent::Object(value) = &mut self.inner {
-            value.write::<T>()
+    pub fn as_gc_mut<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
+        if let ValueContent::Gc(value) = &mut self.inner {
+            value.try_write::<T>()
         } else {
             None
         }
@@ -281,17 +279,17 @@ mod tests {
         assert_eq!(
             std::mem::size_of::<Value>(),
             if cfg!(feature = "typehash_debug_name") {
-                40
+                112
             } else {
-                32
+                80
             }
         );
-        assert_eq!(SIZE, 8);
-        let a = Value::primitive_or_object(42u8);
-        let b = Value::primitive_or_object(10u16);
-        let c = Value::primitive_or_object(4.2f32);
+        assert_eq!(SIZE, 80);
+        let a = Value::primitive_or_gc(42u8);
+        let b = Value::primitive_or_gc(10u16);
+        let c = Value::primitive_or_gc(4.2f32);
         let d = Value::array([a.clone(), b.clone(), c.clone()]);
-        let mut e = Value::primitive_or_object([42u64; 10000]);
+        let mut e = Value::primitive_or_gc([42u64; 10000]);
         let k1 = Value::string("foo");
         let k2 = Value::string("bar");
         let f = Value::map([(k1.clone(), d.clone()), (k2.clone(), e.clone())]);
@@ -299,8 +297,8 @@ mod tests {
         assert_eq!(a.as_primitive::<u8>().unwrap(), 42);
         assert_eq!(b.as_primitive::<u16>().unwrap(), 10);
         assert_eq!(c.as_primitive::<f32>().unwrap(), 4.2);
-        e.as_object_mut::<[u64; 10000]>().unwrap()[0] = 10;
-        assert_eq!(e.as_object::<[u64; 10000]>().unwrap()[0], 10);
+        e.as_gc_mut::<[u64; 10000]>().unwrap()[0] = 10;
+        assert_eq!(e.as_gc::<[u64; 10000]>().unwrap()[0], 10);
         assert!(f.as_map().unwrap()[&k1] == d);
         assert!(f.as_map().unwrap()[&k1].as_array().unwrap()[0] == a);
         assert!(f.as_map().unwrap()[&k1].as_array().unwrap()[1] == b);

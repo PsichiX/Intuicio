@@ -9,7 +9,7 @@ use intuicio_core::{
 use intuicio_data::{
     lifetime::Lifetime,
     managed::{DynamicManaged, DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut},
-    managed_box::DynamicManagedBox,
+    managed_gc::DynamicManagedGc,
 };
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
@@ -296,8 +296,8 @@ impl Default for DynamicExtensionBuilder {
                     .build(),
                 )
                 .with_type(
-                    NativeStructBuilder::new_named_uninitialized::<DynamicManagedBox>(
-                        "DynamicManagedBox",
+                    NativeStructBuilder::new_named_uninitialized::<DynamicManagedGc>(
+                        "DynamicManagedGc",
                     )
                     .build(),
                 ),
@@ -350,7 +350,7 @@ pub enum Value {
     Ref(DynamicManagedRef),
     RefMut(DynamicManagedRefMut),
     Lazy(DynamicManagedLazy),
-    Box(DynamicManagedBox),
+    Gc(DynamicManagedGc),
 }
 
 impl From<DynamicManaged> for Value {
@@ -377,9 +377,9 @@ impl From<DynamicManagedLazy> for Value {
     }
 }
 
-impl From<DynamicManagedBox> for Value {
-    fn from(value: DynamicManagedBox) -> Self {
-        Self::Box(value)
+impl From<DynamicManagedGc> for Value {
+    fn from(value: DynamicManagedGc) -> Self {
+        Self::Gc(value)
     }
 }
 
@@ -426,9 +426,9 @@ impl DynamicExtensionCall<'_> {
         self
     }
 
-    pub fn arg_box<T>(mut self, value: T) -> Self {
-        let value = DynamicManagedBox::new(value).ok().unwrap();
-        self.args.push(Value::Box(value));
+    pub fn arg_gc<T>(mut self, value: T) -> Self {
+        let value = DynamicManagedGc::new(value);
+        self.args.push(Value::Gc(value));
         self
     }
 
@@ -440,7 +440,7 @@ impl DynamicExtensionCall<'_> {
                 Value::Ref(value) => context.stack().push(value),
                 Value::RefMut(value) => context.stack().push(value),
                 Value::Lazy(value) => context.stack().push(value),
-                Value::Box(value) => context.stack().push(value),
+                Value::Gc(value) => context.stack().push(value),
             };
         }
         self.handle.invoke(context, registry);
@@ -455,7 +455,7 @@ impl DynamicExtensionCall<'_> {
                 Value::Ref(value) => context.stack().push(value),
                 Value::RefMut(value) => context.stack().push(value),
                 Value::Lazy(value) => context.stack().push(value),
-                Value::Box(value) => context.stack().push(value),
+                Value::Gc(value) => context.stack().push(value),
             };
         }
         self.handle.invoke(context, registry);

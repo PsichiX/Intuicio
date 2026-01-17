@@ -5,7 +5,7 @@ use crate::{
 };
 use intuicio_data::{
     managed::{DynamicManaged, DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut},
-    managed_box::DynamicManagedBox,
+    managed_gc::DynamicManagedGc,
 };
 use std::{
     collections::BTreeMap,
@@ -93,7 +93,7 @@ impl Registry {
             .build(),
         )
         .with_type(
-            NativeStructBuilder::new_named_uninitialized::<DynamicManagedBox>("DynamicManagedBox")
+            NativeStructBuilder::new_named_uninitialized::<DynamicManagedGc>("DynamicManagedGc")
                 .build(),
         )
         .with_type(NativeStructBuilder::new_named_uninitialized::<Object>("Object").build())

@@ -157,14 +157,6 @@ impl<T> ManagedGc<T> {
     }
 }
 
-#[allow(useless_deprecated)]
-#[deprecated(note = "Use ManagedGc::reference() instead")]
-impl<T> Clone for ManagedGc<T> {
-    fn clone(&self) -> Self {
-        self.reference()
-    }
-}
-
 pub struct DynamicManagedGc {
     type_hash: TypeHash,
     kind: Kind,
@@ -353,6 +345,32 @@ impl DynamicManagedGc {
             Kind::Owned { lifetime, .. } => ManagedGcLifetime::Owned(lifetime),
             Kind::Referenced { lifetime, .. } => ManagedGcLifetime::Referenced(lifetime),
         }
+    }
+
+    pub fn layout(&self) -> &Layout {
+        &self.layout
+    }
+
+    pub fn finalizer(&self) -> unsafe fn(*mut ()) {
+        self.finalizer
+    }
+
+    /// # Safety
+    pub unsafe fn memory(&self) -> &[u8] {
+        let memory = match &self.kind {
+            Kind::Owned { data, .. } => *data,
+            Kind::Referenced { data, .. } => *data,
+        };
+        unsafe { std::slice::from_raw_parts(memory, self.layout.size()) }
+    }
+
+    /// # Safety
+    pub unsafe fn memory_mut(&mut self) -> &mut [u8] {
+        let memory = match &mut self.kind {
+            Kind::Owned { data, .. } => *data,
+            Kind::Referenced { data, .. } => *data,
+        };
+        unsafe { std::slice::from_raw_parts_mut(memory, self.layout.size()) }
     }
 
     pub fn exists(&self) -> bool {
@@ -671,14 +689,6 @@ impl DynamicManagedGc {
             Kind::Owned { data, .. } => *data,
             Kind::Referenced { data, .. } => *data,
         }
-    }
-}
-
-#[allow(useless_deprecated)]
-#[deprecated(note = "Use DynamicManagedGc::reference() instead")]
-impl Clone for DynamicManagedGc {
-    fn clone(&self) -> Self {
-        self.reference()
     }
 }
 

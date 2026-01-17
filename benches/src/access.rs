@@ -1,5 +1,5 @@
 use crate::{Benchmark, COMPARISON_FORMAT, DURATION, black_box};
-use intuicio_data::{managed::Managed, managed_box::ManagedBox};
+use intuicio_data::{managed::Managed, managed_gc::ManagedGc};
 use std::time::Duration;
 
 pub fn bench() {
@@ -35,16 +35,16 @@ pub fn bench() {
         )
     };
 
-    // managed box
-    let managed_box_access_result = {
+    // managed gc
+    let managed_gc_access_result = {
         println!();
-        let _ = ManagedBox::new(true);
+        let _ = ManagedGc::new(true);
         Benchmark::TimeDuration(Duration::from_secs(DURATION)).run(
-            "managed box access",
-            || ManagedBox::new(black_box(42u128)),
+            "managed gc access",
+            || ManagedGc::new(black_box(42u128)),
             |mut data| {
-                let value = *data.read().unwrap();
-                *data.write().unwrap() = value + 42;
+                let value = *data.try_read().unwrap();
+                *data.try_write().unwrap() = value + 42;
                 data
             },
             |_| {},
@@ -59,10 +59,10 @@ pub fn bench() {
     managed_access_result.print_comparison(&native_access_result, COMPARISON_FORMAT);
 
     println!();
-    println!("ManagedBox vs Native:");
-    managed_box_access_result.print_comparison(&native_access_result, COMPARISON_FORMAT);
+    println!("ManagedGc vs Native:");
+    managed_gc_access_result.print_comparison(&native_access_result, COMPARISON_FORMAT);
 
     println!();
-    println!("ManagedBox vs Managed:");
-    managed_box_access_result.print_comparison(&managed_access_result, COMPARISON_FORMAT);
+    println!("ManagedGc vs Managed:");
+    managed_gc_access_result.print_comparison(&managed_access_result, COMPARISON_FORMAT);
 }

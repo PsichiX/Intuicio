@@ -1,5 +1,5 @@
 use crate::registry::Registry;
-use intuicio_data::{lifetime::*, managed::*, managed_box::*, shared::*};
+use intuicio_data::{lifetime::*, managed::*, managed_gc::*, shared::*};
 use std::{
     cell::{Ref, RefMut},
     marker::PhantomData,
@@ -141,9 +141,9 @@ impl<T> ValueTransformer for ManagedValueTransformer<T> {
     }
 }
 
-pub struct ManagedBoxValueTransformer<T: Clone>(PhantomData<fn() -> T>);
+pub struct ManagedGcValueTransformer<T>(PhantomData<fn() -> T>);
 
-impl<T: Clone> ValueTransformer for ManagedBoxValueTransformer<T> {
+impl<T> ValueTransformer for ManagedGcValueTransformer<T> {
     type Type = T;
     type Borrow<'r>
         = ValueReadAccess<'r, T>
@@ -154,12 +154,12 @@ impl<T: Clone> ValueTransformer for ManagedBoxValueTransformer<T> {
     where
         Self::Type: 'r;
     type Dependency = ManagedValueDependency;
-    type Owned = ManagedBox<T>;
+    type Owned = ManagedGc<T>;
     type Ref = ManagedRef<T>;
     type RefMut = ManagedRefMut<T>;
 
     fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
-        ManagedBox::new(value)
+        ManagedGc::new(value)
     }
 
     fn from_ref(
@@ -191,7 +191,7 @@ impl<T: Clone> ValueTransformer for ManagedBoxValueTransformer<T> {
     }
 
     fn into_owned(value: Self::Owned) -> Self::Type {
-        value.read().unwrap().clone()
+        value.consume().ok().unwrap()
     }
 
     fn into_ref(value: &Self::Ref) -> Self::Borrow<'_> {
@@ -265,9 +265,9 @@ impl<T: 'static> ValueTransformer for DynamicManagedValueTransformer<T> {
     }
 }
 
-pub struct DynamicManagedBoxValueTransformer<T: Clone + 'static>(PhantomData<fn() -> T>);
+pub struct DynamicManagedGcValueTransformer<T: 'static>(PhantomData<fn() -> T>);
 
-impl<T: Clone + 'static> ValueTransformer for DynamicManagedBoxValueTransformer<T> {
+impl<T: 'static> ValueTransformer for DynamicManagedGcValueTransformer<T> {
     type Type = T;
     type Borrow<'r>
         = ValueReadAccess<'r, T>
@@ -278,12 +278,12 @@ impl<T: Clone + 'static> ValueTransformer for DynamicManagedBoxValueTransformer<
     where
         Self::Type: 'r;
     type Dependency = ManagedValueDependency;
-    type Owned = DynamicManagedBox;
+    type Owned = DynamicManagedGc;
     type Ref = DynamicManagedRef;
     type RefMut = DynamicManagedRefMut;
 
     fn from_owned(_: &Registry, value: Self::Type) -> Self::Owned {
-        DynamicManagedBox::new(value).ok().unwrap()
+        DynamicManagedGc::new(value)
     }
 
     fn from_ref(
@@ -315,15 +315,15 @@ impl<T: Clone + 'static> ValueTransformer for DynamicManagedBoxValueTransformer<
     }
 
     fn into_owned(value: Self::Owned) -> Self::Type {
-        value.read::<T>().unwrap().clone()
+        value.consume().ok().unwrap()
     }
 
     fn into_ref(value: &Self::Ref) -> Self::Borrow<'_> {
-        value.read::<T>().unwrap()
+        value.read().unwrap()
     }
 
     fn into_ref_mut(value: &mut Self::RefMut) -> Self::BorrowMut<'_> {
-        value.write::<T>().unwrap()
+        value.write().unwrap()
     }
 }
 
@@ -408,12 +408,12 @@ mod tests {
         *a - *b
     }
 
-    #[intuicio_function(transformer = "ManagedBoxValueTransformer")]
+    #[intuicio_function(transformer = "ManagedGcValueTransformer")]
     fn mul(a: &i32, b: &mut i32) -> i32 {
         *a * *b
     }
 
-    #[intuicio_function(transformer = "DynamicManagedBoxValueTransformer")]
+    #[intuicio_function(transformer = "DynamicManagedGcValueTransformer")]
     fn div(a: &i32, b: &mut i32) -> i32 {
         *a / *b
     }
@@ -494,10 +494,10 @@ mod tests {
             [uninitialized]
         });
         registry.add_type(define_native_struct! {
-            registry => struct (ManagedBox<i32>) {}
+            registry => struct (ManagedGc<i32>) {}
         });
         registry.add_type(define_native_struct! {
-            registry => struct (DynamicManagedBox) {}
+            registry => struct (DynamicManagedGc) {}
             [uninitialized]
         });
         registry.add_type(Foo::define_struct(&registry));
@@ -568,59 +568,59 @@ mod tests {
         );
         assert_eq!(sub(&40, &mut 2), 38);
 
-        let a = ManagedBox::new(40);
-        let mut b = ManagedBox::new(2);
-        context.stack().push(b.borrow_mut().unwrap());
-        context.stack().push(a.borrow().unwrap());
+        let a = ManagedGc::new(40);
+        let mut b = ManagedGc::new(2);
+        context.stack().push(b.borrow_mut::<false>());
+        context.stack().push(a.borrow::<false>());
         mul::intuicio_function(&mut context, &registry);
         assert_eq!(
             *context
                 .stack()
-                .pop::<ManagedBox<i32>>()
+                .pop::<ManagedGc<i32>>()
                 .unwrap()
-                .read()
+                .try_read()
                 .unwrap(),
             80
         );
         assert_eq!(
             *mul::define_function(&registry)
-                .call::<(ManagedBox<i32>,), _>(
+                .call::<(ManagedGc<i32>,), _>(
                     &mut context,
                     &registry,
-                    (a.borrow().unwrap(), b.borrow_mut().unwrap()),
+                    (a.borrow::<false>(), b.borrow_mut::<false>()),
                     true
                 )
                 .0
-                .read()
+                .try_read()
                 .unwrap(),
             80
         );
         assert_eq!(mul(&40, &mut 2), 80);
 
-        let a = DynamicManagedBox::new(40).ok().unwrap();
-        let mut b = DynamicManagedBox::new(2).ok().unwrap();
-        context.stack().push(b.borrow_mut().unwrap());
-        context.stack().push(a.borrow().unwrap());
+        let a = DynamicManagedGc::new(40);
+        let mut b = DynamicManagedGc::new(2);
+        context.stack().push(b.borrow_mut::<false>());
+        context.stack().push(a.borrow::<false>());
         div::intuicio_function(&mut context, &registry);
         assert_eq!(
             *context
                 .stack()
-                .pop::<DynamicManagedBox>()
+                .pop::<DynamicManagedGc>()
                 .unwrap()
-                .read::<i32>()
+                .try_read::<i32>()
                 .unwrap(),
             20
         );
         assert_eq!(
             *div::define_function(&registry)
-                .call::<(DynamicManagedBox,), _>(
+                .call::<(DynamicManagedGc,), _>(
                     &mut context,
                     &registry,
-                    (a.borrow().unwrap(), b.borrow_mut().unwrap()),
+                    (a.borrow::<false>(), b.borrow_mut::<false>()),
                     true
                 )
                 .0
-                .read::<i32>()
+                .try_read::<i32>()
                 .unwrap(),
             20
         );

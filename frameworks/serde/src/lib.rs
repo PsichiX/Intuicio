@@ -6,7 +6,7 @@ use intuicio_core::{
     },
 };
 use intuicio_data::{
-    Finalize, managed::DynamicManaged, managed_box::DynamicManagedBox, type_hash::TypeHash,
+    Finalize, managed::DynamicManaged, managed_gc::DynamicManagedGc, type_hash::TypeHash,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, error::Error};
@@ -499,7 +499,7 @@ impl SerializationRegistry {
                 )
             },
         );
-        self.register::<DynamicManagedBox>(
+        self.register::<DynamicManagedGc>(
             |data, serializer, registry| unsafe {
                 let type_hash = data.type_hash();
                 let ptr = data.as_ptr_raw();
@@ -508,7 +508,7 @@ impl SerializationRegistry {
                     ..Default::default()
                 }) else {
                     return Err(format!(
-                        "Type of DynamicManagedBox object not found. Hash: {type_hash}"
+                        "Type of DynamicManagedGc object not found. Hash: {type_hash}"
                     )
                     .into());
                 };
@@ -572,10 +572,10 @@ impl SerializationRegistry {
                     .into());
                 };
                 if initialized {
-                    DynamicManagedBox::finalize_raw(data as *mut DynamicManagedBox as *mut ());
+                    DynamicManagedGc::finalize_raw(data as *mut DynamicManagedGc as *mut ());
                 }
-                (data as *mut DynamicManagedBox).write_unaligned(
-                    DynamicManagedBox::new_uninitialized(
+                (data as *mut DynamicManagedGc).write_unaligned(
+                    DynamicManagedGc::new_uninitialized(
                         type_handle.type_hash(),
                         *type_handle.layout(),
                         type_handle.finalizer(),

@@ -1,7 +1,7 @@
 use intuicio_core::{
     IntuicioStruct, context::Context, registry::Registry, types::struct_type::NativeStructBuilder,
 };
-use intuicio_data::managed_box::ManagedBox;
+use intuicio_data::managed_gc::ManagedGc;
 use intuicio_derive::*;
 use intuicio_framework_text::{Name, Text, name, text};
 use std::collections::HashMap;
@@ -16,8 +16,8 @@ struct Loc {
 #[intuicio_methods(module_name = "test")]
 impl Loc {
     #[intuicio_method()]
-    pub fn get(this: ManagedBox<Self>, key: Name) -> Text {
-        this.read()
+    pub fn get(this: ManagedGc<Self>, key: Name) -> Text {
+        this.try_read()
             .unwrap()
             .map
             .get(&key)
@@ -26,8 +26,8 @@ impl Loc {
     }
 
     #[intuicio_method()]
-    pub fn set(mut this: ManagedBox<Self>, key: Name, value: Text) {
-        this.write().unwrap().map.insert(key, value);
+    pub fn set(mut this: ManagedGc<Self>, key: Name, value: Text) {
+        this.try_write().unwrap().map.insert(key, value);
     }
 }
 
@@ -38,7 +38,7 @@ fn test_text() {
 
     registry.add_type(Name::define_struct(&registry));
     registry.add_type(Text::define_struct(&registry));
-    registry.add_type(NativeStructBuilder::new::<ManagedBox<Loc>>().build());
+    registry.add_type(NativeStructBuilder::new::<ManagedGc<Loc>>().build());
     registry.add_type(Loc::define_struct(&registry));
     let get = registry.add_function(Loc::get__define_function(&registry));
     let set = registry.add_function(Loc::set__define_function(&registry));
@@ -48,16 +48,16 @@ fn test_text() {
     let foo_text = text!("Foo");
     let bar_text = text!("Bar");
 
-    let loc = ManagedBox::<Loc>::default();
-    Loc::set(loc.clone(), foo_name, foo_text.clone());
+    let loc = ManagedGc::<Loc>::default();
+    Loc::set(loc.reference(), foo_name, foo_text.clone());
 
-    let (v,) = get.call::<(Text,), _>(&mut context, &registry, (loc.clone(), foo_name), false);
+    let (v,) = get.call::<(Text,), _>(&mut context, &registry, (loc.reference(), foo_name), false);
     assert_eq!(v, foo_text);
 
     set.call::<(), _>(
         &mut context,
         &registry,
-        (loc.clone(), bar_name, bar_text.clone()),
+        (loc.reference(), bar_name, bar_text.clone()),
         false,
     );
     assert_eq!(Loc::get(loc, bar_name), bar_text);
