@@ -33,6 +33,10 @@ impl LifetimeState {
             && self.inner.readers.load(Ordering::Acquire) == 0
     }
 
+    pub fn readers_count(&self) -> usize {
+        self.inner.readers.load(Ordering::Acquire)
+    }
+
     pub fn writer_depth(&self) -> usize {
         self.inner.writer.load(Ordering::Acquire)
     }
@@ -569,6 +573,10 @@ impl LifetimeRef {
         }
     }
 
+    pub fn lazy(&self) -> LifetimeLazy {
+        LifetimeLazy(self.0.clone())
+    }
+
     pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
@@ -838,6 +846,10 @@ impl LifetimeRefMut {
             })
             .await;
         }
+    }
+
+    pub fn lazy(&self) -> LifetimeLazy {
+        LifetimeLazy(self.0.clone())
     }
 
     pub fn read<'a, T: ?Sized>(&'a self, data: &'a T) -> Option<ValueReadAccess<'a, T>> {

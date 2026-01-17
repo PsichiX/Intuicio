@@ -2,6 +2,7 @@ pub mod data_stack;
 pub mod lifetime;
 pub mod managed;
 pub mod managed_box;
+pub mod managed_gc;
 pub mod shared;
 pub mod type_hash;
 
