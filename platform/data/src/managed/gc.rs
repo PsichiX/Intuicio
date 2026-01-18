@@ -4,6 +4,7 @@ use crate::{
     managed::{
         DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut, ManagedLazy, ManagedRef,
         ManagedRefMut,
+        value::{DynamicManagedValue, ManagedValue},
     },
     non_zero_alloc, non_zero_dealloc,
     type_hash::TypeHash,
@@ -106,6 +107,10 @@ impl<T> ManagedGc<T> {
         self.dynamic.is_owned_by(&other.dynamic)
     }
 
+    pub fn transfer_ownership(&mut self, new_owner: &mut Self) -> bool {
+        self.dynamic.transfer_ownership(&mut new_owner.dynamic)
+    }
+
     pub fn try_read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         self.dynamic.try_read::<T>()
     }
@@ -120,6 +125,14 @@ impl<T> ManagedGc<T> {
 
     pub fn write<const LOCKING: bool>(&'_ mut self) -> ValueWriteAccess<'_, T> {
         self.dynamic.write::<LOCKING, T>()
+    }
+
+    pub fn try_borrow(&self) -> Option<ManagedRef<T>> {
+        self.dynamic.try_borrow()?.into_typed().ok()
+    }
+
+    pub fn try_borrow_mut(&self) -> Option<ManagedRefMut<T>> {
+        self.dynamic.try_borrow_mut()?.into_typed().ok()
     }
 
     pub fn borrow<const LOCKING: bool>(&self) -> ManagedRef<T> {
@@ -154,6 +167,17 @@ impl<T> ManagedGc<T> {
     /// # Safety
     pub unsafe fn as_mut_ptr(&mut self) -> *mut T {
         unsafe { self.dynamic.as_mut_ptr_raw().cast::<T>() }
+    }
+}
+
+impl<T> TryFrom<ManagedValue<T>> for ManagedGc<T> {
+    type Error = ();
+
+    fn try_from(value: ManagedValue<T>) -> Result<Self, Self::Error> {
+        match value {
+            ManagedValue::Gc(value) => Ok(value),
+            _ => Err(()),
+        }
     }
 }
 
@@ -389,10 +413,39 @@ impl DynamicManagedGc {
     }
 
     pub fn is_owned_by(&self, other: &Self) -> bool {
-        if let (Kind::Referenced { lifetime: l1, .. }, Kind::Owned { lifetime: l2, .. }) =
-            (&self.kind, &other.kind)
+        if let (
+            Kind::Referenced {
+                lifetime: l1,
+                data: d1,
+            },
+            Kind::Owned {
+                lifetime: l2,
+                data: d2,
+            },
+        ) = (&self.kind, &other.kind)
         {
-            l1.state().is_owned_by(l2.state())
+            *d1 == *d2 && l1.state().is_owned_by(l2.state())
+        } else {
+            false
+        }
+    }
+
+    pub fn transfer_ownership(&mut self, new_owner: &mut Self) -> bool {
+        if let (
+            Kind::Owned {
+                lifetime: l1,
+                data: d1,
+            },
+            Kind::Referenced {
+                lifetime: l2,
+                data: d2,
+            },
+        ) = (&mut self.kind, &new_owner.kind)
+            && *d1 == *d2
+            && l2.state().is_owned_by(l1.state())
+        {
+            std::mem::swap(&mut self.kind, &mut new_owner.kind);
+            true
         } else {
             false
         }
@@ -570,6 +623,32 @@ impl DynamicManagedGc {
         }
     }
 
+    pub fn try_borrow(&self) -> Option<DynamicManagedRef> {
+        unsafe {
+            match &self.kind {
+                Kind::Owned { lifetime, data } => {
+                    DynamicManagedRef::new_raw(self.type_hash, lifetime.borrow()?, *data)
+                }
+                Kind::Referenced { lifetime, data } => {
+                    DynamicManagedRef::new_raw(self.type_hash, lifetime.borrow()?, *data)
+                }
+            }
+        }
+    }
+
+    pub fn try_borrow_mut(&self) -> Option<DynamicManagedRefMut> {
+        unsafe {
+            match &self.kind {
+                Kind::Owned { lifetime, data } => {
+                    DynamicManagedRefMut::new_raw(self.type_hash, lifetime.borrow_mut()?, *data)
+                }
+                Kind::Referenced { lifetime, data } => {
+                    DynamicManagedRefMut::new_raw(self.type_hash, lifetime.borrow_mut()?, *data)
+                }
+            }
+        }
+    }
+
     pub fn borrow<const LOCKING: bool>(&self) -> DynamicManagedRef {
         unsafe {
             if LOCKING {
@@ -688,6 +767,17 @@ impl DynamicManagedGc {
         match &self.kind {
             Kind::Owned { data, .. } => *data,
             Kind::Referenced { data, .. } => *data,
+        }
+    }
+}
+
+impl TryFrom<DynamicManagedValue> for DynamicManagedGc {
+    type Error = ();
+
+    fn try_from(value: DynamicManagedValue) -> Result<Self, Self::Error> {
+        match value {
+            DynamicManagedValue::Gc(value) => Ok(value),
+            _ => Err(()),
         }
     }
 }
@@ -943,5 +1033,20 @@ mod tests {
         assert_eq!(v.read::<true>().value, 42);
         let this = v.read::<true>().this.reference();
         assert_eq!(this.read::<true>().value, 42);
+    }
+
+    #[test]
+    fn test_managed_gc_transfer_ownership() {
+        let mut a = ManagedGc::new(42);
+        let mut b = a.reference();
+
+        assert!(!a.is_owned_by(&b));
+        assert!(b.is_owned_by(&a));
+        assert!(!b.transfer_ownership(&mut a));
+        assert!(a.transfer_ownership(&mut b));
+        assert!(a.is_owned_by(&b));
+        assert!(!b.is_owned_by(&a));
+        drop(b);
+        assert!(!a.exists());
     }
 }

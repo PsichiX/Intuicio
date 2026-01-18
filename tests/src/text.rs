@@ -1,7 +1,7 @@
 use intuicio_core::{
     IntuicioStruct, context::Context, registry::Registry, types::struct_type::NativeStructBuilder,
 };
-use intuicio_data::managed_gc::ManagedGc;
+use intuicio_data::managed::gc::ManagedGc;
 use intuicio_derive::*;
 use intuicio_framework_text::{Name, Text, name, text};
 use std::collections::HashMap;

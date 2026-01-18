@@ -1,5 +1,5 @@
 use crate::{Benchmark, COMPARISON_FORMAT, DURATION, black_box};
-use intuicio_data::{managed::Managed, managed_gc::ManagedGc};
+use intuicio_data::managed::{Managed, gc::ManagedGc};
 use std::time::Duration;
 
 pub fn bench() {

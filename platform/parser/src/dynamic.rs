@@ -8,8 +8,10 @@ use intuicio_core::{
 };
 use intuicio_data::{
     lifetime::Lifetime,
-    managed::{DynamicManaged, DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut},
-    managed_gc::DynamicManagedGc,
+    managed::{
+        DynamicManaged, DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut,
+        gc::DynamicManagedGc,
+    },
 };
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 

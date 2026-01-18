@@ -1,7 +1,7 @@
 use intuicio_data::{
     is_copy,
     lifetime::{ValueReadAccess, ValueWriteAccess},
-    managed_gc::DynamicManagedGc,
+    managed::gc::DynamicManagedGc,
     type_hash::TypeHash,
 };
 use std::{cmp::Ordering, collections::BTreeMap};

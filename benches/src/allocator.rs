@@ -1,8 +1,7 @@
 use crate::{Benchmark, COMPARISON_FORMAT, DURATION, black_box};
 use intuicio_data::{
     data_stack::{DataStack, DataStackMode},
-    managed::Managed,
-    managed_gc::ManagedGc,
+    managed::{Managed, gc::ManagedGc},
 };
 use std::time::Duration;
 

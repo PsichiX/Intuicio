@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-framework-arena"
-version = "0.50.0"
+version = "0.51.0"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Arena allocator framework module for Intuicio scripting platform"
@@ -14,5 +14,5 @@ readme = "../../README.md"
 typehash_debug_name = ["intuicio-data/typehash_debug_name"]
 
 [dependencies]
-intuicio-data = { version = "0.50", path = "../../platform/data" }
+intuicio-data = { version = "0.51", path = "../../platform/data" }
 serde = { version = "1", features = ["derive"] }

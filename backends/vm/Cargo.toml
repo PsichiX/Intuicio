@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-backend-vm"
-version = "0.50.0"
+version = "0.51.0"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "VM backend module for Intuicio scripting platform"
@@ -14,7 +14,7 @@ readme = "../../README.md"
 typehash_debug_name = ["intuicio-data/typehash_debug_name"]
 
 [dependencies]
-intuicio-data = { version = "0.50", path = "../../platform/data" }
-intuicio-core = { version = "0.50", path = "../../platform/core" }
+intuicio-data = { version = "0.51", path = "../../platform/data" }
+intuicio-core = { version = "0.51", path = "../../platform/core" }
 serde = { version = "1", features = ["derive", "rc"] }
 typid = "1"

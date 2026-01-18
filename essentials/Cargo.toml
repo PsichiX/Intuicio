@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-essentials"
-version = "0.50.0"
+version = "0.51.0"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Essentials module for Intuicio scripting platform"
@@ -17,8 +17,8 @@ vm = ["intuicio-backend-vm"]
 typehash_debug_name = ["intuicio-data/typehash_debug_name"]
 
 [dependencies]
-intuicio-data = { version = "0.50", path = "../platform/data" }
-intuicio-core = { version = "0.50", path = "../platform/core" }
-intuicio-derive = { version = "0.50", path = "../platform/derive" }
-intuicio-plugins = { version = "0.50", path = "../platform/plugins", optional = true }
-intuicio-backend-vm = { version = "0.50", path = "../backends/vm", optional = true }
+intuicio-data = { version = "0.51", path = "../platform/data" }
+intuicio-core = { version = "0.51", path = "../platform/core" }
+intuicio-derive = { version = "0.51", path = "../platform/derive" }
+intuicio-plugins = { version = "0.51", path = "../platform/plugins", optional = true }
+intuicio-backend-vm = { version = "0.51", path = "../backends/vm", optional = true }

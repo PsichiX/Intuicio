@@ -6,7 +6,9 @@ use intuicio_core::{
     },
 };
 use intuicio_data::{
-    Finalize, managed::DynamicManaged, managed_gc::DynamicManagedGc, type_hash::TypeHash,
+    Finalize,
+    managed::{DynamicManaged, gc::DynamicManagedGc},
+    type_hash::TypeHash,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, error::Error};

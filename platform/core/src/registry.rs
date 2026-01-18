@@ -3,9 +3,9 @@ use crate::{
     object::Object,
     types::{Type, TypeHandle, TypeQuery, struct_type::NativeStructBuilder},
 };
-use intuicio_data::{
-    managed::{DynamicManaged, DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut},
-    managed_gc::DynamicManagedGc,
+use intuicio_data::managed::{
+    DynamicManaged, DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut,
+    gc::DynamicManagedGc,
 };
 use std::{
     collections::BTreeMap,

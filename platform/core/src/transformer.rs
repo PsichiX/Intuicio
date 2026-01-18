@@ -1,5 +1,9 @@
 use crate::registry::Registry;
-use intuicio_data::{lifetime::*, managed::*, managed_gc::*, shared::*};
+use intuicio_data::{
+    lifetime::*,
+    managed::{gc::*, *},
+    shared::*,
+};
 use std::{
     cell::{Ref, RefMut},
     marker::PhantomData,

@@ -1,8 +1,12 @@
+pub mod gc;
+pub mod value;
+
 use crate::{
     Finalize,
     lifetime::{
         Lifetime, LifetimeLazy, LifetimeRef, LifetimeRefMut, ValueReadAccess, ValueWriteAccess,
     },
+    managed::value::{DynamicManagedValue, ManagedValue},
     non_zero_alloc, non_zero_dealloc,
     type_hash::TypeHash,
 };
@@ -30,8 +34,14 @@ impl<T> Managed<T> {
         (self.lifetime, self.data)
     }
 
-    pub fn into_dynamic(self) -> Option<DynamicManaged> {
-        DynamicManaged::new(self.data).ok()
+    pub fn into_dynamic(self) -> Result<DynamicManaged, Self> {
+        match DynamicManaged::new(self.data) {
+            Ok(value) => Ok(value),
+            Err(data) => Err(Managed {
+                lifetime: self.lifetime,
+                data,
+            }),
+        }
     }
 
     pub fn renew(mut self) -> Self {
@@ -47,16 +57,8 @@ impl<T> Managed<T> {
         self.lifetime.read(&self.data)
     }
 
-    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
-        self.lifetime.read_async(&self.data).await
-    }
-
     pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         self.lifetime.write(&mut self.data)
-    }
-
-    pub async fn write_async(&'_ mut self) -> ValueWriteAccess<'_, T> {
-        self.lifetime.write_async(&mut self.data).await
     }
 
     pub fn consume(self) -> Result<T, Self> {
@@ -81,19 +83,11 @@ impl<T> Managed<T> {
         Some(ManagedRef::new(&self.data, self.lifetime.borrow()?))
     }
 
-    pub async fn borrow_async(&self) -> ManagedRef<T> {
-        ManagedRef::new(&self.data, self.lifetime.borrow_async().await)
-    }
-
     pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
         Some(ManagedRefMut::new(
             &mut self.data,
             self.lifetime.borrow_mut()?,
         ))
-    }
-
-    pub async fn borrow_mut_async(&mut self) -> ManagedRefMut<T> {
-        ManagedRefMut::new(&mut self.data, self.lifetime.borrow_mut_async().await)
     }
 
     pub fn lazy(&mut self) -> ManagedLazy<T> {
@@ -131,17 +125,6 @@ impl<T> Managed<T> {
     /// # Safety
     pub unsafe fn as_mut_ptr(&mut self) -> *mut T {
         &mut self.data as _
-    }
-}
-
-impl<T> TryFrom<ManagedValue<T>> for Managed<T> {
-    type Error = ();
-
-    fn try_from(value: ManagedValue<T>) -> Result<Self, Self::Error> {
-        match value {
-            ManagedValue::Owned(value) => Ok(value),
-            _ => Err(()),
-        }
     }
 }
 
@@ -206,13 +189,6 @@ impl<T: ?Sized> ManagedRef<T> {
         })
     }
 
-    pub async fn borrow_async(&self) -> ManagedRef<T> {
-        ManagedRef {
-            lifetime: self.lifetime.borrow_async().await,
-            data: self.data,
-        }
-    }
-
     /// # Safety
     pub unsafe fn lazy_immutable(&self) -> ManagedLazy<T> {
         ManagedLazy {
@@ -223,10 +199,6 @@ impl<T: ?Sized> ManagedRef<T> {
 
     pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         unsafe { self.lifetime.read_ptr(self.data) }
-    }
-
-    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
-        unsafe { self.lifetime.read_ptr_async(self.data).await }
     }
 
     /// # Safety
@@ -332,25 +304,11 @@ impl<T: ?Sized> ManagedRefMut<T> {
         })
     }
 
-    pub async fn borrow_async(&self) -> ManagedRef<T> {
-        ManagedRef {
-            lifetime: self.lifetime.borrow_async().await,
-            data: self.data,
-        }
-    }
-
     pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
         Some(ManagedRefMut {
             lifetime: self.lifetime.borrow_mut()?,
             data: self.data,
         })
-    }
-
-    pub async fn borrow_mut_async(&mut self) -> ManagedRefMut<T> {
-        ManagedRefMut {
-            lifetime: self.lifetime.borrow_mut_async().await,
-            data: self.data,
-        }
     }
 
     pub fn lazy(&self) -> ManagedLazy<T> {
@@ -364,16 +322,8 @@ impl<T: ?Sized> ManagedRefMut<T> {
         unsafe { self.lifetime.read_ptr(self.data) }
     }
 
-    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
-        unsafe { self.lifetime.read_ptr_async(self.data).await }
-    }
-
     pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         unsafe { self.lifetime.write_ptr(self.data) }
-    }
-
-    pub async fn write_async(&'_ mut self) -> ValueWriteAccess<'_, T> {
-        unsafe { self.lifetime.write_ptr_async(self.data).await }
     }
 
     /// # Safety
@@ -497,13 +447,6 @@ impl<T: ?Sized> ManagedLazy<T> {
         })
     }
 
-    pub async fn borrow_async(&self) -> ManagedRef<T> {
-        ManagedRef {
-            lifetime: self.lifetime.borrow_async().await,
-            data: self.data,
-        }
-    }
-
     pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
         Some(ManagedRefMut {
             lifetime: self.lifetime.borrow_mut()?,
@@ -511,27 +454,12 @@ impl<T: ?Sized> ManagedLazy<T> {
         })
     }
 
-    pub async fn borrow_mut_async(&mut self) -> ManagedRefMut<T> {
-        ManagedRefMut {
-            lifetime: self.lifetime.borrow_mut_async().await,
-            data: self.data,
-        }
-    }
-
     pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         unsafe { self.lifetime.read_ptr(self.data) }
     }
 
-    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
-        unsafe { self.lifetime.read_ptr_async(self.data).await }
-    }
-
     pub fn write(&'_ self) -> Option<ValueWriteAccess<'_, T>> {
         unsafe { self.lifetime.write_ptr(self.data) }
-    }
-
-    pub async fn write_async(&'_ self) -> ValueWriteAccess<'_, T> {
-        unsafe { self.lifetime.write_ptr_async(self.data).await }
     }
 
     /// # Safety
@@ -585,186 +513,6 @@ impl<T> TryFrom<ManagedValue<T>> for ManagedLazy<T> {
             ManagedValue::Lazy(value) => Ok(value),
             _ => Err(()),
         }
-    }
-}
-
-pub enum ManagedValue<T> {
-    Owned(Managed<T>),
-    Ref(ManagedRef<T>),
-    RefMut(ManagedRefMut<T>),
-    Lazy(ManagedLazy<T>),
-}
-
-impl<T> ManagedValue<T> {
-    pub fn as_owned(&self) -> Option<&Managed<T>> {
-        match self {
-            Self::Owned(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_mut_owned(&mut self) -> Option<&mut Managed<T>> {
-        match self {
-            Self::Owned(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_ref(&self) -> Option<&ManagedRef<T>> {
-        match self {
-            Self::Ref(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_mut_ref(&mut self) -> Option<&mut ManagedRef<T>> {
-        match self {
-            Self::Ref(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_ref_mut(&self) -> Option<&ManagedRefMut<T>> {
-        match self {
-            Self::RefMut(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_mut_ref_mut(&mut self) -> Option<&mut ManagedRefMut<T>> {
-        match self {
-            Self::RefMut(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_lazy(&self) -> Option<&ManagedLazy<T>> {
-        match self {
-            Self::Lazy(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_mut_lazy(&mut self) -> Option<&mut ManagedLazy<T>> {
-        match self {
-            Self::Lazy(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
-        match self {
-            Self::Owned(value) => value.read(),
-            Self::Ref(value) => value.read(),
-            Self::RefMut(value) => value.read(),
-            Self::Lazy(value) => value.read(),
-        }
-    }
-
-    pub async fn read_async(&'_ self) -> ValueReadAccess<'_, T> {
-        match self {
-            Self::Owned(value) => value.read_async().await,
-            Self::Ref(value) => value.read_async().await,
-            Self::RefMut(value) => value.read_async().await,
-            Self::Lazy(value) => value.read_async().await,
-        }
-    }
-
-    pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
-        match self {
-            Self::Owned(value) => value.write(),
-            Self::RefMut(value) => value.write(),
-            Self::Lazy(value) => value.write(),
-            _ => None,
-        }
-    }
-
-    pub async fn write_async(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
-        match self {
-            Self::Owned(value) => Some(value.write_async().await),
-            Self::RefMut(value) => Some(value.write_async().await),
-            Self::Lazy(value) => Some(value.write_async().await),
-            _ => None,
-        }
-    }
-
-    pub fn borrow(&self) -> Option<ManagedRef<T>> {
-        match self {
-            Self::Owned(value) => value.borrow(),
-            Self::Ref(value) => value.borrow(),
-            Self::RefMut(value) => value.borrow(),
-            _ => None,
-        }
-    }
-
-    pub async fn borrow_async(&self) -> Option<ManagedRef<T>> {
-        match self {
-            Self::Owned(value) => Some(value.borrow_async().await),
-            Self::Ref(value) => Some(value.borrow_async().await),
-            Self::RefMut(value) => Some(value.borrow_async().await),
-            _ => None,
-        }
-    }
-
-    pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
-        match self {
-            Self::Owned(value) => value.borrow_mut(),
-            Self::RefMut(value) => value.borrow_mut(),
-            _ => None,
-        }
-    }
-
-    pub async fn borrow_mut_async(&mut self) -> Option<ManagedRefMut<T>> {
-        match self {
-            Self::Owned(value) => Some(value.borrow_mut_async().await),
-            Self::RefMut(value) => Some(value.borrow_mut_async().await),
-            _ => None,
-        }
-    }
-
-    pub fn lazy(&mut self) -> Option<ManagedLazy<T>> {
-        match self {
-            Self::Owned(value) => Some(value.lazy()),
-            Self::Lazy(value) => Some(value.clone()),
-            Self::RefMut(value) => Some(value.lazy()),
-            _ => None,
-        }
-    }
-
-    /// # Safety
-    pub async fn lazy_immutable(&self) -> ManagedLazy<T> {
-        unsafe {
-            match self {
-                Self::Owned(value) => value.lazy_immutable(),
-                Self::Lazy(value) => value.clone(),
-                Self::Ref(value) => value.lazy_immutable(),
-                Self::RefMut(value) => value.lazy(),
-            }
-        }
-    }
-}
-
-impl<T> From<Managed<T>> for ManagedValue<T> {
-    fn from(value: Managed<T>) -> Self {
-        Self::Owned(value)
-    }
-}
-
-impl<T> From<ManagedRef<T>> for ManagedValue<T> {
-    fn from(value: ManagedRef<T>) -> Self {
-        Self::Ref(value)
-    }
-}
-
-impl<T> From<ManagedRefMut<T>> for ManagedValue<T> {
-    fn from(value: ManagedRefMut<T>) -> Self {
-        Self::RefMut(value)
-    }
-}
-
-impl<T> From<ManagedLazy<T>> for ManagedValue<T> {
-    fn from(value: ManagedLazy<T>) -> Self {
-        Self::Lazy(value)
     }
 }
 
@@ -935,25 +683,9 @@ impl DynamicManaged {
         }
     }
 
-    pub async fn read_async<'a, T: 'a>(&'a self) -> Option<ValueReadAccess<'a, T>> {
-        if self.type_hash == TypeHash::of::<T>() {
-            Some(unsafe { self.lifetime.read_ptr_async(self.memory.cast::<T>()).await })
-        } else {
-            None
-        }
-    }
-
     pub fn write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.write_ptr(self.memory.cast::<T>()) }
-        } else {
-            None
-        }
-    }
-
-    pub async fn write_async<'a, T: 'a>(&'a mut self) -> Option<ValueWriteAccess<'a, T>> {
-        if self.type_hash == TypeHash::of::<T>() {
-            Some(unsafe { self.lifetime.write_ptr_async(self.memory.cast::<T>()).await })
         } else {
             None
         }
@@ -1013,31 +745,9 @@ impl DynamicManaged {
         unsafe { DynamicManagedRef::new_raw(self.type_hash, self.lifetime.borrow()?, self.memory) }
     }
 
-    pub async fn borrow_async(&self) -> DynamicManagedRef {
-        unsafe {
-            DynamicManagedRef::new_raw(
-                self.type_hash,
-                self.lifetime.borrow_async().await,
-                self.memory,
-            )
-            .unwrap()
-        }
-    }
-
     pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
         unsafe {
             DynamicManagedRefMut::new_raw(self.type_hash, self.lifetime.borrow_mut()?, self.memory)
-        }
-    }
-
-    pub async fn borrow_mut_async(&mut self) -> DynamicManagedRefMut {
-        unsafe {
-            DynamicManagedRefMut::new_raw(
-                self.type_hash,
-                self.lifetime.borrow_mut_async().await,
-                self.memory,
-            )
-            .unwrap()
         }
     }
 
@@ -1169,14 +879,6 @@ impl DynamicManagedRef {
         })
     }
 
-    pub async fn borrow_async(&self) -> DynamicManagedRef {
-        DynamicManagedRef {
-            type_hash: self.type_hash,
-            lifetime: self.lifetime.borrow_async().await,
-            data: self.data,
-        }
-    }
-
     /// # Safety
     pub unsafe fn lazy_immutable(&self) -> DynamicManagedLazy {
         DynamicManagedLazy {
@@ -1193,14 +895,6 @@ impl DynamicManagedRef {
     pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.read_ptr(self.data.cast::<T>()) }
-        } else {
-            None
-        }
-    }
-
-    pub async fn read_async<'a, T: 'a>(&'a self) -> Option<ValueReadAccess<'a, T>> {
-        if self.type_hash == TypeHash::of::<T>() {
-            Some(unsafe { self.lifetime.read_ptr_async(self.data.cast::<T>()).await })
         } else {
             None
         }
@@ -1336,28 +1030,12 @@ impl DynamicManagedRefMut {
         })
     }
 
-    pub async fn borrow_async(&self) -> DynamicManagedRef {
-        DynamicManagedRef {
-            type_hash: self.type_hash,
-            lifetime: self.lifetime.borrow_async().await,
-            data: self.data,
-        }
-    }
-
     pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
         Some(DynamicManagedRefMut {
             type_hash: self.type_hash,
             lifetime: self.lifetime.borrow_mut()?,
             data: self.data,
         })
-    }
-
-    pub async fn borrow_mut_async(&mut self) -> DynamicManagedRefMut {
-        DynamicManagedRefMut {
-            type_hash: self.type_hash,
-            lifetime: self.lifetime.borrow_mut_async().await,
-            data: self.data,
-        }
     }
 
     pub fn lazy(&self) -> DynamicManagedLazy {
@@ -1380,25 +1058,9 @@ impl DynamicManagedRefMut {
         }
     }
 
-    pub async fn read_async<'a, T: 'a>(&'a self) -> Option<ValueReadAccess<'a, T>> {
-        if self.type_hash == TypeHash::of::<T>() {
-            Some(unsafe { self.lifetime.read_ptr_async(self.data.cast::<T>()).await })
-        } else {
-            None
-        }
-    }
-
     pub fn write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.write_ptr(self.data.cast::<T>()) }
-        } else {
-            None
-        }
-    }
-
-    pub async fn write_async<'a, T: 'a>(&'a mut self) -> Option<ValueWriteAccess<'a, T>> {
-        if self.type_hash == TypeHash::of::<T>() {
-            Some(unsafe { self.lifetime.write_ptr_async(self.data.cast::<T>()).await })
         } else {
             None
         }
@@ -1566,25 +1228,9 @@ impl DynamicManagedLazy {
         }
     }
 
-    pub async fn read_async<'a, T: 'a>(&'a self) -> Option<ValueReadAccess<'a, T>> {
-        if self.type_hash == TypeHash::of::<T>() {
-            Some(unsafe { self.lifetime.read_ptr_async(self.data.cast::<T>()).await })
-        } else {
-            None
-        }
-    }
-
     pub fn write<T>(&'_ self) -> Option<ValueWriteAccess<'_, T>> {
         if self.type_hash == TypeHash::of::<T>() {
             unsafe { self.lifetime.write_ptr(self.data.cast::<T>()) }
-        } else {
-            None
-        }
-    }
-
-    pub async fn write_async<'a, T: 'a>(&'a self) -> Option<ValueWriteAccess<'a, T>> {
-        if self.type_hash == TypeHash::of::<T>() {
-            Some(unsafe { self.lifetime.write_ptr_async(self.data.cast::<T>()).await })
         } else {
             None
         }
@@ -1598,28 +1244,12 @@ impl DynamicManagedLazy {
         })
     }
 
-    pub async fn borrow_async(&self) -> DynamicManagedRef {
-        DynamicManagedRef {
-            type_hash: self.type_hash,
-            lifetime: self.lifetime.borrow_async().await,
-            data: self.data,
-        }
-    }
-
     pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
         Some(DynamicManagedRefMut {
             type_hash: self.type_hash,
             lifetime: self.lifetime.borrow_mut()?,
             data: self.data,
         })
-    }
-
-    pub async fn borrow_mut_async(&mut self) -> DynamicManagedRefMut {
-        DynamicManagedRefMut {
-            type_hash: self.type_hash,
-            lifetime: self.lifetime.borrow_mut_async().await,
-            data: self.data,
-        }
     }
 
     /// # Safety
@@ -1699,186 +1329,6 @@ impl TryFrom<DynamicManagedValue> for DynamicManagedLazy {
             DynamicManagedValue::Lazy(value) => Ok(value),
             _ => Err(()),
         }
-    }
-}
-
-pub enum DynamicManagedValue {
-    Owned(DynamicManaged),
-    Ref(DynamicManagedRef),
-    RefMut(DynamicManagedRefMut),
-    Lazy(DynamicManagedLazy),
-}
-
-impl DynamicManagedValue {
-    pub fn as_owned(&self) -> Option<&DynamicManaged> {
-        match self {
-            Self::Owned(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_mut_owned(&mut self) -> Option<&mut DynamicManaged> {
-        match self {
-            Self::Owned(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_ref(&self) -> Option<&DynamicManagedRef> {
-        match self {
-            Self::Ref(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_mut_ref(&mut self) -> Option<&mut DynamicManagedRef> {
-        match self {
-            Self::Ref(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_ref_mut(&self) -> Option<&DynamicManagedRefMut> {
-        match self {
-            Self::RefMut(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_mut_ref_mut(&mut self) -> Option<&mut DynamicManagedRefMut> {
-        match self {
-            Self::RefMut(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_lazy(&self) -> Option<&DynamicManagedLazy> {
-        match self {
-            Self::Lazy(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_mut_lazy(&mut self) -> Option<&mut DynamicManagedLazy> {
-        match self {
-            Self::Lazy(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
-        match self {
-            Self::Owned(value) => value.read::<T>(),
-            Self::Ref(value) => value.read::<T>(),
-            Self::RefMut(value) => value.read::<T>(),
-            Self::Lazy(value) => value.read::<T>(),
-        }
-    }
-
-    pub async fn read_async<'a, T: 'a>(&'a self) -> Option<ValueReadAccess<'a, T>> {
-        match self {
-            Self::Owned(value) => value.read_async::<T>().await,
-            Self::Ref(value) => value.read_async::<T>().await,
-            Self::RefMut(value) => value.read_async::<T>().await,
-            Self::Lazy(value) => value.read_async::<T>().await,
-        }
-    }
-
-    pub fn write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
-        match self {
-            Self::Owned(value) => value.write::<T>(),
-            Self::RefMut(value) => value.write::<T>(),
-            Self::Lazy(value) => value.write::<T>(),
-            _ => None,
-        }
-    }
-
-    pub async fn write_async<'a, T: 'a>(&'a mut self) -> Option<ValueWriteAccess<'a, T>> {
-        match self {
-            Self::Owned(value) => value.write_async::<T>().await,
-            Self::RefMut(value) => value.write_async::<T>().await,
-            Self::Lazy(value) => value.write_async::<T>().await,
-            _ => None,
-        }
-    }
-
-    pub fn borrow(&self) -> Option<DynamicManagedRef> {
-        match self {
-            Self::Owned(value) => value.borrow(),
-            Self::Ref(value) => value.borrow(),
-            Self::RefMut(value) => value.borrow(),
-            _ => None,
-        }
-    }
-
-    pub async fn borrow_async(&self) -> Option<DynamicManagedRef> {
-        match self {
-            Self::Owned(value) => Some(value.borrow_async().await),
-            Self::Ref(value) => Some(value.borrow_async().await),
-            Self::RefMut(value) => Some(value.borrow_async().await),
-            _ => None,
-        }
-    }
-
-    pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
-        match self {
-            Self::Owned(value) => value.borrow_mut(),
-            Self::RefMut(value) => value.borrow_mut(),
-            _ => None,
-        }
-    }
-
-    pub async fn borrow_mut_async(&mut self) -> Option<DynamicManagedRefMut> {
-        match self {
-            Self::Owned(value) => Some(value.borrow_mut_async().await),
-            Self::RefMut(value) => Some(value.borrow_mut_async().await),
-            _ => None,
-        }
-    }
-
-    pub fn lazy(&self) -> Option<DynamicManagedLazy> {
-        match self {
-            Self::Owned(value) => Some(value.lazy()),
-            Self::Lazy(value) => Some(value.clone()),
-            Self::RefMut(value) => Some(value.lazy()),
-            _ => None,
-        }
-    }
-
-    /// # Safety
-    pub async fn lazy_immutable(&self) -> DynamicManagedLazy {
-        unsafe {
-            match self {
-                Self::Owned(value) => value.lazy(),
-                Self::Lazy(value) => value.clone(),
-                Self::Ref(value) => value.lazy_immutable(),
-                Self::RefMut(value) => value.lazy(),
-            }
-        }
-    }
-}
-
-impl From<DynamicManaged> for DynamicManagedValue {
-    fn from(value: DynamicManaged) -> Self {
-        Self::Owned(value)
-    }
-}
-
-impl From<DynamicManagedRef> for DynamicManagedValue {
-    fn from(value: DynamicManagedRef) -> Self {
-        Self::Ref(value)
-    }
-}
-
-impl From<DynamicManagedRefMut> for DynamicManagedValue {
-    fn from(value: DynamicManagedRefMut) -> Self {
-        Self::RefMut(value)
-    }
-}
-
-impl From<DynamicManagedLazy> for DynamicManagedValue {
-    fn from(value: DynamicManagedLazy) -> Self {
-        Self::Lazy(value)
     }
 }
 
@@ -1976,7 +1426,7 @@ mod tests {
     fn test_conversion() {
         let value = Managed::new(42);
         assert_eq!(*value.read().unwrap(), 42);
-        let value = value.into_dynamic().unwrap();
+        let value = value.into_dynamic().ok().unwrap();
         assert_eq!(*value.read::<i32>().unwrap(), 42);
         let mut value = value.into_typed::<i32>().ok().unwrap();
         assert_eq!(*value.read().unwrap(), 42);
@@ -2092,18 +1542,5 @@ mod tests {
         let value = *value;
         assert_ne!(value.lifetime().tag(), value_ref.lifetime().tag());
         assert!(!value_ref.lifetime().exists());
-    }
-
-    #[pollster::test]
-    async fn test_managed_async() {
-        let mut value = Managed::new(42);
-        *value.write_async().await = 40;
-        assert_eq!(*value.read_async().await, 40);
-        *value.borrow_mut_async().await.write_async().await = 2;
-        assert_eq!(*value.read_async().await, 2);
-        let value_lazy = value.lazy();
-        assert_eq!(*value_lazy.read_async().await, 2);
-        *value_lazy.write_async().await = 42;
-        assert_eq!(*value_lazy.read_async().await, 42);
     }
 }
