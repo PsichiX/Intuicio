@@ -573,25 +573,40 @@ pub struct Transferred(usize);
 pub fn install(registry: &mut Registry) {
     registry.add_type(define_native_struct! {
         registry => mod reflect struct Reference (Reference) {}
-        [override_send = true]
+        // [override_send = true]
     });
     registry.add_type(define_native_struct! {
         registry => mod reflect struct Type (Type) {}
+        [override_send = true]
+        [override_sync = true]
     });
     registry.add_type(define_native_struct! {
         registry => mod reflect struct Function (Function) {}
+        [override_send = true]
+        [override_sync = true]
     });
     registry.add_type(define_native_struct! {
         registry => mod math struct Boolean (Boolean) {}
+        [override_send = true]
+        [override_sync = true]
+        [override_copy = true]
     });
     registry.add_type(define_native_struct! {
         registry => mod math struct Integer (Integer) {}
+        [override_send = true]
+        [override_sync = true]
+        [override_copy = true]
     });
     registry.add_type(define_native_struct! {
         registry => mod math struct Real (Real) {}
+        [override_send = true]
+        [override_sync = true]
+        [override_copy = true]
     });
     registry.add_type(define_native_struct! {
         registry => mod math struct Text (Text) {}
+        [override_send = true]
+        [override_sync = true]
     });
     registry.add_type(define_native_struct! {
         registry => mod math struct Array (Array) {}
@@ -603,7 +618,7 @@ pub fn install(registry: &mut Registry) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Integer, Reference, Transferable};
+    use super::*;
     use intuicio_core::{IntuicioEnum, IntuicioStruct, registry::Registry};
     use intuicio_derive::*;
     use std::thread::spawn;

@@ -8,7 +8,7 @@ use crate::{
     object::RuntimeObject,
     types::{EnumVariantQuery, MetaQuery, StructFieldQuery, Type, struct_type::StructField},
 };
-use intuicio_data::{Finalize, Initialize, is_copy, is_send, is_sync, type_hash::TypeHash};
+use intuicio_data::{Finalize, Initialize, type_hash::TypeHash};
 use rustc_hash::FxHasher;
 use std::{
     alloc::Layout,
@@ -194,9 +194,9 @@ impl NativeEnumBuilder {
             layout: Layout::new::<T>().pad_to_align(),
             initializer: Some(T::initialize_raw),
             finalizer: T::finalize_raw,
-            is_send: is_send::<T>(),
-            is_sync: is_sync::<T>(),
-            is_copy: is_copy::<T>(),
+            is_send: false,
+            is_sync: false,
+            is_copy: false,
         }
     }
 
@@ -213,9 +213,9 @@ impl NativeEnumBuilder {
             layout: Layout::new::<T>().pad_to_align(),
             initializer: Some(T::initialize_raw),
             finalizer: T::finalize_raw,
-            is_send: is_send::<T>(),
-            is_sync: is_sync::<T>(),
-            is_copy: is_copy::<T>(),
+            is_send: false,
+            is_sync: false,
+            is_copy: false,
         }
     }
 
@@ -232,9 +232,9 @@ impl NativeEnumBuilder {
             layout: Layout::new::<T>().pad_to_align(),
             initializer: None,
             finalizer: T::finalize_raw,
-            is_send: is_send::<T>(),
-            is_sync: is_sync::<T>(),
-            is_copy: is_copy::<T>(),
+            is_send: false,
+            is_sync: false,
+            is_copy: false,
         }
     }
 
@@ -251,9 +251,9 @@ impl NativeEnumBuilder {
             layout: Layout::new::<T>().pad_to_align(),
             initializer: None,
             finalizer: T::finalize_raw,
-            is_send: is_send::<T>(),
-            is_sync: is_sync::<T>(),
-            is_copy: is_copy::<T>(),
+            is_send: false,
+            is_sync: false,
+            is_copy: false,
         }
     }
 
@@ -697,27 +697,27 @@ macro_rules! define_native_enum {
         $( [override_sync = $override_sync:literal] )?
         $( [override_copy = $override_copy:literal] )?
     ) => {{
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_send = Option::<bool>::None;
         $(
             override_send = Some($override_send as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_sync = Option::<bool>::None;
         $(
             override_sync = Some($override_sync as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_copy = Option::<bool>::None;
         $(
             override_copy = Some($override_copy as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut name = std::any::type_name::<$type>().to_owned();
         $(
             name = stringify!($name).to_owned();
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut result = $crate::types::enum_type::NativeEnumBuilder::new_named_uninitialized::<$type>(name);
         $(
             result = result.module_name(stringify!($module_name).to_owned());
@@ -745,27 +745,27 @@ macro_rules! define_native_enum {
         $( [override_sync = $override_sync:literal] )?
         $( [override_copy = $override_copy:literal] )?
     ) => {{
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_send = Option::<bool>::None;
         $(
             override_send = Some($override_send as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_sync = Option::<bool>::None;
         $(
             override_sync = Some($override_sync as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_copy = Option::<bool>::None;
         $(
             override_copy = Some($override_copy as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut name = std::any::type_name::<$type>().to_owned();
         $(
             name = stringify!($name).to_owned();
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut result = $crate::types::enum_type::NativeEnumBuilder::new_named::<$type>(name);
         $(
             result = result.module_name(stringify!($module_name).to_owned());
@@ -805,7 +805,7 @@ macro_rules! define_native_enum {
         $name:ident ( $( $field_name:ident : $field_type:ty ),* ) = $discriminant:literal
     }) => {
         $result = {
-            #[allow(unused_mut)]
+            #[allow(unused)]
             let mut variant = $crate::types::enum_type::EnumVariant::new(stringify!($name));
             $crate::define_native_enum! { @fields_tuple $registry => variant => $type => $name => {
                 $( $field_name : $field_type ),*
@@ -817,7 +817,7 @@ macro_rules! define_native_enum {
         $name:ident { $( $field_name:ident : $field_type:ty ),* } = $discriminant:literal
     }) => {
         $result = {
-            #[allow(unused_mut)]
+            #[allow(unused)]
             let mut variant = $crate::types::enum_type::EnumVariant::new(stringify!($name));
             $(
                 variant = variant.with_field_with_offset(
@@ -855,7 +855,7 @@ macro_rules! define_runtime_enum {
             $( $variant:tt )*
         }
     ) => {{
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut result = $crate::types::enum_type::RuntimeEnumBuilder::new(stringify!($name));
         $(
             result = result.module_name(stringify!($module_name).to_owned());
@@ -867,7 +867,7 @@ macro_rules! define_runtime_enum {
         $name:ident $( ( $( $field_name:ident : $field_type:ty ),+ ) )? = $discriminant:literal
     }) => {
         $result = {
-            #[allow(unused_mut)]
+            #[allow(unused)]
             let mut variant = $crate::types::enum_type::EnumVariant::new(stringify!($name));
             $(
                 $(
@@ -888,7 +888,7 @@ macro_rules! define_runtime_enum {
         $name:ident $( ( $( $field_name:ident : $field_type:ty ),+ ) )?
     }) => {
         $result = {
-            #[allow(unused_mut)]
+            #[allow(unused)]
             let mut variant = $crate::types::enum_type::EnumVariant::new(stringify!($name));
             $(
                 $(
@@ -909,7 +909,7 @@ macro_rules! define_runtime_enum {
         $name:ident $( { $( $field_name:ident : $field_type:ty ),+ } )? = $discriminant:literal
     }) => {
         $result = {
-            #[allow(unused_mut)]
+            #[allow(unused)]
             let mut variant = $crate::types::enum_type::EnumVariant::new(stringify!($name));
             $(
                 $(
@@ -930,7 +930,7 @@ macro_rules! define_runtime_enum {
         $name:ident $( { $( $field_name:ident : $field_type:ty ),+ } )?
     }) => {
         $result = {
-            #[allow(unused_mut)]
+            #[allow(unused)]
             let mut variant = $crate::types::enum_type::EnumVariant::new(stringify!($name));
             $(
                 $(
@@ -1000,6 +1000,9 @@ mod test {
                 {C(a: u64, b: u32) = 2}
                 {D { a: u16, b: u8 } = 3}
             }
+            [override_send = true]
+            [override_sync = true]
+            [override_copy = true]
         };
         let b = define_runtime_enum! {
             registry => enum Foo {

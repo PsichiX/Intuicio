@@ -45,10 +45,8 @@ macro_rules! parse_enum_attributes {
                         for meta in list.nested.iter() {
                             match meta {
                                 NestedMeta::Meta(meta) => match meta {
-                                    Meta::Path(path) => {
-                                        if path.is_ident("debug") {
-                                            result.debug = true;
-                                        }
+                                    Meta::Path(path) if path.is_ident("debug") => {
+                                        result.debug = true;
                                     }
                                     Meta::NameValue(name_value) => {
                                         if name_value.path.is_ident("name") {
@@ -132,40 +130,36 @@ macro_rules! parse_variant_attributes {
                 Err(err) => return Some(TokenStream::from(err.to_compile_error()).into()),
             };
             match attribute {
-                Meta::List(list) => {
-                    if list.path.is_ident("intuicio") {
-                        for meta in list.nested.iter() {
-                            match meta {
-                                NestedMeta::Meta(meta) => match meta {
-                                    Meta::Path(path) => {
-                                        if path.is_ident("ignore") {
-                                            result.ignore = true;
+                Meta::List(list) if list.path.is_ident("intuicio") => {
+                    for meta in list.nested.iter() {
+                        match meta {
+                            NestedMeta::Meta(meta) => match meta {
+                                Meta::Path(path) if path.is_ident("ignore") => {
+                                    result.ignore = true;
+                                }
+                                Meta::NameValue(name_value) => {
+                                    if name_value.path.is_ident("name") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.name = Some(Ident::new(
+                                                    &content.value(),
+                                                    Span::call_site().into(),
+                                                ))
+                                            }
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("meta") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.meta = Some(content.value());
+                                            }
+                                            _ => {}
                                         }
                                     }
-                                    Meta::NameValue(name_value) => {
-                                        if name_value.path.is_ident("name") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.name = Some(Ident::new(
-                                                        &content.value(),
-                                                        Span::call_site().into(),
-                                                    ))
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("meta") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.meta = Some(content.value());
-                                                }
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                },
+                                }
                                 _ => {}
-                            }
+                            },
+                            _ => {}
                         }
                     }
                 }
@@ -185,40 +179,36 @@ macro_rules! parse_field_attributes {
                 Err(err) => return Some(TokenStream::from(err.to_compile_error()).into()),
             };
             match attribute {
-                Meta::List(list) => {
-                    if list.path.is_ident("intuicio") {
-                        for meta in list.nested.iter() {
-                            match meta {
-                                NestedMeta::Meta(meta) => match meta {
-                                    Meta::Path(path) => {
-                                        if path.is_ident("ignore") {
-                                            result.ignore = true;
+                Meta::List(list) if list.path.is_ident("intuicio") => {
+                    for meta in list.nested.iter() {
+                        match meta {
+                            NestedMeta::Meta(meta) => match meta {
+                                Meta::Path(path) if path.is_ident("ignore") => {
+                                    result.ignore = true;
+                                }
+                                Meta::NameValue(name_value) => {
+                                    if name_value.path.is_ident("name") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.name = Some(Ident::new(
+                                                    &content.value(),
+                                                    Span::call_site().into(),
+                                                ))
+                                            }
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("meta") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.meta = Some(content.value());
+                                            }
+                                            _ => {}
                                         }
                                     }
-                                    Meta::NameValue(name_value) => {
-                                        if name_value.path.is_ident("name") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.name = Some(Ident::new(
-                                                        &content.value(),
-                                                        Span::call_site().into(),
-                                                    ))
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("meta") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.meta = Some(content.value());
-                                                }
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                },
+                                }
                                 _ => {}
-                            }
+                            },
+                            _ => {}
                         }
                     }
                 }

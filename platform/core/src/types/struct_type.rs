@@ -4,7 +4,7 @@ use crate::{
     object::RuntimeObject,
     types::{MetaQuery, StructFieldQuery, Type, TypeHandle},
 };
-use intuicio_data::{Finalize, Initialize, is_copy, is_send, is_sync, type_hash::TypeHash};
+use intuicio_data::{Finalize, Initialize, type_hash::TypeHash};
 use rustc_hash::FxHasher;
 use std::{
     alloc::Layout,
@@ -72,7 +72,7 @@ impl RuntimeStructBuilder {
             self.layout = new_layout;
             field.offset = offset;
         }
-        self.fields.sort_by(|a, b| a.offset.cmp(&b.offset));
+        self.fields.sort_by_key(|a| a.offset);
         let is_send = self.fields.iter().all(|field| field.type_handle.is_send());
         let is_sync = self.fields.iter().all(|field| field.type_handle.is_sync());
         let is_copy = self.fields.iter().all(|field| field.type_handle.is_copy());
@@ -140,9 +140,9 @@ impl NativeStructBuilder {
             layout: Layout::new::<T>().pad_to_align(),
             initializer: Some(T::initialize_raw),
             finalizer: T::finalize_raw,
-            is_send: is_send::<T>(),
-            is_sync: is_sync::<T>(),
-            is_copy: is_copy::<T>(),
+            is_send: false,
+            is_sync: false,
+            is_copy: false,
         }
     }
 
@@ -158,9 +158,9 @@ impl NativeStructBuilder {
             layout: Layout::new::<T>().pad_to_align(),
             initializer: Some(T::initialize_raw),
             finalizer: T::finalize_raw,
-            is_send: is_send::<T>(),
-            is_sync: is_sync::<T>(),
-            is_copy: is_copy::<T>(),
+            is_send: false,
+            is_sync: false,
+            is_copy: false,
         }
     }
 
@@ -176,9 +176,9 @@ impl NativeStructBuilder {
             layout: Layout::new::<T>().pad_to_align(),
             initializer: None,
             finalizer: T::finalize_raw,
-            is_send: is_send::<T>(),
-            is_sync: is_sync::<T>(),
-            is_copy: is_copy::<T>(),
+            is_send: false,
+            is_sync: false,
+            is_copy: false,
         }
     }
 
@@ -194,9 +194,9 @@ impl NativeStructBuilder {
             layout: Layout::new::<T>().pad_to_align(),
             initializer: None,
             finalizer: T::finalize_raw,
-            is_send: is_send::<T>(),
-            is_sync: is_sync::<T>(),
-            is_copy: is_copy::<T>(),
+            is_send: false,
+            is_sync: false,
+            is_copy: false,
         }
     }
 
@@ -248,7 +248,7 @@ impl NativeStructBuilder {
     }
 
     pub fn build(mut self) -> Struct {
-        self.fields.sort_by(|a, b| a.offset.cmp(&b.offset));
+        self.fields.sort_by_key(|a| a.offset);
         Struct {
             meta: self.meta,
             name: self.name,
@@ -594,27 +594,27 @@ macro_rules! define_native_struct {
         $( [override_sync = $override_sync:literal] )?
         $( [override_copy = $override_copy:literal] )?
     ) => {{
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_send = Option::<bool>::None;
         $(
             override_send = Some($override_send as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_sync = Option::<bool>::None;
         $(
             override_sync = Some($override_sync as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_copy = Option::<bool>::None;
         $(
             override_copy = Some($override_copy as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut name = std::any::type_name::<$type>().to_owned();
         $(
             name = stringify!($name).to_owned();
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut result = $crate::types::struct_type::NativeStructBuilder::new_named_uninitialized::<$type>(name);
         $(
             result = result.module_name(stringify!($module_name).to_owned());
@@ -652,27 +652,27 @@ macro_rules! define_native_struct {
         $( [override_sync = $override_sync:literal] )?
         $( [override_copy = $override_copy:literal] )?
     ) => {{
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_send = Option::<bool>::None;
         $(
             override_send = Some($override_send as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_sync = Option::<bool>::None;
         $(
             override_sync = Some($override_sync as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut override_copy = Option::<bool>::None;
         $(
             override_copy = Some($override_copy as bool);
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut name = std::any::type_name::<$type>().to_owned();
         $(
             name = stringify!($name).to_owned();
         )?
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut result = $crate::types::struct_type::NativeStructBuilder::new_named::<$type>(name);
         $(
             result = result.module_name(stringify!($module_name).to_owned());
@@ -711,7 +711,7 @@ macro_rules! define_runtime_struct {
             $( $field_name:ident : $field_type:ty ),*
         }
     ) => {{
-        #[allow(unused_mut)]
+        #[allow(unused)]
         let mut result = $crate::types::struct_type::RuntimeStructBuilder::new(stringify!($name));
         $(
             result.module_name = Some(stringify!($module_name).to_owned());
@@ -762,6 +762,9 @@ mod tests {
                 a: bool,
                 b: usize
             }
+            [override_send = true]
+            [override_sync = true]
+            [override_copy = true]
         };
         let b = define_runtime_struct! {
             registry => struct Foo {

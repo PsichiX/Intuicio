@@ -66,88 +66,85 @@ macro_rules! parse_method_attributes {
                 Err(err) => return TokenStream::from(err.to_compile_error()),
             };
             match attribute {
-                Meta::List(list) => {
-                    if list.path.is_ident("intuicio_method") {
-                        found = true;
-                        for meta in list.nested.iter() {
-                            match meta {
-                                NestedMeta::Meta(meta) => match meta {
-                                    Meta::Path(path) => {
-                                        if path.is_ident("use_registry") {
-                                            result.use_registry = true;
-                                        } else if path.is_ident("use_context") {
-                                            result.use_context = true;
-                                        } else if path.is_ident("debug") {
-                                            result.debug = true;
-                                        }
+                Meta::List(list) if list.path.is_ident("intuicio_method") => {
+                    found = true;
+                    for meta in list.nested.iter() {
+                        match meta {
+                            NestedMeta::Meta(meta) => match meta {
+                                Meta::Path(path) => {
+                                    if path.is_ident("use_registry") {
+                                        result.use_registry = true;
+                                    } else if path.is_ident("use_context") {
+                                        result.use_context = true;
+                                    } else if path.is_ident("debug") {
+                                        result.debug = true;
                                     }
-                                    Meta::List(list) => {
-                                        if list.path.is_ident("args_meta") {
-                                            for meta in list.nested.iter() {
-                                                if let NestedMeta::Meta(Meta::NameValue(
-                                                    name_value,
-                                                )) = meta
-                                                {
-                                                    match &name_value.lit {
-                                                        Lit::Str(content) => {
-                                                            result.args_meta.insert(
-                                                                name_value
-                                                                    .path
-                                                                    .get_ident()
-                                                                    .unwrap()
-                                                                    .to_string(),
-                                                                content.value(),
-                                                            );
-                                                        }
-                                                        _ => {}
+                                }
+                                Meta::List(list) => {
+                                    if list.path.is_ident("args_meta") {
+                                        for meta in list.nested.iter() {
+                                            if let NestedMeta::Meta(Meta::NameValue(name_value)) =
+                                                meta
+                                            {
+                                                match &name_value.lit {
+                                                    Lit::Str(content) => {
+                                                        result.args_meta.insert(
+                                                            name_value
+                                                                .path
+                                                                .get_ident()
+                                                                .unwrap()
+                                                                .to_string(),
+                                                            content.value(),
+                                                        );
                                                     }
+                                                    _ => {}
                                                 }
                                             }
                                         }
                                     }
-                                    Meta::NameValue(name_value) => {
-                                        if name_value.path.is_ident("name") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.name = Some(Ident::new(
-                                                        &content.value(),
-                                                        Span::call_site().into(),
-                                                    ))
-                                                }
-                                                _ => {}
+                                }
+                                Meta::NameValue(name_value) => {
+                                    if name_value.path.is_ident("name") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.name = Some(Ident::new(
+                                                    &content.value(),
+                                                    Span::call_site().into(),
+                                                ))
                                             }
-                                        } else if name_value.path.is_ident("transformer") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.transformer = Some(Ident::new(
-                                                        &content.value(),
-                                                        Span::call_site().into(),
-                                                    ))
-                                                }
-                                                _ => {}
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("transformer") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.transformer = Some(Ident::new(
+                                                    &content.value(),
+                                                    Span::call_site().into(),
+                                                ))
                                             }
-                                        } else if name_value.path.is_ident("dependency") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.dependency = Some(Ident::new(
-                                                        &content.value(),
-                                                        Span::call_site().into(),
-                                                    ))
-                                                }
-                                                _ => {}
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("dependency") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.dependency = Some(Ident::new(
+                                                    &content.value(),
+                                                    Span::call_site().into(),
+                                                ))
                                             }
-                                        } else if name_value.path.is_ident("meta") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.meta = Some(content.value());
-                                                }
-                                                _ => {}
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("meta") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.meta = Some(content.value());
                                             }
+                                            _ => {}
                                         }
                                     }
-                                },
-                                _ => {}
-                            }
+                                }
+                            },
+                            _ => {}
                         }
                     }
                 }

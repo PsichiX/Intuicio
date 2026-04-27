@@ -30,73 +30,71 @@ macro_rules! parse_struct_attributes {
                 Err(err) => return TokenStream::from(err.to_compile_error()),
             };
             match attribute {
-                Meta::List(list) => {
-                    if list.path.is_ident("intuicio") {
-                        for meta in list.nested.iter() {
-                            match meta {
-                                NestedMeta::Meta(meta) => match meta {
-                                    Meta::Path(path) => {
-                                        if path.is_ident("debug") {
-                                            result.debug = true;
-                                        } else if path.is_ident("uninitialized") {
-                                            result.uninitialized = true;
+                Meta::List(list) if list.path.is_ident("intuicio") => {
+                    for meta in list.nested.iter() {
+                        match meta {
+                            NestedMeta::Meta(meta) => match meta {
+                                Meta::Path(path) => {
+                                    if path.is_ident("debug") {
+                                        result.debug = true;
+                                    } else if path.is_ident("uninitialized") {
+                                        result.uninitialized = true;
+                                    }
+                                }
+                                Meta::NameValue(name_value) => {
+                                    if name_value.path.is_ident("name") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.name = Some(Ident::new(
+                                                    &content.value(),
+                                                    Span::call_site().into(),
+                                                ))
+                                            }
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("module_name") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.module_name = Some(Ident::new(
+                                                    &content.value(),
+                                                    Span::call_site().into(),
+                                                ))
+                                            }
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("override_send") {
+                                        match &name_value.lit {
+                                            Lit::Bool(content) => {
+                                                result.override_send = Some(content.value)
+                                            }
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("override_sync") {
+                                        match &name_value.lit {
+                                            Lit::Bool(content) => {
+                                                result.override_sync = Some(content.value)
+                                            }
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("override_copy") {
+                                        match &name_value.lit {
+                                            Lit::Bool(content) => {
+                                                result.override_copy = Some(content.value)
+                                            }
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("meta") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.meta = Some(content.value());
+                                            }
+                                            _ => {}
                                         }
                                     }
-                                    Meta::NameValue(name_value) => {
-                                        if name_value.path.is_ident("name") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.name = Some(Ident::new(
-                                                        &content.value(),
-                                                        Span::call_site().into(),
-                                                    ))
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("module_name") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.module_name = Some(Ident::new(
-                                                        &content.value(),
-                                                        Span::call_site().into(),
-                                                    ))
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("override_send") {
-                                            match &name_value.lit {
-                                                Lit::Bool(content) => {
-                                                    result.override_send = Some(content.value)
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("override_sync") {
-                                            match &name_value.lit {
-                                                Lit::Bool(content) => {
-                                                    result.override_sync = Some(content.value)
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("override_copy") {
-                                            match &name_value.lit {
-                                                Lit::Bool(content) => {
-                                                    result.override_copy = Some(content.value)
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("meta") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.meta = Some(content.value());
-                                                }
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                },
+                                }
                                 _ => {}
-                            }
+                            },
+                            _ => {}
                         }
                     }
                 }
@@ -116,40 +114,36 @@ macro_rules! parse_field_attributes {
                 Err(err) => return Some(TokenStream::from(err.to_compile_error()).into()),
             };
             match attribute {
-                Meta::List(list) => {
-                    if list.path.is_ident("intuicio") {
-                        for meta in list.nested.iter() {
-                            match meta {
-                                NestedMeta::Meta(meta) => match meta {
-                                    Meta::Path(path) => {
-                                        if path.is_ident("ignore") {
-                                            result.ignore = true;
+                Meta::List(list) if list.path.is_ident("intuicio") => {
+                    for meta in list.nested.iter() {
+                        match meta {
+                            NestedMeta::Meta(meta) => match meta {
+                                Meta::Path(path) if path.is_ident("ignore") => {
+                                    result.ignore = true;
+                                }
+                                Meta::NameValue(name_value) => {
+                                    if name_value.path.is_ident("name") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.name = Some(Ident::new(
+                                                    &content.value(),
+                                                    Span::call_site().into(),
+                                                ))
+                                            }
+                                            _ => {}
+                                        }
+                                    } else if name_value.path.is_ident("meta") {
+                                        match &name_value.lit {
+                                            Lit::Str(content) => {
+                                                result.meta = Some(content.value());
+                                            }
+                                            _ => {}
                                         }
                                     }
-                                    Meta::NameValue(name_value) => {
-                                        if name_value.path.is_ident("name") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.name = Some(Ident::new(
-                                                        &content.value(),
-                                                        Span::call_site().into(),
-                                                    ))
-                                                }
-                                                _ => {}
-                                            }
-                                        } else if name_value.path.is_ident("meta") {
-                                            match &name_value.lit {
-                                                Lit::Str(content) => {
-                                                    result.meta = Some(content.value());
-                                                }
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                },
+                                }
                                 _ => {}
-                            }
+                            },
+                            _ => {}
                         }
                     }
                 }

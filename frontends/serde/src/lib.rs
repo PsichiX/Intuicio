@@ -990,94 +990,94 @@ impl NodeDefinition for SerdeNodes {
     fn set_property(&mut self, property_name: &str, property_value: PropertyValue) {
         if let Self::Operation(operation) = self {
             match operation {
-                SerdeOperation::Expression(SerdeExpression::Literal(literal)) => {
-                    if property_name == "Value" {
-                        match literal {
-                            SerdeLiteral::Unit => {}
-                            SerdeLiteral::Bool(value) => {
-                                if let Ok(v) = property_value.get_exact::<bool>() {
-                                    *value = v;
-                                }
+                SerdeOperation::Expression(SerdeExpression::Literal(literal))
+                    if property_name == "Value" =>
+                {
+                    match literal {
+                        SerdeLiteral::Unit => {}
+                        SerdeLiteral::Bool(value) => {
+                            if let Ok(v) = property_value.get_exact::<bool>() {
+                                *value = v;
                             }
-                            SerdeLiteral::I8(value) => {
-                                if let Ok(v) = property_value.get_exact::<i8>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::I8(value) => {
+                            if let Ok(v) = property_value.get_exact::<i8>() {
+                                *value = v;
                             }
-                            SerdeLiteral::I16(value) => {
-                                if let Ok(v) = property_value.get_exact::<i16>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::I16(value) => {
+                            if let Ok(v) = property_value.get_exact::<i16>() {
+                                *value = v;
                             }
-                            SerdeLiteral::I32(value) => {
-                                if let Ok(v) = property_value.get_exact::<i32>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::I32(value) => {
+                            if let Ok(v) = property_value.get_exact::<i32>() {
+                                *value = v;
                             }
-                            SerdeLiteral::I64(value) => {
-                                if let Ok(v) = property_value.get_exact::<i64>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::I64(value) => {
+                            if let Ok(v) = property_value.get_exact::<i64>() {
+                                *value = v;
                             }
-                            SerdeLiteral::I128(value) => {
-                                if let Ok(v) = property_value.get_exact::<i128>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::I128(value) => {
+                            if let Ok(v) = property_value.get_exact::<i128>() {
+                                *value = v;
                             }
-                            SerdeLiteral::Isize(value) => {
-                                if let Ok(v) = property_value.get_exact::<isize>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::Isize(value) => {
+                            if let Ok(v) = property_value.get_exact::<isize>() {
+                                *value = v;
                             }
-                            SerdeLiteral::U8(value) => {
-                                if let Ok(v) = property_value.get_exact::<u8>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::U8(value) => {
+                            if let Ok(v) = property_value.get_exact::<u8>() {
+                                *value = v;
                             }
-                            SerdeLiteral::U16(value) => {
-                                if let Ok(v) = property_value.get_exact::<u16>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::U16(value) => {
+                            if let Ok(v) = property_value.get_exact::<u16>() {
+                                *value = v;
                             }
-                            SerdeLiteral::U32(value) => {
-                                if let Ok(v) = property_value.get_exact::<u32>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::U32(value) => {
+                            if let Ok(v) = property_value.get_exact::<u32>() {
+                                *value = v;
                             }
-                            SerdeLiteral::U64(value) => {
-                                if let Ok(v) = property_value.get_exact::<u64>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::U64(value) => {
+                            if let Ok(v) = property_value.get_exact::<u64>() {
+                                *value = v;
                             }
-                            SerdeLiteral::U128(value) => {
-                                if let Ok(v) = property_value.get_exact::<u128>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::U128(value) => {
+                            if let Ok(v) = property_value.get_exact::<u128>() {
+                                *value = v;
                             }
-                            SerdeLiteral::Usize(value) => {
-                                if let Ok(v) = property_value.get_exact::<usize>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::Usize(value) => {
+                            if let Ok(v) = property_value.get_exact::<usize>() {
+                                *value = v;
                             }
-                            SerdeLiteral::F32(value) => {
-                                if let Ok(v) = property_value.get_exact::<f32>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::F32(value) => {
+                            if let Ok(v) = property_value.get_exact::<f32>() {
+                                *value = v;
                             }
-                            SerdeLiteral::F64(value) => {
-                                if let Ok(v) = property_value.get_exact::<f64>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::F64(value) => {
+                            if let Ok(v) = property_value.get_exact::<f64>() {
+                                *value = v;
                             }
-                            SerdeLiteral::Char(value) => {
-                                if let Ok(v) = property_value.get_exact::<char>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::Char(value) => {
+                            if let Ok(v) = property_value.get_exact::<char>() {
+                                *value = v;
                             }
-                            SerdeLiteral::String(value) => {
-                                if let Ok(v) = property_value.get_exact::<String>() {
-                                    *value = v;
-                                }
+                        }
+                        SerdeLiteral::String(value) => {
+                            if let Ok(v) = property_value.get_exact::<String>() {
+                                *value = v;
                             }
                         }
                     }

@@ -1,5 +1,5 @@
 # matching 1.92 stable release
-nightly := "+nightly-2025-10-24"
+nightly := "+nightly"
 
 list:
   just --list

@@ -330,7 +330,7 @@ impl World {
                     .push((entity, vec![Reference::null(); count]));
                 &mut bucket.entitity_components[index].1
             };
-            for component in original.into_iter().chain(components.into_iter()) {
+            for component in original.into_iter().chain(components) {
                 if let Some(component_type) = component.type_of()
                     && let Some(index) = bucket
                         .types

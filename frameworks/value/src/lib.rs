@@ -1,5 +1,4 @@
 use intuicio_data::{
-    is_copy,
     lifetime::{ValueReadAccess, ValueWriteAccess},
     managed::gc::DynamicManagedGc,
     type_hash::TypeHash,
@@ -136,22 +135,27 @@ impl Value {
         }
     }
 
-    pub fn primitive_or_gc<T>(value: T) -> Self {
-        if is_copy::<T>() && std::mem::size_of::<T>() <= SIZE {
-            let mut data = [0; SIZE];
-            unsafe {
-                data.as_mut_ptr().cast::<T>().write(value);
-            }
-            Self {
-                inner: ValueContent::Primitive {
-                    type_hash: TypeHash::of::<T>(),
-                    data,
-                },
-            }
-        } else {
-            Self {
-                inner: ValueContent::Gc(DynamicManagedGc::new(value)),
-            }
+    pub fn primitive<T: Copy>(value: T) -> Self {
+        assert!(
+            std::mem::size_of::<T>() <= SIZE,
+            "Value can only store primitives up to {} bytes",
+            SIZE
+        );
+        let mut data = [0; SIZE];
+        unsafe {
+            data.as_mut_ptr().cast::<T>().write(value);
+        }
+        Self {
+            inner: ValueContent::Primitive {
+                type_hash: TypeHash::of::<T>(),
+                data,
+            },
+        }
+    }
+
+    pub fn gc<T>(value: T) -> Self {
+        Self {
+            inner: ValueContent::Gc(DynamicManagedGc::new(value)),
         }
     }
 
@@ -285,11 +289,11 @@ mod tests {
             }
         );
         assert_eq!(SIZE, 80);
-        let a = Value::primitive_or_gc(42u8);
-        let b = Value::primitive_or_gc(10u16);
-        let c = Value::primitive_or_gc(4.2f32);
+        let a = Value::primitive(42u8);
+        let b = Value::primitive(10u16);
+        let c = Value::primitive(4.2f32);
         let d = Value::array([a.clone(), b.clone(), c.clone()]);
-        let mut e = Value::primitive_or_gc([42u64; 10000]);
+        let mut e = Value::gc([42u64; 10000]);
         let k1 = Value::string("foo");
         let k2 = Value::string("bar");
         let f = Value::map([(k1.clone(), d.clone()), (k2.clone(), e.clone())]);
