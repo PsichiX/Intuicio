@@ -1,14 +1,22 @@
+//! Running parsers one after another.
+//!
+//! Both parsers here yield a `Vec<ParserOutput>` with one entry per part.
+//! The `_inv` variants drop the entries that carry [`ParserNoValue`], which
+//! keeps whitespace and other separators out of the result.
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`SequenceParser`].
     pub fn seq(values: impl IntoIterator<Item = ParserHandle>) -> ParserHandle {
         SequenceParser::from_iter(values).into_handle()
     }
 
+    /// See [`SequenceDelimitedParser`].
     pub fn seq_del(
         delimiter: ParserHandle,
         values: impl IntoIterator<Item = ParserHandle>,
@@ -20,12 +28,14 @@ pub mod shorthand {
         result.into_handle()
     }
 
+    /// [`SequenceParser`] that drops empty outputs.
     pub fn seq_inv(values: impl IntoIterator<Item = ParserHandle>) -> ParserHandle {
         SequenceParser::from_iter(values)
             .ignore_no_value(true)
             .into_handle()
     }
 
+    /// [`SequenceDelimitedParser`] that drops empty outputs.
     pub fn seq_del_inv(
         delimiter: ParserHandle,
         values: impl IntoIterator<Item = ParserHandle>,
@@ -38,6 +48,9 @@ pub mod shorthand {
     }
 }
 
+/// Runs every parser in order and collects their outputs.
+///
+/// Fails as soon as one of them fails, so a sequence is all or nothing.
 #[derive(Default, Clone)]
 pub struct SequenceParser {
     parsers: Vec<ParserHandle>,
@@ -45,16 +58,19 @@ pub struct SequenceParser {
 }
 
 impl SequenceParser {
+    /// Appends `parser`, builder style.
     pub fn with(mut self, parser: ParserHandle) -> Self {
         self.push(parser);
         self
     }
 
+    /// Sets whether [`ParserNoValue`] outputs are left out of the result.
     pub fn ignore_no_value(mut self, ignore: bool) -> Self {
         self.ignore_no_value = ignore;
         self
     }
 
+    /// Appends `parser`.
     pub fn push(&mut self, parser: ParserHandle) {
         self.parsers.push(parser);
     }
@@ -83,6 +99,10 @@ impl FromIterator<ParserHandle> for SequenceParser {
     }
 }
 
+/// Runs every parser in order with a delimiter between them.
+///
+/// The delimiter has to match between each pair, and what it produces is
+/// thrown away.
 #[derive(Clone)]
 pub struct SequenceDelimitedParser {
     delimiter: ParserHandle,
@@ -91,6 +111,7 @@ pub struct SequenceDelimitedParser {
 }
 
 impl SequenceDelimitedParser {
+    /// Separates the parts with `delimiter`.
     pub fn new(delimiter: ParserHandle) -> Self {
         Self {
             delimiter,
@@ -99,16 +120,19 @@ impl SequenceDelimitedParser {
         }
     }
 
+    /// Appends `parser`, builder style.
     pub fn with(mut self, parser: ParserHandle) -> Self {
         self.push(parser);
         self
     }
 
+    /// Sets whether [`ParserNoValue`] outputs are left out of the result.
     pub fn ignore_no_value(mut self, ignore: bool) -> Self {
         self.ignore_no_value = ignore;
         self
     }
 
+    /// Appends `parser`.
     pub fn push(&mut self, parser: ParserHandle) {
         self.parsers.push(parser);
     }

@@ -227,7 +227,7 @@ impl Pipeline {
                     let size = (end - start) as usize;
                     if let Some(function) = registry.find_function(FunctionQuery {
                         name: Some(function_name.into()),
-                        module_name: function_module_name.map(|name| name.into()),
+                        module_name: function_module_name.map(|name| name.into()).into(),
                         ..Default::default()
                     }) {
                         (start..end)

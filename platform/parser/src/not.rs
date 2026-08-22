@@ -1,19 +1,28 @@
+//! Negative lookahead.
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`NotParser`].
     pub fn not(parser: ParserHandle) -> ParserHandle {
         NotParser::new(parser).into_handle()
     }
 }
 
+/// Succeeds exactly when the inner parser fails, and fails when it
+/// succeeds.
+///
+/// Consumes nothing either way and yields [`ParserNoValue`], so it only
+/// guards what may follow.
 #[derive(Clone)]
 pub struct NotParser(ParserHandle);
 
 impl NotParser {
+    /// Negates `parser`.
     pub fn new(parser: ParserHandle) -> Self {
         Self(parser)
     }

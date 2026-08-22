@@ -1,29 +1,40 @@
+//! Choosing between parsers.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserRegistry};
 use std::fmt::Write;
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`AlternationParser`].
     pub fn alt(values: impl IntoIterator<Item = ParserHandle>) -> ParserHandle {
         AlternationParser::from_iter(values).into_handle()
     }
 }
 
+/// Tries each parser in order and takes the first that matches.
+///
+/// Order decides the outcome, so put the longer or more specific option
+/// first. When every option fails the errors are joined into one message.
 #[derive(Default, Clone)]
 pub struct AlternationParser {
     parsers: Vec<ParserHandle>,
 }
 
 impl AlternationParser {
+    /// Appends `parser`, builder style.
     pub fn with(mut self, parser: ParserHandle) -> Self {
         self.append(parser);
         self
     }
 
+    /// Adds `parser` as the last option to try.
     pub fn append(&mut self, parser: ParserHandle) {
         self.parsers.push(parser);
     }
 
+    /// Adds `parser` as the first option to try, ahead of everything already
+    /// there.
     pub fn prepend(&mut self, parser: ParserHandle) {
         self.parsers.insert(0, parser);
     }

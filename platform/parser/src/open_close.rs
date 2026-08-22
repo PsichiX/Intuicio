@@ -1,22 +1,30 @@
+//! Matching something between two markers.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserRegistry};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
     use crate::shorthand::ignore;
 
+    /// See [`OpenCloseParser`].
     pub fn oc(parser: ParserHandle, open: ParserHandle, close: ParserHandle) -> ParserHandle {
         OpenCloseParser::new(parser, open, close).into_handle()
     }
 
+    /// [`OpenCloseParser`] with an opening marker only.
     pub fn prefix(parser: ParserHandle, prefix: ParserHandle) -> ParserHandle {
         oc(parser, prefix, ignore())
     }
 
+    /// [`OpenCloseParser`] with a closing marker only.
     pub fn suffix(parser: ParserHandle, suffix: ParserHandle) -> ParserHandle {
         oc(parser, ignore(), suffix)
     }
 }
 
+/// Matches an opening parser, the inner one, then a closing parser.
+///
+/// Only the inner value is kept. What the markers produce is thrown away.
 #[derive(Clone)]
 pub struct OpenCloseParser {
     parser: ParserHandle,
@@ -25,6 +33,7 @@ pub struct OpenCloseParser {
 }
 
 impl OpenCloseParser {
+    /// Matches `parser` between `open` and `close`.
     pub fn new(parser: ParserHandle, open: ParserHandle, close: ParserHandle) -> Self {
         Self {
             parser,

@@ -417,9 +417,7 @@ impl<T: NodeDefinition> NodeGraph<T> {
     }
 
     pub fn query_nearest_nodes(&self, x: i64, y: i64) -> impl Iterator<Item = NodeId<T>> + '_ {
-        self.rtree
-            .nearest_neighbor_iter(&[x, y])
-            .map(|node| node.id)
+        self.rtree.nearest_neighbor_iter([x, y]).map(|node| node.id)
     }
 
     pub fn query_region_nodes(
@@ -431,7 +429,7 @@ impl<T: NodeDefinition> NodeGraph<T> {
         extrude: i64,
     ) -> impl Iterator<Item = NodeId<T>> + '_ {
         self.rtree
-            .locate_in_envelope(&AABB::from_corners(
+            .locate_in_envelope(AABB::from_corners(
                 [fx - extrude, fy - extrude],
                 [tx - extrude, ty - extrude],
             ))

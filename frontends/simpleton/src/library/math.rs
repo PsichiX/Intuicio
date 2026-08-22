@@ -1,7 +1,7 @@
 use crate::{Boolean, Integer, Real, Reference};
 use intuicio_core::{define_native_struct, registry::Registry};
 use intuicio_derive::intuicio_function;
-use rand::Rng;
+use rand::RngExt;
 use std::ops::Rem;
 
 #[intuicio_function(module_name = "math", use_registry)]

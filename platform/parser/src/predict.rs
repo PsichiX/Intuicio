@@ -1,17 +1,25 @@
+//! Positive lookahead.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserRegistry};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`PredictParser`].
     pub fn pred(parser: ParserHandle) -> ParserHandle {
         PredictParser::new(parser).into_handle()
     }
 }
 
+/// Runs the inner parser for its verdict only, then rewinds.
+///
+/// Keeps the value the inner parser produced but leaves the input where it
+/// was, so the same text can be matched again by what follows.
 #[derive(Clone)]
 pub struct PredictParser(ParserHandle);
 
 impl PredictParser {
+    /// Looks ahead with `parser`.
     pub fn new(parser: ParserHandle) -> Self {
         Self(parser)
     }

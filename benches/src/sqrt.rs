@@ -132,7 +132,7 @@ pub fn bench() {
         let sqrt = registry
             .find_function(FunctionQuery {
                 name: Some("sqrt".into()),
-                module_name: Some("test".into()),
+                module_name: Some("test".into()).into(),
                 ..Default::default()
             })
             .unwrap();

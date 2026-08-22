@@ -1,3 +1,15 @@
+//! Calling C functions from Intuicio.
+//!
+//! A C function has no Intuicio signature of its own, so the caller gives it
+//! one. [`FfiFunction`] pops the arguments that signature names off the context
+//! stack, calls through libffi, and pushes the result back. It therefore looks
+//! like any other function body.
+//!
+//! [`FfiLibrary`] loads a dynamic library and finds a function in it by the
+//! name in the signature.
+//!
+//! Only native types work here. Every argument and result is passed as its raw
+//! bytes, and a runtime type has no C representation.
 use intuicio_core::{
     context::Context,
     function::{Function, FunctionBody, FunctionQuery, FunctionSignature},
@@ -17,10 +29,16 @@ use std::{
     sync::Arc,
 };
 
+/// Address of a C function, as libffi names it.
 pub use libffi::low::CodePtr as FfiCodePtr;
 
+/// A shared [`FfiFunction`], as [`FfiLibrary`] hands it out.
 pub type FfiFunctionHandle = Arc<FfiFunction>;
 
+/// A loaded dynamic library and the functions taken out of it.
+///
+/// The library stays loaded for as long as this value lives, so every
+/// [`FfiFunctionHandle`] taken from it has to be dropped first.
 pub struct FfiLibrary {
     library: Library,
     functions: Vec<(FunctionSignature, FfiFunctionHandle)>,
@@ -28,6 +46,14 @@ pub struct FfiLibrary {
 }
 
 impl FfiLibrary {
+    /// Loads the library at `path`.
+    ///
+    /// A path with no extension gets the one this platform uses for dynamic
+    /// libraries, so `"target/debug/mylib"` works everywhere.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the library cannot be loaded.
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Box<dyn Error>> {
         let mut path = path.as_ref().to_path_buf();
         if path.extension().is_none() {
@@ -40,10 +66,23 @@ impl FfiLibrary {
         })
     }
 
+    /// Returns the path the library was loaded from.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Finds the symbol named by `signature` and describes it with that
+    /// signature.
+    ///
+    /// The handle is remembered, so [`FfiLibrary::find`] can look it up later.
+    /// Asking twice for the same signature replaces the earlier handle.
+    ///
+    /// The output parameter named `result` becomes the return type. Any other
+    /// output is ignored, since a C function returns at most one value.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the library exports no symbol of that name.
     pub fn function(
         &mut self,
         signature: FunctionSignature,
@@ -71,6 +110,8 @@ impl FfiLibrary {
         }
     }
 
+    /// Returns the first function already taken from this library that `query`
+    /// matches.
     pub fn find(&self, query: FunctionQuery) -> Option<FfiFunctionHandle> {
         self.functions.iter().find_map(|(signature, handle)| {
             if query.is_valid(signature) {
@@ -83,6 +124,10 @@ impl FfiLibrary {
 }
 
 #[derive(Debug, Clone)]
+/// A C function plus the Intuicio types of its arguments and result.
+///
+/// [`FfiFunction::call`] moves values between the context stack and the C call.
+/// Types are only used for their layout, so they must be native ones.
 pub struct FfiFunction {
     function: FfiCodePtr,
     result: Option<TypeHandle>,
@@ -93,6 +138,10 @@ unsafe impl Send for FfiFunction {}
 unsafe impl Sync for FfiFunction {}
 
 impl FfiFunction {
+    /// Describes `function` with the types of `signature`.
+    ///
+    /// The output parameter named `result` becomes the return type. Any other
+    /// output is ignored.
     pub fn from_function_signature(function: FfiCodePtr, signature: &FunctionSignature) -> Self {
         FfiFunction {
             function,
@@ -109,6 +158,11 @@ impl FfiFunction {
         }
     }
 
+    /// Wraps `function` into an Intuicio [`Function`], ready to be registered.
+    ///
+    /// # Panics
+    ///
+    /// The generated body panics when a call fails.
     pub fn build_function(function: FfiCodePtr, signature: FunctionSignature) -> Function {
         let ffi = Self::from_function_signature(function, &signature);
         Function::new(
@@ -119,6 +173,10 @@ impl FfiFunction {
         )
     }
 
+    /// Describes `function` as taking nothing and returning nothing.
+    ///
+    /// Add the types with [`FfiFunction::with_argument`] and
+    /// [`FfiFunction::with_result`].
     pub fn new(function: FfiCodePtr) -> Self {
         Self {
             function,
@@ -127,25 +185,47 @@ impl FfiFunction {
         }
     }
 
+    /// Sets the return type, builder style.
     pub fn with_result(mut self, type_: TypeHandle) -> Self {
         self.result(type_);
         self
     }
 
+    /// Appends an argument type, builder style.
     pub fn with_argument(mut self, type_: TypeHandle) -> Self {
         self.argument(type_);
         self
     }
 
+    /// Sets the return type.
     pub fn result(&mut self, type_: TypeHandle) {
         self.result = Some(type_);
     }
 
+    /// Appends an argument type.
     pub fn argument(&mut self, type_: TypeHandle) {
         self.arguments.push(type_);
     }
 
+    /// Pops the arguments off the context stack, calls the C function, and
+    /// pushes the result back.
+    ///
+    /// Arguments are popped in declaration order, so push them in reverse.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the stack is empty or holds a value of another type. Values
+    /// popped before the failure are dropped.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the result type is a runtime type, which has no C
+    /// representation.
+    ///
     /// # Safety
+    ///
+    /// The described types must match what the C function really takes and
+    /// returns. A mismatch reads or writes the wrong number of bytes.
     pub unsafe fn call(&self, context: &mut Context) -> Result<(), Box<dyn Error>> {
         let mut arguments_data = self
             .arguments
@@ -204,13 +284,16 @@ impl FfiFunction {
             )
         };
         if let Some(type_) = self.result.as_ref() {
-            unsafe {
-                context.stack().push_raw(
-                    *type_.layout(),
-                    type_.type_hash(),
-                    type_.finalizer(),
-                    &result,
+            let finalizer = type_.finalizer().as_native().unwrap_or_else(|| {
+                panic!(
+                    "Foreign function result type `{}` is a runtime type, which has no C representation",
+                    type_.name()
                 )
+            });
+            unsafe {
+                context
+                    .stack()
+                    .push_raw(*type_.layout(), type_.type_hash(), finalizer, &result)
             };
         }
         Ok(())

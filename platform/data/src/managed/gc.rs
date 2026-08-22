@@ -1,5 +1,38 @@
+//! Value boxes that tolerate reference cycles.
+//!
+//! Reference counting leaks when two values point at each other. These boxes
+//! avoid that by not counting at all: exactly one handle **owns** the
+//! allocation and every other handle only **references** it. A cycle is then
+//! just a reference pointing back, and nothing keeps the value alive on its
+//! own.
+//!
+//! When the owner is dropped the value is destroyed, and every reference to
+//! it reports that through [`DynamicManagedGc::exists`] rather than dangling.
+//! Ownership can also be handed to a reference with
+//! [`DynamicManagedGc::transfer_ownership`], which is how a value outlives the
+//! handle it started in.
+//!
+//! [`ManagedGc`] is the typed box, [`DynamicManagedGc`] the type-erased one it
+//! is built on.
+//!
+//! # Blocking and non-blocking access
+//!
+//! The `try_` methods return [`None`] when the value is busy. The plain ones
+//! take a `LOCKING` constant: `true` spins until the value is free, `false`
+//! panics right away. Pick `false` on a single thread, where a busy value
+//! means a bug rather than a race.
+//!
+//! ```
+//! # use intuicio_data::managed::gc::ManagedGc;
+//! let mut owner = ManagedGc::new(42);
+//! let handle = owner.reference();
+//! assert!(handle.exists());
+//! drop(owner);
+//! // the owner is gone, so the reference knows the value is gone too
+//! assert!(!handle.exists());
+//! ```
 use crate::{
-    Finalize,
+    Finalize, Finalizer,
     lifetime::{Lifetime, LifetimeLazy, ValueReadAccess, ValueWriteAccess},
     managed::{
         DynamicManagedLazy, DynamicManagedRef, DynamicManagedRefMut, ManagedLazy, ManagedRef,
@@ -15,6 +48,7 @@ use std::{
     mem::MaybeUninit,
 };
 
+/// Whether this handle owns the allocation or only points at it.
 enum Kind {
     Owned {
         lifetime: Box<Lifetime>,
@@ -26,11 +60,19 @@ enum Kind {
     },
 }
 
+/// Borrow state of a garbage collected box, as seen from a handle.
+///
+/// Which variant comes back tells whether the handle owns the value.
 pub enum ManagedGcLifetime<'a> {
+    /// This handle owns the value.
     Owned(&'a Lifetime),
+    /// This handle only references the value.
     Referenced(&'a LifetimeLazy),
 }
 
+/// Typed garbage collected box.
+///
+/// See the [module docs](self) for the ownership model.
 pub struct ManagedGc<T> {
     dynamic: DynamicManagedGc,
     _phantom: PhantomData<fn() -> T>,
@@ -46,6 +88,7 @@ impl<T: Default> Default for ManagedGc<T> {
 }
 
 impl<T> ManagedGc<T> {
+    /// Allocates a value and owns it.
     pub fn new(data: T) -> Self {
         Self {
             dynamic: DynamicManagedGc::new(data),
@@ -53,7 +96,16 @@ impl<T> ManagedGc<T> {
         }
     }
 
+    /// Allocates a value that can point back at itself.
+    ///
+    /// `f` is handed a reference to the box before the value exists, so it can
+    /// store it inside the value it returns.
+    ///
     /// # Safety
+    ///
+    /// The handle passed to `f` points at memory that is not written yet.
+    /// Storing it is fine, but reading or writing through it before `f`
+    /// returns is undefined.
     pub unsafe fn new_cyclic(f: impl FnOnce(Self) -> T) -> Self {
         Self {
             dynamic: unsafe { DynamicManagedGc::new_cyclic(|dynamic| f(dynamic.into_typed())) },
@@ -61,6 +113,7 @@ impl<T> ManagedGc<T> {
         }
     }
 
+    /// Takes another handle that references the same value without owning it.
     pub fn reference(&self) -> Self {
         Self {
             dynamic: self.dynamic.reference(),
@@ -68,6 +121,10 @@ impl<T> ManagedGc<T> {
         }
     }
 
+    /// Takes the value out and frees the allocation.
+    ///
+    /// Gives the box back when it does not own the value or something is
+    /// accessing it.
     pub fn consume(self) -> Result<T, Self> {
         self.dynamic.consume().map_err(|value| Self {
             dynamic: value,
@@ -75,66 +132,108 @@ impl<T> ManagedGc<T> {
         })
     }
 
+    /// Erases the type.
     pub fn into_dynamic(self) -> DynamicManagedGc {
         self.dynamic
     }
 
+    /// Replaces the lifetime, killing every reference taken so far. Does
+    /// nothing on a referencing handle.
     pub fn renew(&mut self) {
         self.dynamic.renew();
     }
 
+    /// Returns the type of the value.
     pub fn type_hash(&self) -> TypeHash {
         self.dynamic.type_hash()
     }
 
+    /// Returns the borrow state, and with it whether this handle owns the
+    /// value.
     pub fn lifetime(&self) -> ManagedGcLifetime<'_> {
         self.dynamic.lifetime()
     }
 
+    /// Returns `true` while the value is alive.
+    ///
+    /// Always `true` for the owner.
     pub fn exists(&self) -> bool {
         self.dynamic.exists()
     }
 
+    /// Returns `true` when this handle owns the value.
     pub fn is_owning(&self) -> bool {
         self.dynamic.is_owning()
     }
 
+    /// Returns `true` when this handle only references the value.
     pub fn is_referencing(&self) -> bool {
         self.dynamic.is_referencing()
     }
 
+    /// Returns `true` when this handle references the value that `other` owns.
     pub fn is_owned_by(&self, other: &Self) -> bool {
         self.dynamic.is_owned_by(&other.dynamic)
     }
 
+    /// Hands ownership over to a handle that references this value.
+    ///
+    /// Returns `false` unless this handle owns the value and `new_owner`
+    /// references it.
     pub fn transfer_ownership(&mut self, new_owner: &mut Self) -> bool {
         self.dynamic.transfer_ownership(&mut new_owner.dynamic)
     }
 
+    /// Guards the value for reading, or returns [`None`] when it is busy or
+    /// gone.
     pub fn try_read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         self.dynamic.try_read::<T>()
     }
 
+    /// Guards the value for writing, or returns [`None`] when it is busy or
+    /// gone.
     pub fn try_write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         self.dynamic.try_write::<T>()
     }
 
+    /// Guards the value for reading, spinning until it is free when `LOCKING`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is gone, or when it is busy and `LOCKING` is
+    /// `false`.
     pub fn read<const LOCKING: bool>(&'_ self) -> ValueReadAccess<'_, T> {
         self.dynamic.read::<LOCKING, T>()
     }
 
+    /// Guards the value for writing, spinning until it is free when `LOCKING`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is gone, or when it is busy and `LOCKING` is
+    /// `false`.
     pub fn write<const LOCKING: bool>(&'_ mut self) -> ValueWriteAccess<'_, T> {
         self.dynamic.write::<LOCKING, T>()
     }
 
+    /// Takes a shared handle, or returns [`None`] when the value is busy or
+    /// gone.
     pub fn try_borrow(&self) -> Option<ManagedRef<T>> {
         self.dynamic.try_borrow()?.into_typed().ok()
     }
 
+    /// Takes an exclusive handle, or returns [`None`] when the value is busy or
+    /// gone.
     pub fn try_borrow_mut(&self) -> Option<ManagedRefMut<T>> {
         self.dynamic.try_borrow_mut()?.into_typed().ok()
     }
 
+    /// Takes a shared handle, spinning until it is free when `LOCKING`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is gone, or when it is busy and `LOCKING` is
+    /// `false`.
     pub fn borrow<const LOCKING: bool>(&self) -> ManagedRef<T> {
         self.dynamic
             .borrow::<LOCKING>()
@@ -143,6 +242,12 @@ impl<T> ManagedGc<T> {
             .expect("ManagedGc cannot be immutably borrowed")
     }
 
+    /// Takes an exclusive handle, spinning until it is free when `LOCKING`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is gone, or when it is busy and `LOCKING` is
+    /// `false`.
     pub fn borrow_mut<const LOCKING: bool>(&mut self) -> ManagedRefMut<T> {
         self.dynamic
             .borrow_mut::<LOCKING>()
@@ -151,6 +256,11 @@ impl<T> ManagedGc<T> {
             .expect("ManagedGc cannot be mutably borrowed")
     }
 
+    /// Takes an unclaimed handle, which claims nothing and never blocks.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is gone.
     pub fn lazy(&self) -> ManagedLazy<T> {
         self.dynamic
             .lazy()
@@ -159,12 +269,22 @@ impl<T> ManagedGc<T> {
             .expect("ManagedGc cannot be lazily borrowed")
     }
 
+    /// Returns a pointer to the value, checking nothing.
+    ///
     /// # Safety
+    ///
+    /// Neither the borrow state nor whether the value is still alive is
+    /// checked.
     pub unsafe fn as_ptr(&self) -> *const T {
         unsafe { self.dynamic.as_ptr_raw().cast::<T>() }
     }
 
+    /// Returns a mutable pointer to the value, checking nothing.
+    ///
     /// # Safety
+    ///
+    /// Neither the borrow state nor whether the value is still alive is
+    /// checked.
     pub unsafe fn as_mut_ptr(&mut self) -> *mut T {
         unsafe { self.dynamic.as_mut_ptr_raw().cast::<T>() }
     }
@@ -181,11 +301,15 @@ impl<T> TryFrom<ManagedValue<T>> for ManagedGc<T> {
     }
 }
 
+/// Type-erased garbage collected box.
+///
+/// The [`ManagedGc`] counterpart for script values. See the
+/// [module docs](self) for the ownership model.
 pub struct DynamicManagedGc {
     type_hash: TypeHash,
     kind: Kind,
     layout: Layout,
-    finalizer: unsafe fn(*mut ()),
+    finalizer: Finalizer,
     drop: bool,
 }
 
@@ -205,7 +329,7 @@ impl Drop for DynamicManagedGc {
                 if data.is_null() {
                     return;
                 }
-                (self.finalizer)(data.cast::<()>());
+                self.finalizer.finalize(data.cast::<()>());
                 non_zero_dealloc(*data, self.layout);
             }
         }
@@ -213,6 +337,7 @@ impl Drop for DynamicManagedGc {
 }
 
 impl DynamicManagedGc {
+    /// Allocates a value and owns it.
     pub fn new<T: Finalize>(data: T) -> Self {
         let layout = Layout::new::<T>().pad_to_align();
         unsafe {
@@ -228,13 +353,22 @@ impl DynamicManagedGc {
                     data: memory.cast::<u8>(),
                 },
                 layout,
-                finalizer: T::finalize_raw,
+                finalizer: Finalizer::of::<T>(),
                 drop: true,
             }
         }
     }
 
+    /// Allocates a value that can point back at itself.
+    ///
+    /// `f` is handed a reference to the box before the value exists, so it can
+    /// store it inside the value it returns.
+    ///
     /// # Safety
+    ///
+    /// The handle passed to `f` points at memory that is not written yet.
+    /// Storing it is fine, but reading or writing through it before `f`
+    /// returns is undefined.
     pub unsafe fn new_cyclic<T: Finalize>(f: impl FnOnce(Self) -> T) -> Self {
         let layout = Layout::new::<T>().pad_to_align();
         unsafe {
@@ -249,7 +383,7 @@ impl DynamicManagedGc {
                     data: memory.cast::<u8>(),
                 },
                 layout,
-                finalizer: T::finalize_raw,
+                finalizer: Finalizer::of::<T>(),
                 drop: true,
             };
             let data = f(result.reference());
@@ -258,12 +392,19 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Takes ownership of an existing allocation.
+    ///
+    /// The box will free `memory` and run `finalizer` when it is dropped.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `memory` is null.
     pub fn new_raw(
         type_hash: TypeHash,
         lifetime: Lifetime,
         memory: *mut u8,
         layout: Layout,
-        finalizer: unsafe fn(*mut ()),
+        finalizer: impl Into<Finalizer>,
     ) -> Self {
         if memory.is_null() {
             handle_alloc_error(layout);
@@ -275,15 +416,19 @@ impl DynamicManagedGc {
                 data: memory,
             },
             layout,
-            finalizer,
+            finalizer: finalizer.into(),
             drop: true,
         }
     }
 
+    /// Allocates room for a value without writing one into it.
+    ///
+    /// The finalizer still runs on drop, so the caller must fill the memory
+    /// before the box is dropped or read.
     pub fn new_uninitialized(
         type_hash: TypeHash,
         layout: Layout,
-        finalizer: unsafe fn(*mut ()),
+        finalizer: impl Into<Finalizer>,
     ) -> Self {
         let memory = unsafe { non_zero_alloc(layout) };
         if memory.is_null() {
@@ -296,11 +441,12 @@ impl DynamicManagedGc {
                 data: memory,
             },
             layout,
-            finalizer,
+            finalizer: finalizer.into(),
             drop: true,
         }
     }
 
+    /// Takes another handle that references the same value without owning it.
     pub fn reference(&self) -> Self {
         match &self.kind {
             Kind::Owned { lifetime, data } => Self {
@@ -310,7 +456,7 @@ impl DynamicManagedGc {
                     data: *data,
                 },
                 layout: self.layout,
-                finalizer: self.finalizer,
+                finalizer: self.finalizer.clone(),
                 drop: true,
             },
             Kind::Referenced { lifetime, data } => Self {
@@ -320,12 +466,16 @@ impl DynamicManagedGc {
                     data: *data,
                 },
                 layout: self.layout,
-                finalizer: self.finalizer,
+                finalizer: self.finalizer.clone(),
                 drop: true,
             },
         }
     }
 
+    /// Takes the value out and frees the allocation.
+    ///
+    /// Gives the box back when it does not own the value, the type does not
+    /// match, or something is accessing it.
     pub fn consume<T>(mut self) -> Result<T, Self> {
         if let Kind::Owned { lifetime, data } = &mut self.kind {
             if self.type_hash == TypeHash::of::<T>() && !lifetime.state().is_in_use() {
@@ -347,6 +497,7 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Puts a type back on the box.
     pub fn into_typed<T>(self) -> ManagedGc<T> {
         ManagedGc {
             dynamic: self,
@@ -354,16 +505,21 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Replaces the lifetime, killing every reference taken so far. Does
+    /// nothing on a referencing handle.
     pub fn renew(&mut self) {
         if let Kind::Owned { lifetime, .. } = &mut self.kind {
             **lifetime = Default::default();
         }
     }
 
+    /// Returns the type of the value.
     pub fn type_hash(&self) -> TypeHash {
         self.type_hash
     }
 
+    /// Returns the borrow state, and with it whether this handle owns the
+    /// value.
     pub fn lifetime(&self) -> ManagedGcLifetime<'_> {
         match &self.kind {
             Kind::Owned { lifetime, .. } => ManagedGcLifetime::Owned(lifetime),
@@ -371,15 +527,22 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Returns the layout of the allocation.
     pub fn layout(&self) -> &Layout {
         &self.layout
     }
 
-    pub fn finalizer(&self) -> unsafe fn(*mut ()) {
-        self.finalizer
+    /// Returns the drop function of the stored type.
+    pub fn finalizer(&self) -> &Finalizer {
+        &self.finalizer
     }
 
+    /// Returns the value as raw bytes.
+    ///
     /// # Safety
+    ///
+    /// Bypasses the borrow state, and does not check that the value is still
+    /// alive.
     pub unsafe fn memory(&self) -> &[u8] {
         let memory = match &self.kind {
             Kind::Owned { data, .. } => *data,
@@ -388,7 +551,13 @@ impl DynamicManagedGc {
         unsafe { std::slice::from_raw_parts(memory, self.layout.size()) }
     }
 
+    /// Returns the value as mutable raw bytes.
+    ///
     /// # Safety
+    ///
+    /// Bypasses the borrow state, does not check that the value is still
+    /// alive, and writing bytes that are not a valid value of the stored type
+    /// makes every later access undefined.
     pub unsafe fn memory_mut(&mut self) -> &mut [u8] {
         let memory = match &mut self.kind {
             Kind::Owned { data, .. } => *data,
@@ -397,6 +566,9 @@ impl DynamicManagedGc {
         unsafe { std::slice::from_raw_parts_mut(memory, self.layout.size()) }
     }
 
+    /// Returns `true` while the value is alive.
+    ///
+    /// Always `true` for the owner.
     pub fn exists(&self) -> bool {
         match &self.kind {
             Kind::Owned { .. } => true,
@@ -404,14 +576,17 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Returns `true` when this handle owns the value.
     pub fn is_owning(&self) -> bool {
         matches!(self.kind, Kind::Owned { .. })
     }
 
+    /// Returns `true` when this handle only references the value.
     pub fn is_referencing(&self) -> bool {
         matches!(self.kind, Kind::Referenced { .. })
     }
 
+    /// Returns `true` when this handle references the value that `other` owns.
     pub fn is_owned_by(&self, other: &Self) -> bool {
         if let (
             Kind::Referenced {
@@ -430,6 +605,10 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Hands ownership over to a handle that references this value.
+    ///
+    /// Returns `false` unless this handle owns the value and `new_owner`
+    /// references it.
     pub fn transfer_ownership(&mut self, new_owner: &mut Self) -> bool {
         if let (
             Kind::Owned {
@@ -451,10 +630,17 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Returns `true` when the value is a `T`.
     pub fn is<T>(&self) -> bool {
         self.type_hash == TypeHash::of::<T>()
     }
 
+    /// Guards the value for reading, or returns [`None`] when it is busy or
+    /// gone.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is not a `T`.
     pub fn try_read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         if !self.is::<T>() {
             panic!(
@@ -480,6 +666,12 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Guards the value for writing, or returns [`None`] when it is busy or
+    /// gone.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is not a `T`.
     pub fn try_write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         if !self.is::<T>() {
             panic!(
@@ -505,6 +697,12 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Guards the value for reading, spinning until it is free when `LOCKING`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is not a `T`, is gone, or is busy and `LOCKING`
+    /// is `false`.
     pub fn read<const LOCKING: bool, T>(&'_ self) -> ValueReadAccess<'_, T> {
         if !self.is::<T>() {
             panic!(
@@ -564,6 +762,12 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Guards the value for writing, spinning until it is free when `LOCKING`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is not a `T`, is gone, or is busy and `LOCKING`
+    /// is `false`.
     pub fn write<const LOCKING: bool, T>(&'_ mut self) -> ValueWriteAccess<'_, T> {
         if !self.is::<T>() {
             panic!(
@@ -623,6 +827,8 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Takes a shared handle, or returns [`None`] when the value is busy or
+    /// gone.
     pub fn try_borrow(&self) -> Option<DynamicManagedRef> {
         unsafe {
             match &self.kind {
@@ -636,6 +842,8 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Takes an exclusive handle, or returns [`None`] when the value is busy or
+    /// gone.
     pub fn try_borrow_mut(&self) -> Option<DynamicManagedRefMut> {
         unsafe {
             match &self.kind {
@@ -649,6 +857,12 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Takes a shared handle, spinning until it is free when `LOCKING`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is gone, or when it is busy and `LOCKING` is
+    /// `false`.
     pub fn borrow<const LOCKING: bool>(&self) -> DynamicManagedRef {
         unsafe {
             if LOCKING {
@@ -694,6 +908,12 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Takes an exclusive handle, spinning until it is free when `LOCKING`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is gone, or when it is busy and `LOCKING` is
+    /// `false`.
     pub fn borrow_mut<const LOCKING: bool>(&mut self) -> DynamicManagedRefMut {
         unsafe {
             if LOCKING {
@@ -739,6 +959,11 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Takes an unclaimed handle, which claims nothing and never blocks.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is gone.
     pub fn lazy(&self) -> DynamicManagedLazy {
         unsafe {
             match &self.kind {
@@ -754,7 +979,12 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Returns the allocation pointer, checking nothing.
+    ///
     /// # Safety
+    ///
+    /// Neither the type, the borrow state, nor whether the value is still
+    /// alive is checked.
     pub unsafe fn as_ptr_raw(&self) -> *const u8 {
         match &self.kind {
             Kind::Owned { data, .. } => *data as *const u8,
@@ -762,7 +992,12 @@ impl DynamicManagedGc {
         }
     }
 
+    /// Returns the mutable allocation pointer, checking nothing.
+    ///
     /// # Safety
+    ///
+    /// Neither the type, the borrow state, nor whether the value is still
+    /// alive is checked.
     pub unsafe fn as_mut_ptr_raw(&mut self) -> *mut u8 {
         match &self.kind {
             Kind::Owned { data, .. } => *data,

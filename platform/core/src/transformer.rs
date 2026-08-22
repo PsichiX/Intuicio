@@ -1,3 +1,36 @@
+//! How native function arguments are represented on the script side.
+//!
+//! A Rust function like `fn add(a: &i32, b: &mut i32) -> i32` cannot take
+//! plain references off a script stack, because nothing on that stack has a
+//! Rust lifetime. A [`ValueTransformer`] decides which box stands in for each
+//! position instead: what an owned value becomes, what a `&T` becomes, and
+//! what a `&mut T` becomes.
+//!
+//! The derive macros take the choice as an attribute:
+//!
+//! ```ignore
+//! #[intuicio_function(transformer = "ManagedValueTransformer")]
+//! fn add(a: &i32, b: &mut i32) -> i32 {
+//!     *a + *b
+//! }
+//! ```
+//!
+//! With that transformer the script side passes a `ManagedRef<i32>` and a
+//! `ManagedRefMut<i32>`, and gets back a `Managed<i32>`.
+//!
+//! # Which one to pick
+//!
+//! | Transformer | Owned | Shared | Exclusive |
+//! |---|---|---|---|
+//! | [`SharedValueTransformer`] | `Shared<T>` | `Shared<T>` | `Shared<T>` |
+//! | [`ManagedValueTransformer`] | `Managed<T>` | `ManagedRef<T>` | `ManagedRefMut<T>` |
+//! | [`ManagedGcValueTransformer`] | `ManagedGc<T>` | `ManagedRef<T>` | `ManagedRefMut<T>` |
+//! | [`DynamicManagedValueTransformer`] | `DynamicManaged` | `DynamicManagedRef` | `DynamicManagedRefMut` |
+//! | [`DynamicManagedGcValueTransformer`] | `DynamicManagedGc` | `DynamicManagedRef` | `DynamicManagedRefMut` |
+//!
+//! The `Shared` one clones instead of borrowing, so it never fails but never
+//! shares writes either. The `Dynamic` ones erase the type, which is what a
+//! dynamically typed frontend wants. The `Gc` ones survive reference cycles.
 use crate::registry::Registry;
 use intuicio_data::{
     lifetime::*,
@@ -9,40 +42,72 @@ use std::{
     marker::PhantomData,
 };
 
+/// Maps between a Rust type and the boxes that stand in for it on the script
+/// side.
+///
+/// See the [module docs](self) for the ready-made implementations.
 pub trait ValueTransformer {
+    /// The Rust type being wrapped.
     type Type;
+    /// What reading through [`ValueTransformer::into_ref`] yields.
     type Borrow<'r>
     where
         Self::Type: 'r;
+    /// What writing through [`ValueTransformer::into_ref_mut`] yields.
     type BorrowMut<'r>
     where
         Self::Type: 'r;
+    /// Proof that the borrowed value stays alive, usually a borrow token taken
+    /// from the owner's lifetime.
     type Dependency;
+    /// The box standing in for an owned `Type`.
     type Owned;
+    /// The box standing in for a `&Type`.
     type Ref;
+    /// The box standing in for a `&mut Type`.
     type RefMut;
 
+    /// Wraps a value the native function produced.
     fn from_owned(registry: &Registry, value: Self::Type) -> Self::Owned;
+    /// Wraps a shared reference, tying it to `dependency`.
     fn from_ref(
         registry: &Registry,
         value: &Self::Type,
         dependency: Option<Self::Dependency>,
     ) -> Self::Ref;
+    /// Wraps an exclusive reference, tying it to `dependency`.
     fn from_ref_mut(
         registry: &Registry,
         value: &mut Self::Type,
         dependency: Option<Self::Dependency>,
     ) -> Self::RefMut;
+    /// Unwraps a value for the native function to take.
     fn into_owned(value: Self::Owned) -> Self::Type;
+    /// Opens a shared box for reading.
     fn into_ref(value: &Self::Ref) -> Self::Borrow<'_>;
+    /// Opens an exclusive box for writing.
     fn into_ref_mut(value: &mut Self::RefMut) -> Self::BorrowMut<'_>;
 }
 
+/// Produces the proof a transformer needs to hand out a reference.
+///
+/// Implemented for every box that can lend a borrow, so a method taking
+/// `&self` can tie its result to the receiver it came from.
 pub trait ValueDependency<T> {
+    /// Takes a shared borrow from `value`.
     fn as_ref(value: &T) -> Self;
+    /// Takes an exclusive borrow from `value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics for boxes that only hold a shared borrow themselves.
     fn as_ref_mut(value: &mut T) -> Self;
 }
 
+/// Passes values as `Shared<T>`, cloning instead of borrowing.
+///
+/// Never fails to hand out a value, but a script writing through one does
+/// not affect the original.
 pub struct SharedValueTransformer<T: Default + Clone + 'static>(PhantomData<fn() -> T>);
 
 impl<T: Default + Clone + 'static> ValueTransformer for SharedValueTransformer<T> {
@@ -83,6 +148,9 @@ impl<T: Default + Clone + 'static> ValueTransformer for SharedValueTransformer<T
     }
 }
 
+/// Passes values as [`Managed`] boxes with real borrow checking.
+///
+/// The usual choice for a statically typed frontend.
 pub struct ManagedValueTransformer<T>(PhantomData<fn() -> T>);
 
 impl<T> ValueTransformer for ManagedValueTransformer<T> {
@@ -145,6 +213,8 @@ impl<T> ValueTransformer for ManagedValueTransformer<T> {
     }
 }
 
+/// [`ManagedValueTransformer`] with [`ManagedGc`] ownership, for values that
+/// may take part in reference cycles.
 pub struct ManagedGcValueTransformer<T>(PhantomData<fn() -> T>);
 
 impl<T> ValueTransformer for ManagedGcValueTransformer<T> {
@@ -207,6 +277,9 @@ impl<T> ValueTransformer for ManagedGcValueTransformer<T> {
     }
 }
 
+/// Passes values as type-erased [`DynamicManaged`] boxes.
+///
+/// The usual choice for a dynamically typed frontend.
 pub struct DynamicManagedValueTransformer<T: 'static>(PhantomData<fn() -> T>);
 
 impl<T: 'static> ValueTransformer for DynamicManagedValueTransformer<T> {
@@ -269,6 +342,8 @@ impl<T: 'static> ValueTransformer for DynamicManagedValueTransformer<T> {
     }
 }
 
+/// [`DynamicManagedValueTransformer`] with [`DynamicManagedGc`] ownership,
+/// for values that may take part in reference cycles.
 pub struct DynamicManagedGcValueTransformer<T: 'static>(PhantomData<fn() -> T>);
 
 impl<T: 'static> ValueTransformer for DynamicManagedGcValueTransformer<T> {
@@ -331,8 +406,13 @@ impl<T: 'static> ValueTransformer for DynamicManagedGcValueTransformer<T> {
     }
 }
 
+/// A borrow token keeping a value alive while a reference to it is out.
+///
+/// This is the [`ValueTransformer::Dependency`] of every managed transformer.
 pub enum ManagedValueDependency {
+    /// A shared borrow of the owner.
     Ref(LifetimeRef),
+    /// An exclusive borrow of the owner.
     RefMut(LifetimeRefMut),
 }
 
@@ -438,6 +518,11 @@ mod tests {
         #[intuicio_method(dependency = "this")]
         fn get(&self) -> &i32 {
             &self.bar
+        }
+
+        #[intuicio_method(dependency = "this")]
+        fn get_mut(&mut self) -> &mut i32 {
+            &mut self.bar
         }
     }
 
@@ -656,6 +741,17 @@ mod tests {
             42
         );
         assert_eq!(*Foo::new(42).get(), 42);
+
+        let mut foo = Managed::new(Foo::new(42));
+        context.stack().push(foo.borrow_mut().unwrap());
+        Foo::get_mut__intuicio_function(&mut context, &registry);
+        {
+            let mut result = context.stack().pop::<ManagedRefMut<i32>>().unwrap();
+            let mut result = result.write().unwrap();
+            assert_eq!(*result, 42);
+            *result = 10;
+        }
+        assert_eq!(foo.read().unwrap().bar, 10);
 
         let bar = DynamicManaged::new(Bar::new(42)).unwrap();
         context.stack().push(bar.borrow().unwrap());

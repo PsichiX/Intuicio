@@ -93,7 +93,7 @@ impl CustomOperation {
             Self::Call { name, module_name } => Some(ScriptOperation::CallFunction {
                 query: FunctionQuery {
                     name: Some(name.to_owned().into()),
-                    module_name: Some(module_name.to_owned().into()),
+                    module_name: Some(module_name.to_owned().into()).into(),
                     ..Default::default()
                 },
             }),

@@ -1,14 +1,18 @@
+//! Matching repeated items with something between them.
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`ListParser`].
     pub fn list(item: ParserHandle, delimiter: ParserHandle, permissive: bool) -> ParserHandle {
         ListParser::new(item, delimiter, permissive).into_handle()
     }
 
+    /// [`ListParser`] that drops empty outputs.
     pub fn list_inv(item: ParserHandle, delimiter: ParserHandle, permissive: bool) -> ParserHandle {
         ListParser::new(item, delimiter, permissive)
             .ignore_no_value(true)
@@ -16,6 +20,12 @@ pub mod shorthand {
     }
 }
 
+/// Matches items separated by a delimiter, yielding a `Vec<ParserOutput>`.
+///
+/// Never fails: an input where even the first item does not match gives an
+/// empty list. `permissive` decides what a delimiter with no item after it
+/// means - `true` ends the list and leaves the delimiter unconsumed, which
+/// allows a trailing one, `false` makes the whole parse fail.
 #[derive(Clone)]
 pub struct ListParser {
     item: ParserHandle,
@@ -25,6 +35,7 @@ pub struct ListParser {
 }
 
 impl ListParser {
+    /// Matches `item` repeatedly, separated by `delimiter`.
     pub fn new(item: ParserHandle, delimiter: ParserHandle, permissive: bool) -> Self {
         Self {
             item,
@@ -34,6 +45,7 @@ impl ListParser {
         }
     }
 
+    /// Sets whether [`ParserNoValue`] outputs are left out of the result.
     pub fn ignore_no_value(mut self, ignore: bool) -> Self {
         self.ignore_no_value = ignore;
         self

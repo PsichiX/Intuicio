@@ -1,9 +1,27 @@
+//! Expressions with operator precedence.
+//!
+//! Writing precedence as nested alternations is painful and slow. A Pratt
+//! parser instead takes a flat list of tokens and folds it using two
+//! binding powers per operator, one for each side.
+//!
+//! It works in two stages: an inner parser turns text into a
+//! `Vec<ParserOutput>` of tokens, then the rules decide which token is an
+//! operator and what to build from it.
+//!
+//! Precedence comes from the order the rule sets are pushed:
+//! [`PrattParser::push_rules`] hands each set a higher binding power than
+//! the last, so operators pushed later bind tighter. Rules inside one set
+//! share a level. Associativity swaps the two binding powers of an infix
+//! rule, which is what makes it fold right instead of left.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
 use std::{error::Error, sync::Arc};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`PrattParser`]. Each inner `Vec` is one precedence level, weakest
+    /// first.
     pub fn pratt(tokenizer_parser: ParserHandle, rules: Vec<Vec<PrattParserRule>>) -> ParserHandle {
         let mut result = PrattParser::new(tokenizer_parser);
         for rule in rules {
@@ -13,23 +31,34 @@ pub mod shorthand {
     }
 }
 
+/// Which way an infix operator folds when it meets itself.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PrattParserAssociativity {
     #[default]
+    /// `a - b - c` folds as `(a - b) - c`.
     Left,
+    /// `a ^ b ^ c` folds as `a ^ (b ^ c)`.
     Right,
 }
 
+/// One operator: how to recognise its token, and what to build from it.
+///
+/// The `_raw` constructors work on [`ParserOutput`] directly. The plain
+/// ones are for the common case where the operator token and the operand
+/// have known types.
 #[derive(Clone)]
 pub enum PrattParserRule {
+    /// An operator before its operand, as in `-x`.
     Prefix {
         operator: Arc<dyn Fn(&ParserOutput) -> bool + Send + Sync>,
         transformer: Arc<dyn Fn(ParserOutput) -> ParserOutput + Send + Sync>,
     },
+    /// An operator after its operand, as in `x!`.
     Postfix {
         operator: Arc<dyn Fn(&ParserOutput) -> bool + Send + Sync>,
         transformer: Arc<dyn Fn(ParserOutput) -> ParserOutput + Send + Sync>,
     },
+    /// An operator between two operands, as in `a + b`.
     Infix {
         operator: Arc<dyn Fn(&ParserOutput) -> bool + Send + Sync>,
         transformer: Arc<dyn Fn(ParserOutput, ParserOutput) -> ParserOutput + Send + Sync>,
@@ -38,7 +67,8 @@ pub enum PrattParserRule {
 }
 
 impl PrattParserRule {
-    pub fn prefx_raw(
+    /// A prefix rule from raw output closures.
+    pub fn prefix_raw(
         operator: impl Fn(&ParserOutput) -> bool + Send + Sync + 'static,
         transformer: impl Fn(ParserOutput) -> ParserOutput + Send + Sync + 'static,
     ) -> Self {
@@ -48,11 +78,16 @@ impl PrattParserRule {
         }
     }
 
+    /// A prefix rule that fires on the operator token `operator` and rebuilds
+    /// its operand with `transformer`.
+    ///
+    /// The generated closures use `consume`, so a token or operand of another
+    /// type panics rather than failing the parse.
     pub fn prefix<O: PartialEq + Send + Sync + 'static, V: Send + Sync + 'static>(
         operator: O,
         transformer: impl Fn(V) -> V + Send + Sync + 'static,
     ) -> Self {
-        Self::prefx_raw(
+        Self::prefix_raw(
             move |token| {
                 token
                     .read::<O>()
@@ -67,6 +102,7 @@ impl PrattParserRule {
         )
     }
 
+    /// A postfix rule from raw output closures.
     pub fn postfix_raw(
         operator: impl Fn(&ParserOutput) -> bool + Send + Sync + 'static,
         transformer: impl Fn(ParserOutput) -> ParserOutput + Send + Sync + 'static,
@@ -77,6 +113,8 @@ impl PrattParserRule {
         }
     }
 
+    /// A postfix rule that fires on the operator token `operator` and rebuilds
+    /// its operand with `transformer`.
     pub fn postfix<O: PartialEq + Send + Sync + 'static, V: Send + Sync + 'static>(
         operator: O,
         transformer: impl Fn(V) -> V + Send + Sync + 'static,
@@ -96,6 +134,7 @@ impl PrattParserRule {
         )
     }
 
+    /// An infix rule from raw output closures.
     pub fn infix_raw(
         operator: impl Fn(&ParserOutput) -> bool + Send + Sync + 'static,
         transformer: impl Fn(ParserOutput, ParserOutput) -> ParserOutput + Send + Sync + 'static,
@@ -108,6 +147,8 @@ impl PrattParserRule {
         }
     }
 
+    /// An infix rule that fires on the operator token `operator` and folds both
+    /// sides with `transformer`.
     pub fn infix<O: PartialEq + Send + Sync + 'static, V: Send + Sync + 'static>(
         operator: O,
         transformer: impl Fn(V, V) -> V + Send + Sync + 'static,
@@ -141,6 +182,11 @@ impl PrattParserRule {
     }
 }
 
+/// Folds a token list into one value using operator rules.
+///
+/// Fails when the tokenizer did not produce a `Vec<ParserOutput>`, and when
+/// tokens are left over after folding, which is what an unbalanced
+/// expression looks like from here.
 #[derive(Clone)]
 pub struct PrattParser {
     tokenizer_parser: ParserHandle,
@@ -150,6 +196,7 @@ pub struct PrattParser {
 }
 
 impl PrattParser {
+    /// Takes tokens from `tokenizer_parser`, with no rules yet.
     pub fn new(tokenizer_parser: ParserHandle) -> Self {
         Self {
             tokenizer_parser,
@@ -158,11 +205,13 @@ impl PrattParser {
         }
     }
 
+    /// [`PrattParser::push_rules`], builder style.
     pub fn with_rules(mut self, rules: impl IntoIterator<Item = PrattParserRule>) -> Self {
         self.push_rules(rules);
         self
     }
 
+    /// Adds one precedence level, binding tighter than every level before it.
     pub fn push_rules(&mut self, rules: impl IntoIterator<Item = PrattParserRule>) {
         let low = self.binding_power_generator + 1;
         let high = self.binding_power_generator + 2;

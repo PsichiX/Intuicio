@@ -46,6 +46,9 @@ clippy:
   cargo clippy --all --all-features
   cargo clippy --tests --all --all-features
 
+docs:
+  cargo doc --all --all-features --no-deps
+
 checks:
   just format
   just build

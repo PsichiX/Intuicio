@@ -1,20 +1,27 @@
+//! Matching an exact piece of text.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
 use std::borrow::Cow;
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`LiteralParser`].
     pub fn lit(value: impl Into<Cow<'static, str>>) -> ParserHandle {
         LiteralParser::new(value).into_handle()
     }
 }
 
+/// Matches a fixed string at the front of the input.
+///
+/// Yields the matched text as a `String`.
 #[derive(Clone)]
 pub struct LiteralParser {
     literal: Cow<'static, str>,
 }
 
 impl LiteralParser {
+    /// Matches `value`.
     pub fn new(value: impl Into<Cow<'static, str>>) -> Self {
         Self {
             literal: value.into(),

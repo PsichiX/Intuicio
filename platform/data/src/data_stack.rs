@@ -1,3 +1,34 @@
+//! Type-erased stack that carries values between function calls.
+//!
+//! [`DataStack`] is the single place where Intuicio moves data. Native and
+//! script functions both take their arguments off it and put their results
+//! back on it, so neither side can tell the other apart.
+//!
+//! # Layout
+//!
+//! The stack is one flat byte buffer that grows upwards. Each pushed value is
+//! stored as its bytes followed by its [`TypeHash`], so a pop can check the
+//! type before reading anything back. The stack also remembers a drop function
+//! per type it has seen, so it can destroy values it no longer knows the Rust
+//! type of.
+//!
+//! Registers, the analogue of local variables, live on the same buffer. A
+//! register is a slot with a fixed type that can be empty or full, and it is
+//! addressed by index rather than by position. See [`DataStackRegisterAccess`].
+//!
+//! # Rules
+//!
+//! Data is only ever **moved**, never copied or cloned. A pop takes the value
+//! off the stack. A move into a register empties the place the value came
+//! from. A type that wants copies has to provide a function that pushes a
+//! duplicate itself.
+//!
+//! ```
+//! # use intuicio_data::data_stack::{DataStack, DataStackMode};
+//! let mut stack = DataStack::new(1024, DataStackMode::Mixed);
+//! stack.push(42_i32);
+//! assert_eq!(stack.pop::<i32>().unwrap(), 42);
+//! ```
 use crate::{Finalize, pointer_alignment_padding, type_hash::TypeHash};
 use smallvec::SmallVec;
 use std::{
@@ -6,12 +37,18 @@ use std::{
     ops::Range,
 };
 
+/// How to destroy a value of one type, remembered per type the stack saw.
 #[derive(Debug, Copy, Clone)]
 struct DataStackFinalizer {
     callback: unsafe fn(*mut ()),
     layout: Layout,
 }
 
+/// Header stored above a register slot.
+///
+/// `finalizer` doubles as the empty or full flag: [`None`] means the slot
+/// holds no value. `padding` records how many bytes were skipped below the
+/// slot to align it, so unwinding can give them back.
 #[derive(Debug, Copy, Clone)]
 struct DataStackRegisterTag {
     type_hash: TypeHash,
@@ -20,21 +57,38 @@ struct DataStackRegisterTag {
     padding: u8,
 }
 
+/// Marker of a stack position, taken with [`DataStack::store`].
+///
+/// Passing it to [`DataStack::restore`] unwinds everything pushed after it,
+/// running the drop function of every value on the way. Passing it to
+/// [`DataStack::reverse`] flips the order of those items instead.
 pub struct DataStackToken(usize);
 
 impl DataStackToken {
+    /// Builds a token pointing at an arbitrary position.
+    ///
     /// # Safety
+    ///
+    /// `position` must be a real item boundary of the stack it will be used
+    /// with. Restoring to a position inside a value leaves the stack reading
+    /// garbage as type tags.
     pub unsafe fn new(position: usize) -> Self {
         Self(position)
     }
 }
 
+/// Handle to one register slot, taken with [`DataStack::access_register`].
+///
+/// A register has a fixed type chosen when it was pushed, and is either
+/// empty or full. Reads and takes check the requested type against the
+/// register type and return [`None`] on a mismatch.
 pub struct DataStackRegisterAccess<'a> {
     stack: &'a mut DataStack,
     position: usize,
 }
 
 impl<'a> DataStackRegisterAccess<'a> {
+    /// Returns the type this register slot was declared with.
     pub fn type_hash(&self) -> TypeHash {
         unsafe {
             self.stack
@@ -47,6 +101,7 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Returns the memory layout of the register slot.
     pub fn layout(&self) -> Layout {
         unsafe {
             self.stack
@@ -59,6 +114,7 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Returns type and layout together, reading the header only once.
     pub fn type_hash_layout(&self) -> (TypeHash, Layout) {
         unsafe {
             let tag = self
@@ -72,6 +128,7 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Returns `true` when the register currently holds a value.
     pub fn has_value(&self) -> bool {
         unsafe {
             self.stack
@@ -85,6 +142,8 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Borrows the stored value, or returns [`None`] when the register is empty
+    /// or holds another type.
     pub fn read<T: 'static>(&'a self) -> Option<&'a T> {
         unsafe {
             let tag = self
@@ -107,6 +166,8 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Borrows the stored value mutably, or returns [`None`] when the register
+    /// is empty or holds another type.
     pub fn write<T: 'static>(&'a mut self) -> Option<&'a mut T> {
         unsafe {
             let tag = self
@@ -129,6 +190,9 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Moves the value out and leaves the register empty.
+    ///
+    /// Returns [`None`] when the register is empty or holds another type.
     pub fn take<T: 'static>(&mut self) -> Option<T> {
         unsafe {
             let mut tag = self
@@ -160,6 +224,9 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Drops the stored value in place and leaves the register empty.
+    ///
+    /// Returns `false` when there was nothing to drop.
     pub fn free(&mut self) -> bool {
         unsafe {
             let mut tag = self
@@ -191,6 +258,9 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Moves a value into the register, dropping whatever was there.
+    ///
+    /// Does nothing when `T` is not the type the register was declared with.
     pub fn set<T: Finalize + 'static>(&mut self, value: T) {
         unsafe {
             let mut tag = self
@@ -228,6 +298,10 @@ impl<'a> DataStackRegisterAccess<'a> {
         }
     }
 
+    /// Moves this register value into `other`, leaving this one empty.
+    ///
+    /// Does nothing when the two registers differ in type or layout, or when
+    /// they are the same slot.
     pub fn move_to(&mut self, other: &mut Self) {
         if self.position == other.position {
             return;
@@ -280,31 +354,46 @@ impl<'a> DataStackRegisterAccess<'a> {
     }
 }
 
+/// What a [`DataStack`] is allowed to hold.
+///
+/// A context keeps its call stack and its registers in two separate stacks,
+/// so each of them can be restricted to what it actually needs.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub enum DataStackMode {
+    /// Pushed values only, no registers.
     Values,
+    /// Registers only, no pushed values.
     Registers,
     #[default]
+    /// Both, which is the default.
     Mixed,
 }
 
 impl DataStackMode {
+    /// Returns `true` when pushing and popping values is allowed.
     pub fn allows_values(self) -> bool {
         matches!(self, Self::Values | Self::Mixed)
     }
 
+    /// Returns `true` when registers are allowed.
     pub fn allows_registers(self) -> bool {
         matches!(self, Self::Registers | Self::Mixed)
     }
 }
 
+/// One item seen by [`DataStack::visit`], reported from the top down.
+///
+/// Mostly useful for debugging and for tools that want to show what is
+/// currently on a stack.
 pub enum DataStackVisitedItem<'a> {
+    /// A pushed value.
     Value {
         type_hash: TypeHash,
         layout: Layout,
         data: &'a [u8],
         range: Range<usize>,
     },
+    /// A register slot. `valid` tells whether it currently holds a value.
     Register {
         type_hash: TypeHash,
         layout: Layout,
@@ -314,6 +403,12 @@ pub enum DataStackVisitedItem<'a> {
     },
 }
 
+/// Type-erased stack of values and registers.
+///
+/// Capacity is fixed at construction and rounded up to a power of two. A push
+/// that does not fit fails instead of growing the stack, so a running script
+/// cannot make the host reallocate under it. Dropping the stack unwinds
+/// everything still on it. See the [module docs](self) for the layout.
 pub struct DataStack {
     memory: Vec<u8>,
     position: usize,
@@ -332,6 +427,8 @@ impl Drop for DataStack {
 }
 
 impl DataStack {
+    /// Allocates a stack of at least `capacity` bytes, rounded up to a power of
+    /// two.
     pub fn new(mut capacity: usize, mode: DataStackMode) -> Self {
         capacity = capacity.next_power_of_two();
         Self {
@@ -344,22 +441,29 @@ impl DataStack {
         }
     }
 
+    /// Returns how many bytes are used.
     pub fn position(&self) -> usize {
         self.position
     }
 
+    /// Returns the total capacity in bytes.
     pub fn size(&self) -> usize {
         self.memory.len()
     }
 
+    /// Returns how many bytes are still free.
     pub fn available(&self) -> usize {
         self.size().saturating_sub(self.position)
     }
 
+    /// Returns the used part of the buffer, tags included.
     pub fn as_bytes(&self) -> &[u8] {
         &self.memory[0..self.position]
     }
 
+    /// Walks the stack from the top down, calling `f` for every item.
+    ///
+    /// Stops early when `f` returns `false`, or when an item cannot be read.
     pub fn visit(&self, mut f: impl FnMut(DataStackVisitedItem) -> bool) {
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
@@ -423,6 +527,10 @@ impl DataStack {
         }
     }
 
+    /// Moves a value onto the stack.
+    ///
+    /// Returns `false` without touching anything when the mode forbids values
+    /// or the value does not fit.
     pub fn push<T: Finalize + Sized + 'static>(&mut self, value: T) -> bool {
         if !self.mode.allows_values() {
             return false;
@@ -456,7 +564,14 @@ impl DataStack {
         true
     }
 
+    /// [`DataStack::push`] for a value whose type is only known at runtime.
+    ///
     /// # Safety
+    ///
+    /// `data` must be a valid byte image of a value of the type named by
+    /// `type_hash`, matching `layout`, and `finalizer` must be the drop
+    /// function of that type. The bytes are moved, so the caller must not drop
+    /// the source afterwards.
     pub unsafe fn push_raw(
         &mut self,
         layout: Layout,
@@ -493,10 +608,13 @@ impl DataStack {
         true
     }
 
+    /// Reserves an empty register for values of type `T` and returns its index.
     pub fn push_register<T: Finalize + 'static>(&mut self) -> Option<usize> {
         unsafe { self.push_register_raw(TypeHash::of::<T>(), Layout::new::<T>().pad_to_align()) }
     }
 
+    /// Reserves a register for `T` and moves `value` into it, returning its
+    /// index.
     pub fn push_register_value<T: Finalize + 'static>(&mut self, value: T) -> Option<usize> {
         let result = self.push_register::<T>()?;
         let mut access = self.access_register(result)?;
@@ -504,7 +622,13 @@ impl DataStack {
         Some(result)
     }
 
+    /// [`DataStack::push_register`] for a type only known at runtime.
+    ///
     /// # Safety
+    ///
+    /// `value_layout` must be the real layout of the type named by
+    /// `type_hash`. A wrong layout makes every later access to that register
+    /// read or write out of bounds.
     pub unsafe fn push_register_raw(
         &mut self,
         type_hash: TypeHash,
@@ -546,6 +670,10 @@ impl DataStack {
         }
     }
 
+    /// Moves the whole content of `other` on top of this stack.
+    ///
+    /// Gives `other` back untouched when it does not fit. Used to hand a batch
+    /// of arguments prepared elsewhere to a call.
     pub fn push_stack(&mut self, mut other: Self) -> Result<(), Self> {
         if self.available() < other.position {
             return Err(other);
@@ -567,6 +695,9 @@ impl DataStack {
         Ok(())
     }
 
+    /// Moves a register value onto the stack, leaving the register empty.
+    ///
+    /// Returns `false` when the mode forbids values or the value does not fit.
     pub fn push_from_register(&mut self, register: &mut DataStackRegisterAccess) -> bool {
         if !self.mode.allows_values() {
             return false;
@@ -619,6 +750,10 @@ impl DataStack {
         true
     }
 
+    /// Moves the top value off the stack.
+    ///
+    /// Returns [`None`], leaving the stack untouched, when the top value is not
+    /// a `T`.
     pub fn pop<T: Sized + 'static>(&mut self) -> Option<T> {
         if !self.mode.allows_values() {
             return None;
@@ -650,7 +785,14 @@ impl DataStack {
         Some(result)
     }
 
+    /// [`DataStack::pop`] without knowing the type, returning the raw bytes
+    /// along with the layout, type and drop function.
+    ///
     /// # Safety
+    ///
+    /// The returned bytes are an owned value that nothing drops for the caller.
+    /// Losing them leaks, and dropping them twice is undefined. Feed them back
+    /// to [`DataStack::push_raw`] or run the returned finalizer once.
     #[allow(clippy::type_complexity)]
     pub unsafe fn pop_raw(&mut self) -> Option<(Layout, TypeHash, unsafe fn(*mut ()), Vec<u8>)> {
         if !self.mode.allows_values() {
@@ -680,6 +822,9 @@ impl DataStack {
         Some((finalizer.layout, type_hash, finalizer.callback, data))
     }
 
+    /// Drops the top value in place instead of returning it.
+    ///
+    /// Returns `false` when the top of the stack is a register.
     pub fn drop(&mut self) -> bool {
         if !self.mode.allows_values() {
             return false;
@@ -705,6 +850,9 @@ impl DataStack {
         true
     }
 
+    /// Removes the topmost register, dropping its value if it holds one.
+    ///
+    /// Returns `false` when the top of the stack is not a register.
     pub fn drop_register(&mut self) -> bool {
         if !self.mode.allows_registers() {
             return false;
@@ -738,6 +886,11 @@ impl DataStack {
         true
     }
 
+    /// Moves the top `data_count` values into a new stack of their own.
+    ///
+    /// `capacity` sizes the new stack, and is raised when the values need more.
+    /// Used to detach arguments for a call that runs elsewhere, for example on
+    /// another thread.
     pub fn pop_stack(&mut self, mut data_count: usize, capacity: Option<usize>) -> Self {
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let mut size = 0;
@@ -774,6 +927,10 @@ impl DataStack {
         result
     }
 
+    /// Moves the top value into a register, dropping whatever the register
+    /// held.
+    ///
+    /// Returns `false` when the types do not match or the stack is empty.
     pub fn pop_to_register(&mut self, register: &mut DataStackRegisterAccess) -> bool {
         if !self.mode.allows_values() {
             return false;
@@ -843,10 +1000,14 @@ impl DataStack {
         true
     }
 
+    /// Marks the current position, to unwind or reverse back to later.
     pub fn store(&self) -> DataStackToken {
         DataStackToken(self.position)
     }
 
+    /// Unwinds down to `token`, dropping every value and register above it.
+    ///
+    /// This is how a scope cleans up after itself.
     pub fn restore(&mut self, token: DataStackToken) {
         let type_layout = Layout::new::<TypeHash>().pad_to_align();
         let tag_layout = Layout::new::<DataStackRegisterTag>().pad_to_align();
@@ -885,6 +1046,11 @@ impl DataStack {
         }
     }
 
+    /// Reverses the order of the items pushed since `token`.
+    ///
+    /// Callers push arguments in declaration order while callees pop them in
+    /// the same order, so the block has to be flipped in between.
+    /// See [`DataStackPack::stack_push_reversed`].
     pub fn reverse(&mut self, token: DataStackToken) {
         let size = self.position.saturating_sub(token.0);
         let mut meta_data = SmallVec::<[_; 8]>::with_capacity(8);
@@ -941,6 +1107,9 @@ impl DataStack {
         self.registers[start..].reverse();
     }
 
+    /// Returns the type of the top item without moving anything.
+    ///
+    /// A register reports the type tag of its header, not the type it stores.
     pub fn peek(&self) -> Option<TypeHash> {
         if self.position == 0 {
             return None;
@@ -955,10 +1124,12 @@ impl DataStack {
         })
     }
 
+    /// Returns how many registers are alive.
     pub fn registers_count(&self) -> usize {
         self.registers.len()
     }
 
+    /// Takes a handle to one register, or [`None`] when the index is unused.
     pub fn access_register(&'_ mut self, index: usize) -> Option<DataStackRegisterAccess<'_>> {
         let position = *self.registers.get(index)?;
         Some(DataStackRegisterAccess {
@@ -967,6 +1138,10 @@ impl DataStack {
         })
     }
 
+    /// Takes handles to two different registers at once, for moving a value
+    /// between them.
+    ///
+    /// Returns [`None`] when the indices are equal or unused.
     pub fn access_registers_pair(
         &'_ mut self,
         a: usize,
@@ -991,12 +1166,23 @@ impl DataStack {
         }
     }
 
+    /// Stops this stack from unwinding its content when it is dropped.
+    ///
     /// # Safety
+    ///
+    /// Everything still on the stack leaks unless its ownership was already
+    /// handed to someone else, which is what [`DataStack::push_stack`] does.
     pub unsafe fn prevent_drop(&mut self) {
         self.drop = false;
     }
 
+    /// Returns the padding needed at the current position to reach
+    /// `alignment`.
+    ///
     /// # Safety
+    ///
+    /// Reads the buffer pointer at the current position, which must be inside
+    /// the allocation.
     #[inline]
     unsafe fn alignment_padding(&self, alignment: usize) -> usize {
         pointer_alignment_padding(
@@ -1006,17 +1192,33 @@ impl DataStack {
     }
 }
 
+/// Moves a tuple of values on and off a [`DataStack`] in one step.
+///
+/// This is the bridge between a Rust call with typed arguments and the untyped
+/// stack. Argument tuples and result tuples both go through it.
+/// Implemented for tuples of up to sixteen elements, and for `()`.
 pub trait DataStackPack: Sized {
+    /// Pushes every element in tuple order.
     fn stack_push(self, stack: &mut DataStack);
 
+    /// Pushes every element so that the first one ends up on top.
+    ///
+    /// This is the order a callee expects, since it pops its arguments from
+    /// first to last.
     fn stack_push_reversed(self, stack: &mut DataStack) {
         let token = stack.store();
         self.stack_push(stack);
         stack.reverse(token);
     }
 
+    /// Pops every element in tuple order.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the stack does not hold the expected types.
     fn stack_pop(stack: &mut DataStack) -> Self;
 
+    /// Returns the types of the tuple elements, in order.
     fn pack_types() -> Vec<TypeHash>;
 }
 
@@ -1030,6 +1232,7 @@ impl DataStackPack for () {
     }
 }
 
+/// Implements [`DataStackPack`] for a tuple of the given element types.
 macro_rules! impl_data_stack_tuple {
     ($($type:ident),+) => {
         impl<$($type: 'static),+> DataStackPack for ($($type,)+) {

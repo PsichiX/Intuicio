@@ -1,3 +1,9 @@
+//! Runtime description of a struct.
+//!
+//! [`Struct`] is built by one of two builders and then registered:
+//! [`NativeStructBuilder`] for a real Rust struct, whose layout the compiler
+//! decides, and [`RuntimeStructBuilder`] for a struct a script invented, whose
+//! layout is computed from the fields.
 use crate::{
     Visibility,
     meta::Meta,
@@ -12,6 +18,11 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+/// Builds a [`Struct`] that no Rust type backs.
+///
+/// Field offsets and the overall layout are computed on [`build`](Self::build)
+/// by laying the fields out in order. Values of the result are handled as
+/// [`crate::object::Object`], field by field.
 pub struct RuntimeStructBuilder {
     meta: Option<Meta>,
     name: String,
@@ -23,49 +34,69 @@ pub struct RuntimeStructBuilder {
     layout: Layout,
     initializer: unsafe fn(*mut ()),
     finalizer: unsafe fn(*mut ()),
+    is_runtime: bool,
 }
 
 impl RuntimeStructBuilder {
+    /// Starts a struct with no fields.
+    ///
+    /// The type hash is settled in [`build`](Self::build), not here, because it
+    /// comes from the module and the name, and the module is set afterwards.
     pub fn new(name: impl ToString) -> Self {
         Self {
             meta: None,
             name: name.to_string(),
             module_name: None,
             visibility: Visibility::default(),
-            type_hash: TypeHash::of::<RuntimeObject>(),
+            type_hash: TypeHash::INVALID,
             type_name: std::any::type_name::<RuntimeObject>().to_owned(),
             fields: vec![],
             layout: Layout::from_size_align(0, 1).unwrap(),
             initializer: RuntimeObject::initialize_raw,
             finalizer: RuntimeObject::finalize_raw,
+            is_runtime: true,
         }
     }
 
+    /// Attaches metadata.
     pub fn meta(mut self, meta: Meta) -> Self {
         self.meta = Some(meta);
         self
     }
 
+    /// Attaches metadata when there is any.
     pub fn maybe_meta(mut self, meta: Option<Meta>) -> Self {
         self.meta = meta;
         self
     }
 
+    /// Sets the owning module.
     pub fn module_name(mut self, module_name: impl ToString) -> Self {
         self.module_name = Some(module_name.to_string());
         self
     }
 
+    /// Sets visibility.
     pub fn visibility(mut self, visibility: Visibility) -> Self {
         self.visibility = visibility;
         self
     }
 
+    /// Appends a field. Its offset is decided at build time.
     pub fn field(mut self, field: StructField) -> Self {
         self.fields.push(field);
         self
     }
 
+    /// Lays the fields out and produces the type.
+    ///
+    /// `Send`, `Sync` and `Copy` are inferred: the struct has each of them only
+    /// when every field does.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the fields cannot be laid out, which means the total size
+    /// overflowed.
     pub fn build(mut self) -> Struct {
         for field in &mut self.fields {
             let (new_layout, offset) = self.layout.extend(*field.type_handle.layout()).unwrap();
@@ -76,12 +107,17 @@ impl RuntimeStructBuilder {
         let is_send = self.fields.iter().all(|field| field.type_handle.is_send());
         let is_sync = self.fields.iter().all(|field| field.type_handle.is_sync());
         let is_copy = self.fields.iter().all(|field| field.type_handle.is_copy());
+        let type_hash = if self.is_runtime {
+            TypeHash::of_runtime(&qualified_name(self.module_name.as_deref(), &self.name))
+        } else {
+            self.type_hash
+        };
         Struct {
             meta: self.meta,
             name: self.name,
             module_name: self.module_name,
             visibility: self.visibility,
-            type_hash: self.type_hash,
+            type_hash,
             type_name: self.type_name,
             fields: self.fields,
             layout: self.layout.pad_to_align(),
@@ -90,7 +126,19 @@ impl RuntimeStructBuilder {
             is_send,
             is_sync,
             is_copy,
+            is_runtime: self.is_runtime,
         }
+    }
+}
+
+/// Joins a module and a name into the identity a runtime type hashes.
+///
+/// Two runtime types are the same type when they sit in the same module under
+/// the same name, so that pair is what the hash has to come from.
+pub(crate) fn qualified_name(module_name: Option<&str>, name: &str) -> String {
+    match module_name {
+        Some(module_name) => format!("{module_name}::{name}"),
+        None => name.to_owned(),
     }
 }
 
@@ -107,10 +155,16 @@ impl From<Struct> for RuntimeStructBuilder {
             layout: value.layout,
             initializer: value.initializer.unwrap_or(RuntimeObject::initialize_raw),
             finalizer: value.finalizer,
+            is_runtime: value.is_runtime,
         }
     }
 }
 
+/// Builds a [`Struct`] describing a real Rust type.
+///
+/// The layout comes from the compiler, so field offsets have to be passed in
+/// rather than computed. The `define_native_struct!` macro and the
+/// `IntuicioStruct` derive both do that for you.
 pub struct NativeStructBuilder {
     meta: Option<Meta>,
     name: String,
@@ -125,9 +179,11 @@ pub struct NativeStructBuilder {
     is_send: bool,
     is_sync: bool,
     is_copy: bool,
+    is_runtime: bool,
 }
 
 impl NativeStructBuilder {
+    /// Describes `T`, named after its full Rust type name.
     pub fn new<T: Initialize + Finalize + 'static>() -> Self {
         Self {
             meta: None,
@@ -143,9 +199,11 @@ impl NativeStructBuilder {
             is_send: false,
             is_sync: false,
             is_copy: false,
+            is_runtime: false,
         }
     }
 
+    /// Describes `T` under a name of your choosing.
     pub fn new_named<T: Initialize + Finalize + 'static>(name: impl ToString) -> Self {
         Self {
             meta: None,
@@ -161,9 +219,13 @@ impl NativeStructBuilder {
             is_send: false,
             is_sync: false,
             is_copy: false,
+            is_runtime: false,
         }
     }
 
+    /// Describes `T` without a way to create a default value.
+    ///
+    /// Scripts can then hold and pass values of it, but not construct one.
     pub fn new_uninitialized<T: Finalize + 'static>() -> Self {
         Self {
             meta: None,
@@ -179,9 +241,11 @@ impl NativeStructBuilder {
             is_send: false,
             is_sync: false,
             is_copy: false,
+            is_runtime: false,
         }
     }
 
+    /// [`NativeStructBuilder::new_uninitialized`] under a name of your choosing.
     pub fn new_named_uninitialized<T: Finalize + 'static>(name: impl ToString) -> Self {
         Self {
             meta: None,
@@ -197,29 +261,38 @@ impl NativeStructBuilder {
             is_send: false,
             is_sync: false,
             is_copy: false,
+            is_runtime: false,
         }
     }
 
+    /// Attaches metadata.
     pub fn meta(mut self, meta: Meta) -> Self {
         self.meta = Some(meta);
         self
     }
 
+    /// Attaches metadata when there is any.
     pub fn maybe_meta(mut self, meta: Option<Meta>) -> Self {
         self.meta = meta;
         self
     }
 
+    /// Sets the owning module.
     pub fn module_name(mut self, module_name: impl ToString) -> Self {
         self.module_name = Some(module_name.to_string());
         self
     }
 
+    /// Sets visibility.
     pub fn visibility(mut self, visibility: Visibility) -> Self {
         self.visibility = visibility;
         self
     }
 
+    /// Declares a field at a byte offset inside the Rust type.
+    ///
+    /// Get the offset from `__internal__offset_of__!`, never by hand. Rust does
+    /// not promise any particular field order.
     pub fn field(mut self, mut field: StructField, offset: usize) -> Self {
         field.offset = offset;
         self.is_send = self.is_send && field.type_handle.is_send();
@@ -229,24 +302,40 @@ impl NativeStructBuilder {
         self
     }
 
+    /// Declares that values of this type may move between threads.
+    ///
     /// # Safety
+    ///
+    /// Nothing verifies the claim. Saying `true` for a type that is not `Send`
+    /// lets scripts move it across threads and cause data races.
     pub unsafe fn override_send(mut self, mode: bool) -> Self {
         self.is_send = mode;
         self
     }
 
+    /// Declares that values of this type may be shared between threads.
+    ///
     /// # Safety
+    ///
+    /// Nothing verifies the claim. Saying `true` for a type that is not `Sync`
+    /// lets scripts share it across threads and cause data races.
     pub unsafe fn override_sync(mut self, mode: bool) -> Self {
         self.is_sync = mode;
         self
     }
 
+    /// Declares that values of this type may be duplicated by copying bytes.
+    ///
     /// # Safety
+    ///
+    /// Nothing verifies the claim. Saying `true` for a type that owns a
+    /// resource duplicates the owner and leads to a double free.
     pub unsafe fn override_copy(mut self, mode: bool) -> Self {
         self.is_copy = mode;
         self
     }
 
+    /// Produces the type.
     pub fn build(mut self) -> Struct {
         self.fields.sort_by_key(|a| a.offset);
         Struct {
@@ -263,6 +352,7 @@ impl NativeStructBuilder {
             is_send: self.is_send,
             is_sync: self.is_sync,
             is_copy: self.is_copy,
+            is_runtime: self.is_runtime,
         }
     }
 }
@@ -283,13 +373,18 @@ impl From<Struct> for NativeStructBuilder {
             is_send: value.is_send,
             is_sync: value.is_sync,
             is_copy: value.is_copy,
+            is_runtime: value.is_runtime,
         }
     }
 }
 
+/// One field of a [`Struct`] or of an [`crate::types::enum_type::EnumVariant`].
 pub struct StructField {
+    /// Metadata attached to this field.
     pub meta: Option<Meta>,
+    /// Field name.
     pub name: String,
+    /// How widely this field is visible.
     pub visibility: Visibility,
     pub(crate) offset: usize,
     pub(crate) type_handle: TypeHandle,
@@ -308,6 +403,7 @@ impl std::fmt::Debug for StructField {
 }
 
 impl StructField {
+    /// Builds a field at offset zero, to be placed by a builder.
     pub fn new(name: impl ToString, type_handle: TypeHandle) -> Self {
         Self {
             meta: None,
@@ -318,20 +414,24 @@ impl StructField {
         }
     }
 
+    /// Attaches metadata, builder style.
     pub fn with_meta(mut self, meta: Meta) -> Self {
         self.meta = Some(meta);
         self
     }
 
+    /// Sets visibility, builder style.
     pub fn with_visibility(mut self, visibility: Visibility) -> Self {
         self.visibility = visibility;
         self
     }
 
+    /// Returns the byte offset of this field inside the value.
     pub fn address_offset(&self) -> usize {
         self.offset
     }
 
+    /// Returns the type of this field.
     pub fn type_handle(&self) -> &TypeHandle {
         &self.type_handle
     }
@@ -345,11 +445,18 @@ impl PartialEq for StructField {
     }
 }
 
+/// Runtime description of a struct.
+///
+/// Build one with [`NativeStructBuilder`] or [`RuntimeStructBuilder`].
 #[derive(Debug)]
 pub struct Struct {
+    /// Metadata attached to this type.
     pub meta: Option<Meta>,
+    /// Name this type is registered under.
     pub name: String,
+    /// Module this type belongs to.
     pub module_name: Option<String>,
+    /// How widely this type is visible.
     pub visibility: Visibility,
     type_hash: TypeHash,
     type_name: String,
@@ -360,53 +467,72 @@ pub struct Struct {
     is_send: bool,
     is_sync: bool,
     is_copy: bool,
+    is_runtime: bool,
 }
 
 impl Struct {
+    /// Returns `true` for a struct with no Rust counterpart.
+    ///
+    /// This is recorded when the type is built, not read off `type_hash`. Every
+    /// runtime type gets its own hash, so a value can say which one it is. What
+    /// makes such a type non-native is that the hash comes from
+    /// [`TypeHash::of_runtime`], which no Rust type can produce.
     pub fn is_runtime(&self) -> bool {
-        self.type_hash == TypeHash::of::<RuntimeObject>()
+        self.is_runtime
     }
 
+    /// Returns `true` for a struct describing a real Rust type.
     pub fn is_native(&self) -> bool {
         !self.is_runtime()
     }
 
+    /// Returns `true` when values may move between threads.
     pub fn is_send(&self) -> bool {
         self.is_send
     }
 
+    /// Returns `true` when values may be shared between threads.
     pub fn is_sync(&self) -> bool {
         self.is_sync
     }
 
+    /// Returns `true` when values may be duplicated by copying bytes.
     pub fn is_copy(&self) -> bool {
         self.is_copy
     }
 
+    /// Returns `true` when a default value can be created.
     pub fn can_initialize(&self) -> bool {
         self.initializer.is_some()
     }
 
+    /// Returns the runtime identity of this type.
     pub fn type_hash(&self) -> TypeHash {
         self.type_hash
     }
 
+    /// Returns the full Rust type name.
     pub fn type_name(&self) -> &str {
         &self.type_name
     }
 
+    /// Returns the memory layout of a value.
     pub fn layout(&self) -> &Layout {
         &self.layout
     }
 
+    /// Returns the fields, ordered by offset.
     pub fn fields(&self) -> &[StructField] {
         &self.fields
     }
 
+    /// Returns `true` when both structs have the same layout and fields,
+    /// whatever they are called.
     pub fn is_compatible(&self, other: &Self) -> bool {
         self.layout == other.layout && self.fields == other.fields
     }
 
+    /// Iterates the fields a query matches.
     pub fn find_fields<'a>(
         &'a self,
         query: StructFieldQuery<'a>,
@@ -416,11 +542,20 @@ impl Struct {
             .filter(move |field| query.is_valid(field))
     }
 
+    /// Returns the first field a query matches.
     pub fn find_field<'a>(&'a self, query: StructFieldQuery<'a>) -> Option<&'a StructField> {
         self.find_fields(query).next()
     }
 
+    /// Duplicates a value by copying its bytes.
+    ///
+    /// Returns `false` when the type is not marked `Send`, or when source and
+    /// target overlap.
+    ///
     /// # Safety
+    ///
+    /// `from` must point at an initialized value of this type and `to` at
+    /// writable memory of its layout that does not already hold a value.
     pub unsafe fn try_copy(&self, from: *const u8, to: *mut u8) -> bool {
         if !self.is_send {
             return false;
@@ -433,7 +568,14 @@ impl Struct {
         true
     }
 
+    /// Writes a default value into already allocated memory.
+    ///
+    /// Returns `false` when the type has no initializer.
+    ///
     /// # Safety
+    ///
+    /// `pointer` must be writable memory of this type's layout, not already
+    /// holding a value.
     pub unsafe fn initialize(&self, pointer: *mut ()) -> bool {
         if let Some(initializer) = self.initializer {
             unsafe { (initializer)(pointer) };
@@ -443,21 +585,35 @@ impl Struct {
         }
     }
 
+    /// Drops the value at `pointer` in place.
+    ///
     /// # Safety
+    ///
+    /// `pointer` must point at an initialized value of this type that nothing
+    /// reads afterwards.
     pub unsafe fn finalize(&self, pointer: *mut ()) {
         unsafe { (self.finalizer)(pointer) };
     }
 
+    /// Returns the raw initializer function, or [`None`] when there is none.
+    ///
     /// # Safety
+    ///
+    /// Same conditions as [`Struct::initialize`] apply to every call of it.
     pub unsafe fn initializer(&self) -> Option<unsafe fn(*mut ())> {
         self.initializer
     }
 
+    /// Returns the raw drop function.
+    ///
     /// # Safety
+    ///
+    /// Same conditions as [`Struct::finalize`] apply to every call of it.
     pub unsafe fn finalizer(&self) -> unsafe fn(*mut ()) {
         self.finalizer
     }
 
+    /// Wraps this struct in a [`Type`].
     pub fn into_type(self) -> Type {
         self.into()
     }
@@ -472,18 +628,29 @@ impl PartialEq for Struct {
     }
 }
 
+/// Search filter for structs.
+///
+/// The struct-only counterpart of [`crate::types::TypeQuery`].
 #[derive(Debug, Default, Clone, PartialEq, Hash)]
 pub struct StructQuery<'a> {
+    /// Required registered name.
     pub name: Option<Cow<'a, str>>,
+    /// Required module.
     pub module_name: Option<Cow<'a, str>>,
+    /// Required runtime type identity.
     pub type_hash: Option<TypeHash>,
+    /// Required full Rust type name.
     pub type_name: Option<Cow<'a, str>>,
+    /// Required visibility.
     pub visibility: Option<Visibility>,
+    /// Filters matched against the leading fields.
     pub fields: Cow<'a, [StructFieldQuery<'a>]>,
+    /// Predicate the type metadata must satisfy.
     pub meta: Option<MetaQuery>,
 }
 
 impl<'a> StructQuery<'a> {
+    /// Matches by full Rust type name.
     pub fn of_type_name<T: 'static>() -> Self {
         Self {
             type_name: Some(std::any::type_name::<T>().into()),
@@ -491,6 +658,7 @@ impl<'a> StructQuery<'a> {
         }
     }
 
+    /// Matches the Rust type `T` by its identity.
     pub fn of<T: 'static>() -> Self {
         Self {
             type_hash: Some(TypeHash::of::<T>()),
@@ -498,6 +666,7 @@ impl<'a> StructQuery<'a> {
         }
     }
 
+    /// Matches the Rust type `T` registered under a given name.
     pub fn of_named<T: 'static>(name: &'a str) -> Self {
         Self {
             name: Some(name.into()),
@@ -506,6 +675,7 @@ impl<'a> StructQuery<'a> {
         }
     }
 
+    /// Returns `true` when `struct_type` satisfies every set field.
     pub fn is_valid(&self, struct_type: &Struct) -> bool {
         self.name
             .as_ref()
@@ -547,12 +717,14 @@ impl<'a> StructQuery<'a> {
                 .unwrap_or(true)
     }
 
+    /// Hashes the query.
     pub fn as_hash(&self) -> u64 {
         let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
         hasher.finish()
     }
 
+    /// Copies borrowed names into owned ones.
     pub fn to_static(&self) -> StructQuery<'static> {
         StructQuery {
             name: self
@@ -580,6 +752,22 @@ impl<'a> StructQuery<'a> {
     }
 }
 
+/// Builds a [`Struct`] describing a Rust type, filling in field offsets.
+///
+/// ```ignore
+/// define_native_struct! {
+///     registry => mod lib struct Foo (Foo) {
+///         a: bool,
+///         b: i32
+///     }
+/// }
+/// ```
+///
+/// Add `[uninitialized]` for a type with no default value, and
+/// `[override_send = true]`, `[override_sync = true]` or
+/// `[override_copy = true]` to assert thread and copy properties the builder
+/// cannot infer. Those overrides are unsafe claims. See
+/// [`NativeStructBuilder::override_send`].
 #[macro_export]
 macro_rules! define_native_struct {
     (
@@ -701,6 +889,16 @@ macro_rules! define_native_struct {
     }};
 }
 
+/// Builds a [`Struct`] that no Rust type backs, laying its fields out.
+///
+/// ```ignore
+/// define_runtime_struct! {
+///     registry => mod lib struct Foo {
+///         a: bool,
+///         b: i32
+///     }
+/// }
+/// ```
 #[macro_export]
 macro_rules! define_runtime_struct {
     (
@@ -735,6 +933,7 @@ mod tests {
     #![allow(unused_attributes)]
     use crate as intuicio_core;
     use crate::{IntuicioStruct, meta::Meta, object::*, registry::*};
+    use intuicio_data::type_hash::TypeHash;
     use intuicio_derive::*;
 
     #[derive(IntuicioStruct, Default)]
@@ -745,6 +944,49 @@ mod tests {
     impl Bar {
         #[intuicio_method(meta = "foo", args_meta(_bar = "foo"))]
         fn method_meta(_bar: bool) {}
+    }
+
+    #[test]
+    fn test_runtime_structs_have_their_own_type_hash() {
+        use super::RuntimeStructBuilder;
+
+        let a = RuntimeStructBuilder::new("Player")
+            .module_name("game")
+            .build();
+        let b = RuntimeStructBuilder::new("Vector")
+            .module_name("game")
+            .build();
+        let a_again = RuntimeStructBuilder::new("Player")
+            .module_name("game")
+            .build();
+        let a_elsewhere = RuntimeStructBuilder::new("Player")
+            .module_name("other")
+            .build();
+
+        // Two different script types must be tellable apart, otherwise a value
+        // cannot say which one it is and reflection lands on the wrong type.
+        assert_ne!(a.type_hash(), b.type_hash());
+        // The same module and name is the same type, so building it twice has
+        // to agree. `declare` then `define` relies on this.
+        assert_eq!(a.type_hash(), a_again.type_hash());
+        // The module is part of the identity.
+        assert_ne!(a.type_hash(), a_elsewhere.type_hash());
+
+        // Still not a Rust type, which is what keeps casting illegal.
+        assert!(a.is_runtime());
+        assert!(!a.is_native());
+        assert_ne!(a.type_hash(), TypeHash::of::<RuntimeObject>());
+    }
+
+    #[test]
+    fn test_native_structs_stay_native() {
+        use super::NativeStructBuilder;
+
+        let type_ = NativeStructBuilder::new::<bool>().build();
+
+        assert!(type_.is_native());
+        assert!(!type_.is_runtime());
+        assert_eq!(type_.type_hash(), TypeHash::of::<bool>());
     }
 
     #[test]

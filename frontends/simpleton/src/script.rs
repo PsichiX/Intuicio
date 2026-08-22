@@ -139,7 +139,7 @@ impl ScriptExpression for SimpletonScriptExpression {
                         registry
                             .find_function(FunctionQuery {
                                 name: Some(name.into()),
-                                module_name: Some(module_name.into()),
+                                module_name: Some(module_name.into()).into(),
                                 ..Default::default()
                             })
                             .unwrap_or_else(|| {
@@ -424,7 +424,7 @@ impl SimpletonExpressionStart {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some("new".to_owned().into()),
-                        module_name: Some("closure".to_owned().into()),
+                        module_name: Some("closure".to_owned().into()).into(),
                         ..Default::default()
                     },
                 });
@@ -467,7 +467,7 @@ impl SimpletonExpressionStart {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some(name.to_owned().into()),
-                        module_name: Some(module_name.to_owned().into()),
+                        module_name: Some(module_name.to_owned().into()).into(),
                         ..Default::default()
                     },
                 });
@@ -555,7 +555,7 @@ impl SimpletonExpressionStart {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some("new".to_owned().into()),
-                        module_name: Some("closure".to_owned().into()),
+                        module_name: Some("closure".to_owned().into()).into(),
                         ..Default::default()
                     },
                 });
@@ -601,7 +601,7 @@ impl SimpletonExpressionStart {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some(name.to_owned().into()),
-                        module_name: Some(module_name.to_owned().into()),
+                        module_name: Some(module_name.to_owned().into()).into(),
                         ..Default::default()
                     },
                 });
@@ -658,7 +658,7 @@ impl SimpletonExpressionNext {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some("get".into()),
-                        module_name: Some("array".into()),
+                        module_name: Some("array".into()).into(),
                         ..Default::default()
                     },
                 });
@@ -674,7 +674,7 @@ impl SimpletonExpressionNext {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some("get".into()),
-                        module_name: Some("map".into()),
+                        module_name: Some("map".into()).into(),
                         ..Default::default()
                     },
                 });
@@ -718,7 +718,7 @@ impl SimpletonExpressionNext {
                     result.push(ScriptOperation::CallFunction {
                         query: FunctionQuery {
                             name: Some("get".into()),
-                            module_name: Some("array".into()),
+                            module_name: Some("array".into()).into(),
                             ..Default::default()
                         },
                     });
@@ -731,7 +731,7 @@ impl SimpletonExpressionNext {
                     result.push(ScriptOperation::CallFunction {
                         query: FunctionQuery {
                             name: Some("set".into()),
-                            module_name: Some("array".into()),
+                            module_name: Some("array".into()).into(),
                             ..Default::default()
                         },
                     });
@@ -749,7 +749,7 @@ impl SimpletonExpressionNext {
                     result.push(ScriptOperation::CallFunction {
                         query: FunctionQuery {
                             name: Some("get".into()),
-                            module_name: Some("map".into()),
+                            module_name: Some("map".into()).into(),
                             ..Default::default()
                         },
                     });
@@ -762,7 +762,7 @@ impl SimpletonExpressionNext {
                     result.push(ScriptOperation::CallFunction {
                         query: FunctionQuery {
                             name: Some("set".into()),
-                            module_name: Some("map".into()),
+                            module_name: Some("map".into()).into(),
                             ..Default::default()
                         },
                     });
@@ -1004,7 +1004,7 @@ impl SimpletonStatement {
                 operations.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some("next".to_owned().into()),
-                        module_name: Some("iter".to_owned().into()),
+                        module_name: Some("iter".to_owned().into()).into(),
                         ..Default::default()
                     },
                 });
@@ -1019,7 +1019,7 @@ impl SimpletonStatement {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some("next".to_owned().into()),
-                        module_name: Some("iter".to_owned().into()),
+                        module_name: Some("iter".to_owned().into()).into(),
                         ..Default::default()
                     },
                 });
@@ -1289,11 +1289,7 @@ impl SimpletonBinary {
                 })
                 .collect(),
         };
-        let config = bincode::config::legacy()
-            .with_big_endian()
-            .with_no_limit()
-            .with_fixed_int_encoding();
-        Ok(bincode::serde::encode_to_vec(&binary, config)?)
+        Ok(postcard::to_allocvec(&binary)?)
     }
 }
 
@@ -1318,12 +1314,8 @@ impl ScriptContentProvider<SimpletonModule> for SimpletonBinaryFileContentProvid
         &mut self,
         path: &str,
     ) -> Result<Vec<ScriptContent<SimpletonModule>>, Box<dyn Error>> {
-        let config = bincode::config::legacy()
-            .with_big_endian()
-            .with_no_limit()
-            .with_fixed_int_encoding();
         let bytes = std::fs::read(path)?;
-        let binary = bincode::serde::decode_from_slice::<SimpletonBinary, _>(&bytes, config)?.0;
+        let binary = postcard::from_bytes::<SimpletonBinary>(&bytes)?;
         let version = crate_version!();
         if !binary.version.is_compatible(&version) {
             return Err(format!(

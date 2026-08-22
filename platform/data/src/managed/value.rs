@@ -1,3 +1,12 @@
+//! One enum over every way a value can be held.
+//!
+//! A script does not care whether a value is owned, borrowed or garbage
+//! collected, it just wants to read or write it. [`ManagedValue`] and
+//! [`DynamicManagedValue`] wrap all of those roles and forward the common
+//! operations to whichever one is inside.
+//!
+//! Operations that the role cannot support return [`None`], so for example
+//! writing through a shared handle simply fails.
 use crate::{
     lifetime::{ValueReadAccess, ValueWriteAccess},
     managed::{
@@ -7,15 +16,24 @@ use crate::{
     },
 };
 
+/// A typed value held in any of the possible ways.
+///
+/// See the [module docs](self).
 pub enum ManagedValue<T> {
+    /// The value itself.
     Owned(Managed<T>),
+    /// A shared handle to someone else's value.
     Ref(ManagedRef<T>),
+    /// An exclusive handle to someone else's value.
     RefMut(ManagedRefMut<T>),
+    /// An unclaimed handle to someone else's value.
     Lazy(ManagedLazy<T>),
+    /// A garbage collected handle, owning or referencing.
     Gc(ManagedGc<T>),
 }
 
 impl<T> ManagedValue<T> {
+    /// Returns the owned value, or [`None`] for any other role.
     pub fn as_owned(&self) -> Option<&Managed<T>> {
         match self {
             Self::Owned(value) => Some(value),
@@ -23,6 +41,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the owned value mutably, or [`None`] for any other role.
     pub fn as_mut_owned(&mut self) -> Option<&mut Managed<T>> {
         match self {
             Self::Owned(value) => Some(value),
@@ -30,6 +49,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the shared handle, or [`None`] for any other role.
     pub fn as_ref(&self) -> Option<&ManagedRef<T>> {
         match self {
             Self::Ref(value) => Some(value),
@@ -37,6 +57,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the shared handle mutably, or [`None`] for any other role.
     pub fn as_mut_ref(&mut self) -> Option<&mut ManagedRef<T>> {
         match self {
             Self::Ref(value) => Some(value),
@@ -44,6 +65,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the exclusive handle, or [`None`] for any other role.
     pub fn as_ref_mut(&self) -> Option<&ManagedRefMut<T>> {
         match self {
             Self::RefMut(value) => Some(value),
@@ -51,6 +73,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the exclusive handle mutably, or [`None`] for any other role.
     pub fn as_mut_ref_mut(&mut self) -> Option<&mut ManagedRefMut<T>> {
         match self {
             Self::RefMut(value) => Some(value),
@@ -58,6 +81,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the unclaimed handle, or [`None`] for any other role.
     pub fn as_lazy(&self) -> Option<&ManagedLazy<T>> {
         match self {
             Self::Lazy(value) => Some(value),
@@ -65,6 +89,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the unclaimed handle mutably, or [`None`] for any other role.
     pub fn as_mut_lazy(&mut self) -> Option<&mut ManagedLazy<T>> {
         match self {
             Self::Lazy(value) => Some(value),
@@ -72,6 +97,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the garbage collected handle, or [`None`] for any other role.
     pub fn as_gc(&self) -> Option<&ManagedGc<T>> {
         match self {
             Self::Gc(value) => Some(value),
@@ -79,6 +105,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Returns the garbage collected handle mutably, or [`None`] for any other role.
     pub fn as_mut_gc(&mut self) -> Option<&mut ManagedGc<T>> {
         match self {
             Self::Gc(value) => Some(value),
@@ -86,6 +113,7 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Guards the value for reading, whichever role holds it.
     pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         match self {
             Self::Owned(value) => value.read(),
@@ -96,6 +124,9 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Guards the value for writing.
+    ///
+    /// Always [`None`] for a shared handle.
     pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         match self {
             Self::Owned(value) => value.write(),
@@ -106,6 +137,9 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Takes a shared handle to the value.
+    ///
+    /// Always [`None`] for an unclaimed handle, which cannot lend its claim.
     pub fn borrow(&self) -> Option<ManagedRef<T>> {
         match self {
             Self::Owned(value) => value.borrow(),
@@ -116,6 +150,9 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Takes an exclusive handle to the value.
+    ///
+    /// Always [`None`] for shared and unclaimed handles.
     pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
         match self {
             Self::Owned(value) => value.borrow_mut(),
@@ -125,6 +162,10 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Takes an unclaimed handle to the value.
+    ///
+    /// Always [`None`] for a shared handle. See
+    /// [`ManagedValue::lazy_immutable`].
     pub fn lazy(&mut self) -> Option<ManagedLazy<T>> {
         match self {
             Self::Owned(value) => Some(value.lazy()),
@@ -135,7 +176,12 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// [`ManagedValue::lazy`] that also works for a shared handle.
+    ///
     /// # Safety
+    ///
+    /// For a shared handle, the result can write to a value that was only
+    /// borrowed immutably.
     pub unsafe fn lazy_immutable(&self) -> ManagedLazy<T> {
         unsafe {
             match self {
@@ -148,6 +194,8 @@ impl<T> ManagedValue<T> {
         }
     }
 
+    /// Erases the type, giving `self` back when an owned value cannot be moved
+    /// into its own allocation.
     pub fn into_dynamic(self) -> Result<DynamicManagedValue, Self> {
         match self {
             Self::Owned(value) => match value.into_dynamic() {
@@ -203,15 +251,24 @@ impl<T> From<ManagedGc<T>> for ManagedValue<T> {
     }
 }
 
+/// A value of a runtime known type, held in any of the possible ways.
+///
+/// The [`ManagedValue`] counterpart for script values.
 pub enum DynamicManagedValue {
+    /// The value itself.
     Owned(DynamicManaged),
+    /// A shared handle to someone else's value.
     Ref(DynamicManagedRef),
+    /// An exclusive handle to someone else's value.
     RefMut(DynamicManagedRefMut),
+    /// An unclaimed handle to someone else's value.
     Lazy(DynamicManagedLazy),
+    /// A garbage collected handle, owning or referencing.
     Gc(DynamicManagedGc),
 }
 
 impl DynamicManagedValue {
+    /// Returns the owned value, or [`None`] for any other role.
     pub fn as_owned(&self) -> Option<&DynamicManaged> {
         match self {
             Self::Owned(value) => Some(value),
@@ -219,6 +276,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the owned value mutably, or [`None`] for any other role.
     pub fn as_mut_owned(&mut self) -> Option<&mut DynamicManaged> {
         match self {
             Self::Owned(value) => Some(value),
@@ -226,6 +284,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the shared handle, or [`None`] for any other role.
     pub fn as_ref(&self) -> Option<&DynamicManagedRef> {
         match self {
             Self::Ref(value) => Some(value),
@@ -233,6 +292,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the shared handle mutably, or [`None`] for any other role.
     pub fn as_mut_ref(&mut self) -> Option<&mut DynamicManagedRef> {
         match self {
             Self::Ref(value) => Some(value),
@@ -240,6 +300,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the exclusive handle, or [`None`] for any other role.
     pub fn as_ref_mut(&self) -> Option<&DynamicManagedRefMut> {
         match self {
             Self::RefMut(value) => Some(value),
@@ -247,6 +308,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the exclusive handle mutably, or [`None`] for any other role.
     pub fn as_mut_ref_mut(&mut self) -> Option<&mut DynamicManagedRefMut> {
         match self {
             Self::RefMut(value) => Some(value),
@@ -254,6 +316,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the unclaimed handle, or [`None`] for any other role.
     pub fn as_lazy(&self) -> Option<&DynamicManagedLazy> {
         match self {
             Self::Lazy(value) => Some(value),
@@ -261,6 +324,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the unclaimed handle mutably, or [`None`] for any other role.
     pub fn as_mut_lazy(&mut self) -> Option<&mut DynamicManagedLazy> {
         match self {
             Self::Lazy(value) => Some(value),
@@ -268,6 +332,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the garbage collected handle, or [`None`] for any other role.
     pub fn as_gc(&self) -> Option<&DynamicManagedGc> {
         match self {
             Self::Gc(value) => Some(value),
@@ -275,6 +340,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Returns the garbage collected handle mutably, or [`None`] for any other role.
     pub fn as_mut_gc(&mut self) -> Option<&mut DynamicManagedGc> {
         match self {
             Self::Gc(value) => Some(value),
@@ -282,6 +348,9 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Guards the value for reading, whichever role holds it.
+    ///
+    /// Returns [`None`] when the value is not a `T`.
     pub fn read<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         match self {
             Self::Owned(value) => value.read::<T>(),
@@ -292,6 +361,9 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Guards the value for writing.
+    ///
+    /// Always [`None`] for a shared handle, or when the value is not a `T`.
     pub fn write<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         match self {
             Self::Owned(value) => value.write::<T>(),
@@ -302,6 +374,9 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Takes a shared handle to the value.
+    ///
+    /// Always [`None`] for an unclaimed handle, which cannot lend its claim.
     pub fn borrow(&self) -> Option<DynamicManagedRef> {
         match self {
             Self::Owned(value) => value.borrow(),
@@ -312,6 +387,9 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Takes an exclusive handle to the value.
+    ///
+    /// Always [`None`] for shared and unclaimed handles.
     pub fn borrow_mut(&mut self) -> Option<DynamicManagedRefMut> {
         match self {
             Self::Owned(value) => value.borrow_mut(),
@@ -321,6 +399,10 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Takes an unclaimed handle to the value.
+    ///
+    /// Always [`None`] for a shared handle. See
+    /// [`DynamicManagedValue::lazy_immutable`].
     pub fn lazy(&self) -> Option<DynamicManagedLazy> {
         match self {
             Self::Owned(value) => Some(value.lazy()),
@@ -331,7 +413,12 @@ impl DynamicManagedValue {
         }
     }
 
+    /// [`DynamicManagedValue::lazy`] that also works for a shared handle.
+    ///
     /// # Safety
+    ///
+    /// For a shared handle, the result can write to a value that was only
+    /// borrowed immutably.
     pub unsafe fn lazy_immutable(&self) -> DynamicManagedLazy {
         unsafe {
             match self {
@@ -344,6 +431,7 @@ impl DynamicManagedValue {
         }
     }
 
+    /// Recovers the typed value, giving `self` back on a type mismatch.
     pub fn into_typed<T>(self) -> Result<ManagedValue<T>, Self> {
         match self {
             Self::Owned(value) => match value.into_typed() {

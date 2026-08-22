@@ -1,17 +1,25 @@
+//! Repeating a parser at least once.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`OneOrMoreParser`].
     pub fn oom(parser: ParserHandle) -> ParserHandle {
         OneOrMoreParser::new(parser).into_handle()
     }
 }
 
+/// Runs the inner parser until it fails, requiring at least one match.
+///
+/// Yields a `Vec<ParserOutput>`. Fails with the inner parser's error when
+/// the first attempt already fails.
 #[derive(Clone)]
 pub struct OneOrMoreParser(ParserHandle);
 
 impl OneOrMoreParser {
+    /// Repeats `parser`.
     pub fn new(parser: ParserHandle) -> Self {
         Self(parser)
     }

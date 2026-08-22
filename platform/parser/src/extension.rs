@@ -1,9 +1,12 @@
+//! Building a parser from state kept in the registry.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserRegistry};
 use std::sync::Arc;
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`ExtensionParser`].
     pub fn ext<T: Send + Sync + 'static>(
         f: impl Fn(Arc<T>) -> ParserHandle + Send + Sync + 'static,
     ) -> ParserHandle {
@@ -11,12 +14,20 @@ pub mod shorthand {
     }
 }
 
+/// Asks the [`ParserRegistry`] for the extension of type `T` and builds the
+/// real parser from it, per parse.
+///
+/// This is how a grammar reaches outside itself - to a symbol table, a
+/// counter, or a script host as [`dynamic`](crate::dynamic) does.
+///
+/// Fails when no extension of that type was added to the registry.
 #[derive(Clone)]
 pub struct ExtensionParser<T: Send + Sync + 'static> {
     parser_generator: Arc<dyn Fn(Arc<T>) -> ParserHandle + Send + Sync>,
 }
 
 impl<T: Send + Sync + 'static> ExtensionParser<T> {
+    /// Builds the parser with `f` each time this one runs.
     pub fn new(f: impl Fn(Arc<T>) -> ParserHandle + Send + Sync + 'static) -> Self {
         Self {
             parser_generator: Arc::new(f),

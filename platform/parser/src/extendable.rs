@@ -1,28 +1,40 @@
+//! Parsers that can be added to after they were built.
+//!
+//! Every parser has [`Parser::extend`]. A wrapping parser passes the call down
+//! to its inner parser, until the call reaches one of the parsers here, which
+//! acts on it. That is how a grammar loaded later can add cases to a grammar
+//! already in the registry.
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserRegistry, alternation::AlternationParser,
 };
 use std::sync::RwLock;
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`ExtendableParser::exchange`].
     pub fn ext_exchange(parser: ParserHandle) -> ParserHandle {
         ExtendableParser::exchange(parser).into_handle()
     }
 
+    /// See [`ExtendableParser::depth`].
     pub fn ext_depth(parser: ParserHandle) -> ParserHandle {
         ExtendableParser::depth(parser).into_handle()
     }
 
+    /// See [`ExtendableParser::variants`].
     pub fn ext_variants() -> ParserHandle {
         ExtendableParser::variants().into_handle()
     }
 
+    /// See [`ExtendableWrapperParser`].
     pub fn ext_wrap(parser: ParserHandle, extendable: ParserHandle) -> ParserHandle {
         ExtendableWrapperParser::new(parser, extendable).into_handle()
     }
 }
 
+/// How an [`ExtendableParser`] treats what it is given.
 #[derive(Clone)]
 enum ExtendableParserInner {
     Exchange(ParserHandle),
@@ -30,23 +42,34 @@ enum ExtendableParserInner {
     Variants(AlternationParser),
 }
 
+/// A parser whose contents [`Parser::extend`] rewrites, in one of three
+/// ways.
 pub struct ExtendableParser {
     inner: RwLock<ExtendableParserInner>,
 }
 
 impl ExtendableParser {
+    /// Extending replaces the parser outright.
     pub fn exchange(parser: ParserHandle) -> Self {
         Self {
             inner: RwLock::new(ExtendableParserInner::Exchange(parser)),
         }
     }
 
+    /// Extending wraps the current parser inside the new one, which is handed
+    /// the old one through its own [`Parser::extend`].
+    ///
+    /// Layers build up, which is how precedence levels are stacked.
     pub fn depth(parser: ParserHandle) -> Self {
         Self {
             inner: RwLock::new(ExtendableParserInner::Depth(parser)),
         }
     }
 
+    /// Extending prepends the parser as another alternative to try.
+    ///
+    /// Starts empty, so it matches nothing until extended. New cases are tried
+    /// before older ones.
     pub fn variants() -> Self {
         Self {
             inner: RwLock::new(ExtendableParserInner::Variants(Default::default())),
@@ -85,6 +108,10 @@ impl Parser for ExtendableParser {
     }
 }
 
+/// Parses as one parser but extends a different one.
+///
+/// Lets a rule expose a slot buried inside it, so extending the rule reaches
+/// that slot rather than the rule itself.
 #[derive(Clone)]
 pub struct ExtendableWrapperParser {
     parser: ParserHandle,
@@ -92,6 +119,7 @@ pub struct ExtendableWrapperParser {
 }
 
 impl ExtendableWrapperParser {
+    /// Parses with `parser` and sends extensions to `extendable`.
     pub fn new(parser: ParserHandle, extendable: ParserHandle) -> Self {
         Self { parser, extendable }
     }

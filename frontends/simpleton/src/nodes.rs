@@ -174,7 +174,7 @@ impl NodeDefinition for SimpletonNodes {
                         vec![NodePin::property("Name"), NodePin::property("Module name")];
                     if let Some(function) = registry.find_function(FunctionQuery {
                         name: Some(name.into()),
-                        module_name: Some(module_name.into()),
+                        module_name: Some(module_name.into()).into(),
                         ..Default::default()
                     }) {
                         result.extend(function.signature().inputs.iter().flat_map(|input| {

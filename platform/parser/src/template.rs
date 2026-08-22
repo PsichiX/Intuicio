@@ -1,9 +1,30 @@
+//! Rewriting what was parsed into new text, then parsing that.
+//!
+//! A template turns a parse result back into source, which another rule
+//! then reads. It is how a grammar defines sugar: match the short form,
+//! write out the long form, hand it to the rule that already understands
+//! it.
+//!
+//! The content string is filled in from the parse result:
+//!
+//! | Form | Meaning |
+//! |---|---|
+//! | `@{}@` | the result, when it is a single `String` |
+//! | `@>{prefix}[delimiter]{suffix}@` | every item of a list, in order |
+//! | `@<{prefix}[delimiter]{suffix}@` | every item of a list, reversed |
+//! | `@>{prefix}[delimiter]{suffix}[N]@` | item `N` of a list only |
+//!
+//! Each item is wrapped in `prefix` and `suffix`, and `delimiter` goes
+//! between them. For example `@>{value:}[+]{}@` over `["40", "2"]` gives
+//! `value:40+value:2`.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
 use regex::{Captures, Regex};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`TemplateParser`].
     pub fn template(
         parser: ParserHandle,
         rule: Option<String>,
@@ -14,9 +35,24 @@ pub mod shorthand {
 }
 
 thread_local! {
+    /// The list form of a template placeholder, kept compiled per thread.
     static REGEX: Regex = Regex::new(r"@(>|<)\{([^\}]*)\}\[([^\]@]*)\]\{([^\}]*)\}(\[(\d+)\])?@").unwrap();
 }
 
+/// Rewrites a parse result into text through a template, then optionally
+/// parses that text with another rule.
+///
+/// With a rule the output is whatever that rule produced, and the rewritten
+/// text has to be consumed entirely. Without one the output is the
+/// rewritten text itself, as a `String`.
+///
+/// Fails when the inner parser produced neither a `String` nor a
+/// `Vec<ParserOutput>`.
+///
+/// # Panics
+///
+/// Panics when the template asks for a list item that is out of range, or
+/// for an item that is not a `String`.
 pub struct TemplateParser {
     parser: ParserHandle,
     rule: Option<String>,
@@ -24,6 +60,8 @@ pub struct TemplateParser {
 }
 
 impl TemplateParser {
+    /// Fills `content` from what `parser` produced, then parses the result with
+    /// `rule` when one is given.
     pub fn new(parser: ParserHandle, rule: Option<String>, content: impl ToString) -> Self {
         Self {
             parser,

@@ -288,7 +288,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
         let fib = registry
             .find_function(FunctionQuery {
                 name: Some("fib".into()),
-                module_name: Some("test".into()),
+                module_name: Some("test".into()).into(),
                 ..Default::default()
             })
             .unwrap();
@@ -335,7 +335,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
         let fib = registry
             .find_function(FunctionQuery {
                 name: Some("fib".into()),
-                module_name: Some("test".into()),
+                module_name: Some("test".into()).into(),
                 ..Default::default()
             })
             .unwrap();

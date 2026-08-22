@@ -1,3 +1,55 @@
+//! Building parsers from a grammar written as text.
+//!
+//! Everything in this crate can be assembled by hand in Rust. This module
+//! does the same from a string, so a frontend can be loaded at run time
+//! rather than compiled in. The grammar itself is parsed with the very
+//! combinators it produces.
+//!
+//! A grammar is a list of rules, one per line:
+//!
+//! ```text
+//! value => %map{number_float "map_value"}
+//! op    => %map{|ws|("+" $expr $expr) "map_op_add"}
+//! expr  => [$value $op]
+//! ```
+//!
+//! `name => item` registers `item` under `name`. `name -> other => item`
+//! also passes it to [`Parser::extend`] of the rule called `other`, which
+//! is how a later grammar adds cases to an earlier one. `//` and `/* */`
+//! comments are skipped.
+//!
+//! # Item syntax
+//!
+//! | Form | Builds |
+//! |---|---|
+//! | `"foo"` | [`lit`] |
+//! | `~~~(\w+)~~~` | [`regex`](crate::regex::shorthand::regex) |
+//! | `$name` | [`inject`] |
+//! | `<name>` | [`slot`](crate::slot::shorthand::slot) |
+//! | `[a b]` | [`alt`] |
+//! | `(a b)` | [`seq`] |
+//! | `\|d\|(a b)` | [`seq_del`] with delimiter `d` |
+//! | `{item d true}` | [`list`], the flag being permissiveness |
+//! | `*a` `+a` `?a` `!a` `^a` `3a` | zero or more, one or more, optional, not, predict, repeat |
+//! | `=a` | [`source`] |
+//! | ``@`id`a`` | [`debug`] |
+//! | `oc{a o c}` `prefix{a o}` `suffix{a c}` | [`open_close`](crate::open_close) |
+//! | `string{"(" ")"}` | [`string`] |
+//! | ``template{a "rule" ```content``` }`` | [`template`](crate::template) |
+//! | `#exchange{a}` `#depth{a}` `#variants{}` | [`extendable`](crate::extendable) |
+//! | `#name{a b}` | [`ext_wrap`] around slot `name` |
+//! | `%inspect{a "fn"}` `%map{a "fn"}` `%maperr{a "fn"}` | [`dynamic`](crate::dynamic) callbacks |
+//! | `%pratt{a -> [rules] [rules]}` | [`pratt`](crate::pratt), one bracket per precedence level |
+//! | `any` `nl` `digit` `word` `id` `ws` `ows` `ignore` and friends | the named parsers of [`regex`](crate::regex) |
+//!
+//! A Pratt rule is written between angle brackets:
+//! `<infix op "+" "add" left>` recognises the operator by its text, while
+//! `<infix "is_add" "add" left>` recognises it by calling a function.
+//! `prefix` and `postfix` rules take no associativity.
+//!
+//! Every callback name refers to a function in the
+//! [`DynamicExtension`](crate::dynamic::DynamicExtension) held by the
+//! registry the grammar is parsed with.
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
     pratt::PrattParserAssociativity,
@@ -11,14 +63,18 @@ use crate::{
 };
 use std::{collections::HashMap, error::Error, sync::RwLock};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`GeneratorParser`].
     pub fn generator() -> ParserHandle {
         GeneratorParser::default().into_handle()
     }
 }
 
+/// Slots declared by `<name>` while a grammar is being read, waiting to be
+/// claimed by the `#name{...}` that wraps them.
 #[derive(Default)]
 struct SlotsExtension {
     slots: RwLock<HashMap<String, ParserHandle>>,
@@ -39,6 +95,7 @@ impl SlotsExtension {
     }
 }
 
+/// Reads `<name>` and registers a fresh slot under that name.
 struct SlotExtensionSlotParser(ParserHandle);
 
 impl Parser for SlotExtensionSlotParser {
@@ -57,6 +114,7 @@ impl Parser for SlotExtensionSlotParser {
     }
 }
 
+/// Reads `#name{item}` and ties `item` to the slot declared as `name`.
 struct SlotExtensionExtWrapParser(ParserHandle);
 
 impl Parser for SlotExtensionExtWrapParser {
@@ -77,6 +135,11 @@ impl Parser for SlotExtensionExtWrapParser {
     }
 }
 
+/// Parses a grammar and yields a [`Generator`].
+///
+/// A [`Parser`] like any other, so a grammar can be embedded in a larger
+/// one. It brings its own registry, so the registry passed to
+/// [`Parser::parse`] is ignored.
 pub struct GeneratorParser {
     registry: ParserRegistry,
     parser: ParserHandle,
@@ -105,12 +168,16 @@ impl Parser for GeneratorParser {
     }
 }
 
+/// The parsers a grammar defined, ready to be installed.
 pub struct Generator {
     /// [parser id, parser handle, extender id?]
     parsers: Vec<(String, ParserHandle, Option<String>)>,
 }
 
 impl Generator {
+    /// Reads a grammar from text.
+    ///
+    /// Fails on a syntax error, pointing at the rule that could not be read.
     pub fn new(grammar: &str) -> Result<Self, Box<dyn Error>> {
         let registry = Self::registry();
         Ok(Self {
@@ -123,6 +190,11 @@ impl Generator {
         })
     }
 
+    /// Adds every parser to `registry` under its rule name, and applies the
+    /// `->` extensions.
+    ///
+    /// Fails when a rule extends a name that is not in the registry, so install
+    /// the grammar being extended first.
     pub fn install(&self, registry: &ParserRegistry) -> Result<(), Box<dyn Error>> {
         for (id, parser, extender) in &self.parsers {
             registry.add_parser(id, parser.clone());
@@ -133,18 +205,24 @@ impl Generator {
         Ok(())
     }
 
+    /// Returns the parser defined by the rule `id`, if any.
     pub fn parser(&self, id: &str) -> Option<ParserHandle> {
         self.parsers
             .iter()
             .find_map(|(k, v, _)| if k == id { Some(v.clone()) } else { None })
     }
 
+    /// Walks the rules in declaration order, as (id, parser, extended id).
     pub fn iter(&self) -> impl Iterator<Item = (&str, ParserHandle, Option<&str>)> {
         self.parsers
             .iter()
             .map(|(id, parser, extender)| (id.as_str(), parser.clone(), extender.as_deref()))
     }
 
+    /// A registry holding the parsers that read the grammar syntax itself.
+    ///
+    /// Useful to parse or extend the grammar language, and required by
+    /// [`GeneratorParser`], which cannot work with any other.
     pub fn registry() -> ParserRegistry {
         ParserRegistry::default()
             .with_extension(SlotsExtension::default())
@@ -199,6 +277,7 @@ impl Generator {
     }
 }
 
+/// A whole grammar: rules separated by whitespace or comments.
 fn main() -> ParserHandle {
     map(
         oc(list(rule(), ws(), true), ows(), ows()),
@@ -216,16 +295,19 @@ fn main() -> ParserHandle {
     )
 }
 
+/// A bare name, or any text in backticks.
 fn identifier() -> ParserHandle {
     alt([string("`", "`"), id()])
 }
 
+/// `true` or `false`.
 fn boolean() -> ParserHandle {
     map(alt([lit("true"), lit("false")]), |value: String| {
         value.parse::<bool>().unwrap()
     })
 }
 
+/// `name => item`, or `name -> extended => item`.
 fn rule() -> ParserHandle {
     map(
         seq_del(
@@ -246,6 +328,7 @@ fn rule() -> ParserHandle {
     )
 }
 
+/// A run of `//` and `/* */` comments.
 fn comment() -> ParserHandle {
     map(
         regex(r"(\s*/\*[^\*/]+\*/\s*|\s*//[^\r\n]+[\r\n]\s*)+"),
@@ -253,14 +336,18 @@ fn comment() -> ParserHandle {
     )
 }
 
+/// Whitespace or comments, at least some.
 fn ws() -> ParserHandle {
     alt([comment(), crate::shorthand::ws()])
 }
 
+/// Whitespace or comments, possibly none.
 fn ows() -> ParserHandle {
     alt([comment(), crate::shorthand::ows()])
 }
 
+/// Any item form. The order matters: forms that start alike have to be
+/// tried longest first.
 fn item() -> ParserHandle {
     alt([
         inject("debug"),
@@ -313,6 +400,7 @@ fn item() -> ParserHandle {
     ])
 }
 
+/// `{item delimiter permissive}` - a delimited list
 fn parser_list() -> ParserHandle {
     map_err(
         map(
@@ -332,6 +420,7 @@ fn parser_list() -> ParserHandle {
     )
 }
 
+/// `@`id`item` - tracing of `item`
 fn parser_debug() -> ParserHandle {
     map_err(
         map(
@@ -346,6 +435,7 @@ fn parser_debug() -> ParserHandle {
     )
 }
 
+/// `=item` - the text `item` consumed
 fn parser_source() -> ParserHandle {
     map_err(
         map(prefix(inject("item"), lit("=")), |value: ParserHandle| {
@@ -355,6 +445,7 @@ fn parser_source() -> ParserHandle {
     )
 }
 
+/// `#exchange{item}` - a replaceable parser
 fn parser_ext_exchange() -> ParserHandle {
     map_err(
         map(
@@ -369,6 +460,7 @@ fn parser_ext_exchange() -> ParserHandle {
     )
 }
 
+/// `#depth{item}` - a parser extended by wrapping
 fn parser_ext_depth() -> ParserHandle {
     map_err(
         map(
@@ -383,6 +475,7 @@ fn parser_ext_depth() -> ParserHandle {
     )
 }
 
+/// `#variants{}` - a growing set of alternatives
 fn parser_ext_variants() -> ParserHandle {
     map_err(
         omap(
@@ -393,6 +486,7 @@ fn parser_ext_variants() -> ParserHandle {
     )
 }
 
+/// `#name{item}` - `item` extending the slot `name`
 fn parser_ext_wrap() -> ParserHandle {
     map_err(
         SlotExtensionExtWrapParser(oc(
@@ -405,6 +499,7 @@ fn parser_ext_wrap() -> ParserHandle {
     )
 }
 
+/// `%inspect{item "fn"}` - a look at each output
 fn parser_inspect() -> ParserHandle {
     map_err(
         map(
@@ -423,6 +518,7 @@ fn parser_inspect() -> ParserHandle {
     )
 }
 
+/// `%map{item "fn"}` - a rewrite of each output
 fn parser_map() -> ParserHandle {
     map_err(
         map(
@@ -441,6 +537,7 @@ fn parser_map() -> ParserHandle {
     )
 }
 
+/// `%maperr{item "fn"}` - a rewrite of each error
 fn parser_map_err() -> ParserHandle {
     map_err(
         map(
@@ -459,6 +556,7 @@ fn parser_map_err() -> ParserHandle {
     )
 }
 
+/// `<prefix "operator_fn" "transformer_fn">`
 fn pratt_rule_prefix() -> ParserHandle {
     map_err(
         map(
@@ -483,6 +581,7 @@ fn pratt_rule_prefix() -> ParserHandle {
     )
 }
 
+/// `<prefix op "+" "transformer_fn">`
 fn pratt_rule_prefix_op() -> ParserHandle {
     map_err(
         map(
@@ -512,6 +611,7 @@ fn pratt_rule_prefix_op() -> ParserHandle {
     )
 }
 
+/// `<postfix "operator_fn" "transformer_fn">`
 fn pratt_rule_postfix() -> ParserHandle {
     map_err(
         map(
@@ -536,6 +636,7 @@ fn pratt_rule_postfix() -> ParserHandle {
     )
 }
 
+/// `<postfix op "!" "transformer_fn">`
 fn pratt_rule_postfix_op() -> ParserHandle {
     map_err(
         map(
@@ -565,6 +666,7 @@ fn pratt_rule_postfix_op() -> ParserHandle {
     )
 }
 
+/// `<infix "operator_fn" "transformer_fn" left>`
 fn pratt_rule_infix() -> ParserHandle {
     map_err(
         map(
@@ -600,6 +702,7 @@ fn pratt_rule_infix() -> ParserHandle {
     )
 }
 
+/// `<infix op "+" "transformer_fn" left>`
 fn pratt_rule_infix_op() -> ParserHandle {
     map_err(
         map(
@@ -636,6 +739,7 @@ fn pratt_rule_infix_op() -> ParserHandle {
     )
 }
 
+/// `[rule rule ...]` - one precedence level.
 fn pratt_rule_set() -> ParserHandle {
     map_err(
         map(
@@ -666,6 +770,7 @@ fn pratt_rule_set() -> ParserHandle {
     )
 }
 
+/// `%pratt{tokenizer -> [level] [level]}` - an expression parser
 fn parser_pratt() -> ParserHandle {
     map_err(
         map(
@@ -699,6 +804,7 @@ fn parser_pratt() -> ParserHandle {
     )
 }
 
+/// `[a b]` - the first matching alternative
 fn parser_alt() -> ParserHandle {
     map_err(
         map(
@@ -719,6 +825,7 @@ fn parser_alt() -> ParserHandle {
     )
 }
 
+/// `(a b)` - all of them in order
 fn parser_seq() -> ParserHandle {
     map_err(
         map(
@@ -739,6 +846,7 @@ fn parser_seq() -> ParserHandle {
     )
 }
 
+/// `|d|(a b)` - all of them, separated by `d`
 fn parser_seq_del() -> ParserHandle {
     map_err(
         map(
@@ -775,6 +883,7 @@ fn parser_seq_del() -> ParserHandle {
     )
 }
 
+/// `*item` - zero or more
 fn parser_zom() -> ParserHandle {
     map_err(
         map(prefix(inject("item"), lit("*")), |value: ParserHandle| {
@@ -784,6 +893,7 @@ fn parser_zom() -> ParserHandle {
     )
 }
 
+/// `+item` - one or more
 fn parser_oom() -> ParserHandle {
     map_err(
         map(prefix(inject("item"), lit("+")), |value: ParserHandle| {
@@ -793,6 +903,7 @@ fn parser_oom() -> ParserHandle {
     )
 }
 
+/// `!item` - a negative lookahead
 fn parser_not() -> ParserHandle {
     map_err(
         map(prefix(inject("item"), lit("!")), |value: ParserHandle| {
@@ -802,6 +913,7 @@ fn parser_not() -> ParserHandle {
     )
 }
 
+/// `?item` - an optional match
 fn parser_opt() -> ParserHandle {
     map_err(
         map(prefix(inject("item"), lit("?")), |value: ParserHandle| {
@@ -811,6 +923,7 @@ fn parser_opt() -> ParserHandle {
     )
 }
 
+/// `^item` - a positive lookahead
 fn parser_pred() -> ParserHandle {
     map_err(
         map(prefix(inject("item"), lit("^")), |value: ParserHandle| {
@@ -820,6 +933,7 @@ fn parser_pred() -> ParserHandle {
     )
 }
 
+/// `<name>` - a slot to be filled later
 fn parser_slot() -> ParserHandle {
     map_err(
         SlotExtensionSlotParser(oc(identifier(), lit("<"), lit(">"))).into_handle(),
@@ -827,6 +941,7 @@ fn parser_slot() -> ParserHandle {
     )
 }
 
+/// `3item` - an exact number of repeats
 fn parser_rep() -> ParserHandle {
     map_err(
         map(
@@ -847,6 +962,7 @@ fn parser_rep() -> ParserHandle {
     )
 }
 
+/// `$name` - a parser looked up by name
 fn parser_inject() -> ParserHandle {
     map_err(
         map(prefix(identifier(), lit("$")), |value: String| {
@@ -856,12 +972,14 @@ fn parser_inject() -> ParserHandle {
     )
 }
 
+/// `"foo"` - an exact piece of text
 fn parser_lit() -> ParserHandle {
     map_err(map(string("\"", "\""), |value: String| lit(value)), |_| {
         "Expected literal".into()
     })
 }
 
+/// `~~~(pattern)~~~` - a regular expression
 fn parser_regex() -> ParserHandle {
     map_err(
         map(string("~~~(", ")~~~"), |value: String| regex(value)),
@@ -869,6 +987,7 @@ fn parser_regex() -> ParserHandle {
     )
 }
 
+/// `template{item "rule" ```content```}` - a rewrite
 fn parser_template() -> ParserHandle {
     map_err(
         map(
@@ -892,6 +1011,7 @@ fn parser_template() -> ParserHandle {
     )
 }
 
+/// `oc{item open close}` - something between markers
 fn parser_oc() -> ParserHandle {
     map_err(
         map(
@@ -911,6 +1031,7 @@ fn parser_oc() -> ParserHandle {
     )
 }
 
+/// `prefix{item open}` - something after a marker
 fn parser_prefix() -> ParserHandle {
     map_err(
         map(
@@ -929,6 +1050,7 @@ fn parser_prefix() -> ParserHandle {
     )
 }
 
+/// `suffix{item close}` - something before a marker
 fn parser_suffix() -> ParserHandle {
     map_err(
         map(
@@ -947,6 +1069,7 @@ fn parser_suffix() -> ParserHandle {
     )
 }
 
+/// `string{"(" ")"}` - text between markers
 fn parser_string() -> ParserHandle {
     map_err(
         map(
@@ -965,30 +1088,35 @@ fn parser_string() -> ParserHandle {
     )
 }
 
+/// `any` - any character
 fn parser_any() -> ParserHandle {
     map_err(map(lit("any"), |_: String| any()), |_| {
         "Expected any".into()
     })
 }
 
+/// `nl` - a line break
 fn parser_nl() -> ParserHandle {
     map_err(map(lit("nl"), |_: String| nl()), |_| {
         "Expected new line".into()
     })
 }
 
+/// `digit_hex` - a hexadecimal digit
 fn parser_digit_hex() -> ParserHandle {
     map_err(map(lit("digit_hex"), |_: String| digit_hex()), |_| {
         "Expected HEX digit".into()
     })
 }
 
+/// `digit` - a decimal digit
 fn parser_digit() -> ParserHandle {
     map_err(map(lit("digit"), |_: String| digit()), |_| {
         "Expected digit".into()
     })
 }
 
+/// `number_int_pos` - unsigned digits
 fn parser_number_int_pos() -> ParserHandle {
     map_err(
         map(lit("number_int_pos"), |_: String| number_int_pos()),
@@ -996,76 +1124,89 @@ fn parser_number_int_pos() -> ParserHandle {
     )
 }
 
+/// `number_int` - digits with an optional sign
 fn parser_number_int() -> ParserHandle {
     map_err(map(lit("number_int"), |_: String| number_int()), |_| {
         "Expected integer number".into()
     })
 }
 
+/// `number_float` - a decimal number
 fn parser_number_float() -> ParserHandle {
     map_err(map(lit("number_float"), |_: String| number_float()), |_| {
         "Expected float number".into()
     })
 }
 
+/// `alphanum` - a letter, digit or underscore
 fn parser_alphanum() -> ParserHandle {
     map_err(map(lit("alphanum"), |_: String| alphanum()), |_| {
         "Expected alphanumeric character".into()
     })
 }
 
+/// `alpha_low` - a lowercase letter
 fn parser_alpha_low() -> ParserHandle {
     map_err(map(lit("alpha_low"), |_: String| alpha_low()), |_| {
         "Expected lowercase alphabetic character".into()
     })
 }
 
+/// `alpha_up` - an uppercase letter
 fn parser_alpha_up() -> ParserHandle {
     map_err(map(lit("alpha_up"), |_: String| alpha_up()), |_| {
         "Expected uppercase alphabetic character".into()
     })
 }
 
+/// `alpha` - a letter
 fn parser_alpha() -> ParserHandle {
     map_err(map(lit("alpha"), |_: String| alpha()), |_| {
         "Expected alphabetic character".into()
     })
 }
 
+/// `word` - a run of word characters
 fn parser_word() -> ParserHandle {
     map_err(map(lit("word"), |_: String| word()), |_| {
         "Expected word".into()
     })
 }
 
+/// `id_start` - a character an identifier may start with
 fn parser_id_start() -> ParserHandle {
     map_err(map(lit("id_start"), |_: String| id_start()), |_| {
         "Expected id start".into()
     })
 }
 
+/// `id_continue` - the rest of an identifier
 fn parser_id_continue() -> ParserHandle {
     map_err(map(lit("id_continue"), |_: String| id_continue()), |_| {
         "Expected id continue".into()
     })
 }
 
+/// `id` - a whole identifier
 fn parser_id() -> ParserHandle {
     map_err(map(lit("id"), |_: String| id()), |_| "Expected id".into())
 }
 
+/// `ows` - optional whitespace
 fn parser_ows() -> ParserHandle {
     map_err(map(lit("ows"), |_: String| crate::shorthand::ows()), |_| {
         "Expected optional whitespaces".into()
     })
 }
 
+/// `ws` - required whitespace
 fn parser_ws() -> ParserHandle {
     map_err(map(lit("ws"), |_: String| crate::shorthand::ws()), |_| {
         "Expected whitespaces".into()
     })
 }
 
+/// `ignore` - nothing at all
 fn parser_ignore() -> ParserHandle {
     map_err(map(lit("ignore"), |_: String| ignore()), |_| {
         "Expected ignored".into()

@@ -1,5 +1,5 @@
 use intuicio_core::{
-    IntuicioVersion, Visibility,
+    Filter, IntuicioVersion, Visibility,
     context::Context,
     crate_version,
     function::{FunctionQuery, FunctionQueryParameter},
@@ -86,7 +86,7 @@ impl ScriptExpression for VaultScriptExpression {
                 registry
                     .find_function(FunctionQuery {
                         name: Some(name.into()),
-                        type_query: Some(TypeQuery {
+                        type_query: Filter::Matching(TypeQuery {
                             type_hash: Some(type_hash),
                             ..Default::default()
                         }),
@@ -223,7 +223,10 @@ impl VaultExpression {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some(name.to_owned().into()),
-                        module_name: module_name.as_ref().map(|name| name.to_owned().into()),
+                        module_name: module_name
+                            .as_ref()
+                            .map(|name| name.to_owned().into())
+                            .into(),
                         ..Default::default()
                     },
                 });
@@ -240,11 +243,14 @@ impl VaultExpression {
                 result.push(ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some(name.to_owned().into()),
-                        type_query: Some(TypeQuery {
+                        type_query: Filter::Matching(TypeQuery {
                             name: Some(type_name.to_owned().into()),
                             ..Default::default()
                         }),
-                        module_name: module_name.as_ref().map(|name| name.to_owned().into()),
+                        module_name: module_name
+                            .as_ref()
+                            .map(|name| name.to_owned().into())
+                            .into(),
                         ..Default::default()
                     },
                 });

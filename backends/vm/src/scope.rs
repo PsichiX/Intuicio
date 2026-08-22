@@ -1,3 +1,10 @@
+//! The interpreter itself: one scope of script operations, stepped through.
+//!
+//! A [`VmScope`] holds a list of operations and the position it reached in
+//! them. Operations that open a nested scope, such as a branch or a loop body,
+//! put a child scope inside the parent, so the call stack of the script is a
+//! chain of scopes rather than Rust recursion. That is what lets a script stop
+//! in the middle and carry on later.
 use crate::debugger::VmDebuggerHandle;
 use intuicio_core::{
     context::Context,
@@ -8,33 +15,56 @@ use intuicio_core::{
 use intuicio_data::managed::{ManagedLazy, ManagedRefMut};
 use typid::ID;
 
+/// Identifies one compiled script, so a debugger can tell scopes apart.
+///
+/// Every function installed with this backend gets one, and every nested scope
+/// of that function shares it. See
+/// [`SourceMapLocation`](crate::debugger::SourceMapLocation).
 pub type VmScopeSymbol = ID<()>;
 
+/// What one step of a [`VmScope`] did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VmScopeResult {
+    /// The scope has more operations to run.
     Continue,
+    /// The scope reached its end and will do nothing more.
     Completed,
+    /// The scope hit a `Suspend` operation and stopped in the middle.
     Suspended,
 }
 
 impl VmScopeResult {
+    /// Returns `true` only for [`VmScopeResult::Continue`].
     pub fn can_continue(self) -> bool {
         self == VmScopeResult::Continue
     }
 
+    /// Returns `true` only for [`VmScopeResult::Completed`].
     pub fn is_completed(self) -> bool {
         self == VmScopeResult::Completed
     }
 
+    /// Returns `true` only for [`VmScopeResult::Suspended`].
     pub fn is_suspended(self) -> bool {
         self == VmScopeResult::Suspended
     }
 
+    /// Returns `true` unless the scope is done, so a suspended scope counts as
+    /// able to go on.
     pub fn can_progress(self) -> bool {
         !self.is_completed()
     }
 }
 
+/// A list of script operations and the position reached in them.
+///
+/// This is the whole interpreter. Build one with [`VmScope::new`] and drive it
+/// with [`VmScope::run`], [`VmScope::run_until_suspended`] or
+/// [`VmScope::step`]. It is also the `ScriptFunctionGenerator` of this backend,
+/// so installing a script package produces one scope per function call.
+///
+/// Cloning copies the position and the child scope as well, so a clone carries
+/// on where the original stood.
 pub struct VmScope<'a, SE: ScriptExpression> {
     handle: ScriptHandle<'a, SE>,
     symbol: VmScopeSymbol,
@@ -44,6 +74,9 @@ pub struct VmScope<'a, SE: ScriptExpression> {
 }
 
 impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
+    /// Starts a scope at the first operation of `handle`.
+    ///
+    /// `symbol` names the script this scope belongs to, for debugging.
     pub fn new(handle: ScriptHandle<'a, SE>, symbol: VmScopeSymbol) -> Self {
         Self {
             handle,
@@ -54,18 +87,34 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
         }
     }
 
+    /// Puts the scope back at `position`, with `child` as the nested scope that
+    /// was running there.
+    ///
+    /// This is how a scope taken apart with [`VmScope::into_inner`] is put back
+    /// together, for example after being stored somewhere.
+    ///
     /// # Safety
+    ///
+    /// `position` and `child` must come from a scope over the same script. The
+    /// operations that follow expect the stack and the registers to look the
+    /// way the skipped operations left them. Any other position runs them
+    /// against a state they were never written for.
     pub unsafe fn restore(mut self, position: usize, child: Option<Self>) -> Self {
         self.position = position;
         self.child = child.map(Box::new);
         self
     }
 
+    /// Attaches a debugger, builder style. Child scopes inherit it.
     pub fn with_debugger(mut self, debugger: Option<VmDebuggerHandle<SE>>) -> Self {
         self.debugger = debugger;
         self
     }
 
+    /// Splits the scope into its parts: script, symbol, position, child scope
+    /// and debugger.
+    ///
+    /// [`VmScope::restore`] puts them back together.
     #[allow(clippy::type_complexity)]
     pub fn into_inner(
         self,
@@ -85,26 +134,48 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
         )
     }
 
+    /// Returns the script this scope belongs to.
     pub fn symbol(&self) -> VmScopeSymbol {
         self.symbol
     }
 
+    /// Returns the index of the next operation to run.
     pub fn position(&self) -> usize {
         self.position
     }
 
+    /// Returns `true` once every operation of this scope has run.
+    ///
+    /// Says nothing about a child scope that may still be running.
     pub fn has_completed(&self) -> bool {
         self.position >= self.handle.len()
     }
 
+    /// Returns the nested scope that is running right now, if there is one.
     pub fn child(&self) -> Option<&Self> {
         self.child.as_deref()
     }
 
+    /// Steps until the scope is done.
+    ///
+    /// A `Suspend` operation does not stop this, so use
+    /// [`VmScope::run_until_suspended`] when the script is meant to yield.
+    ///
+    /// # Panics
+    ///
+    /// Panics on the same terms as [`VmScope::step`].
     pub fn run(&mut self, context: &mut Context, registry: &Registry) {
         while self.step(context, registry).can_progress() {}
     }
 
+    /// Steps until the scope is done or hits a `Suspend` operation.
+    ///
+    /// Call it again to carry on from where it stopped. Never returns
+    /// [`VmScopeResult::Continue`].
+    ///
+    /// # Panics
+    ///
+    /// Panics on the same terms as [`VmScope::step`].
     pub fn run_until_suspended(
         &mut self,
         context: &mut Context,
@@ -118,6 +189,18 @@ impl<'a, SE: ScriptExpression> VmScope<'a, SE> {
         }
     }
 
+    /// Runs one operation, or one operation of the deepest child scope.
+    ///
+    /// A scope past its last operation reports
+    /// [`VmScopeResult::Completed`] and does nothing.
+    ///
+    /// # Panics
+    ///
+    /// The operations trust what the frontend produced, so a broken script
+    /// panics rather than failing. It panics when a register or a function
+    /// query matches nothing, when a register index does not exist, when a
+    /// value does not fit on the stack, and when a branch or loop operation
+    /// finds no `bool` on top of the stack.
     pub fn step(&mut self, context: &mut Context, registry: &Registry) -> VmScopeResult {
         if let Some(child) = &mut self.child {
             match child.step(context, registry) {
@@ -332,9 +415,14 @@ impl<SE: ScriptExpression> Clone for VmScope<'_, SE> {
     }
 }
 
+/// How a [`VmScopeFuture`] holds the context it runs on.
 pub enum VmScopeFutureContext {
+    /// The future owns the context.
     Owned(Box<Context>),
+    /// The future holds an exclusive handle to a context owned elsewhere.
     RefMut(ManagedRefMut<Context>),
+    /// The future holds an unclaimed handle, and takes write access only while
+    /// it steps. Something else can use the context in between.
     Lazy(ManagedLazy<Context>),
 }
 
@@ -362,14 +450,28 @@ impl From<ManagedLazy<Context>> for VmScopeFutureContext {
     }
 }
 
+/// A [`VmScope`] driven by an executor instead of by a loop.
+///
+/// Each poll steps the scope up to `operations_per_poll` times. It reports
+/// [`Poll::Ready`](std::task::Poll::Ready) once the scope is done, and
+/// [`Poll::Pending`](std::task::Poll::Pending) when the scope suspends, when
+/// the poll budget runs out, or when the context cannot be borrowed right now.
+///
+/// The future never wakes itself, so the executor has to poll it again on its
+/// own.
 pub struct VmScopeFuture<'a, SE: ScriptExpression> {
+    /// The scope being stepped.
     pub scope: VmScope<'a, SE>,
+    /// The context the scope runs on.
     pub context: VmScopeFutureContext,
+    /// The registry the scope looks types and functions up in.
     pub registry: RegistryHandle,
+    /// How many operations one poll runs at most.
     pub operations_per_poll: usize,
 }
 
 impl<'a, SE: ScriptExpression> VmScopeFuture<'a, SE> {
+    /// Wraps `scope` into a future, with no limit on operations per poll.
     pub fn new(
         scope: VmScope<'a, SE>,
         context: impl Into<VmScopeFutureContext>,
@@ -383,6 +485,10 @@ impl<'a, SE: ScriptExpression> VmScopeFuture<'a, SE> {
         }
     }
 
+    /// Sets how many operations one poll runs at most, builder style.
+    ///
+    /// A small number hands control back to the executor more often, so one
+    /// long script cannot hold up everything else.
     pub fn operations_per_poll(mut self, value: usize) -> Self {
         self.operations_per_poll = value;
         self

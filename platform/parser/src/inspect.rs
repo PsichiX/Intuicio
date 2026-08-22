@@ -1,9 +1,12 @@
+//! Looking at an output without changing it.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
 use std::sync::{Arc, RwLock};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`InspectParser`].
     pub fn inspect(
         parser: ParserHandle,
         f: impl FnMut(&ParserOutput) + Send + Sync + 'static,
@@ -12,6 +15,11 @@ pub mod shorthand {
     }
 }
 
+/// Runs a closure on every value the inner parser produces, then passes the
+/// value along unchanged.
+///
+/// For logging and assertions. Use [`map`](crate::map) to actually change
+/// the value.
 pub struct InspectParser {
     parser: ParserHandle,
     #[allow(clippy::type_complexity)]
@@ -19,6 +27,7 @@ pub struct InspectParser {
 }
 
 impl InspectParser {
+    /// Calls `f` on each output of `parser`.
     pub fn new(parser: ParserHandle, f: impl FnMut(&ParserOutput) + Send + Sync + 'static) -> Self {
         Self {
             parser,

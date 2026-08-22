@@ -1,5 +1,13 @@
-//! Experiments with highly unsafe pointer access.
-//! A.k.a. what could go wrong when trying to emulate direct pointer access in scripting.
+//! Raw pointers passed to and from scripts.
+//!
+//! **Experimental.** Nothing here tracks lifetimes or aliasing. A [`Ptr`] is a
+//! bare pointer with a nicer shape, so a script can hold one long after the
+//! value it points at is gone. Use the managed boxes of `intuicio-data` unless
+//! direct pointer access is really what you need.
+//!
+//! [`PtrValueTransformer`] is what plugs this into a native function: `&T` and
+//! `&mut T` arguments travel as [`Ptr<T>`], and owned values travel as
+//! themselves.
 
 use std::{
     marker::PhantomData,
@@ -8,8 +16,13 @@ use std::{
 
 use intuicio_core::{registry::Registry, transformer::ValueTransformer};
 
+/// A pointer with the type thrown away.
 pub type VoidPtr = Ptr<()>;
 
+/// A raw pointer that can be stored in a script value.
+///
+/// `Copy`, and null by default. Dereferencing goes through [`Deref`], which
+/// panics on a null pointer and checks nothing else.
 #[repr(transparent)]
 pub struct Ptr<T> {
     pointer: *mut T,
@@ -24,19 +37,27 @@ impl<T> Default for Ptr<T> {
 }
 
 impl<T> Ptr<T> {
+    /// Returns `true` when this pointer is null.
     pub fn is_null(self) -> bool {
         self.pointer.is_null()
     }
 
+    /// Returns the address as a shared raw pointer.
     pub fn to_ptr(self) -> *const T {
         self.pointer
     }
 
+    /// Returns the address as a mutable raw pointer.
     pub fn to_ptr_mut(self) -> *mut T {
         self.pointer
     }
 
+    /// Borrows the value, or returns [`None`] for a null pointer.
+    ///
     /// # Safety
+    ///
+    /// The pointer must still name a live, initialized `T`, and nothing else
+    /// may write to it while the borrow lives.
     pub unsafe fn as_ref(&self) -> Option<&T> {
         if self.is_null() {
             None
@@ -45,7 +66,12 @@ impl<T> Ptr<T> {
         }
     }
 
+    /// Borrows the value mutably, or returns [`None`] for a null pointer.
+    ///
     /// # Safety
+    ///
+    /// The pointer must still name a live, initialized `T`, and nothing else
+    /// may touch it while the borrow lives.
     pub unsafe fn as_ref_mut(&mut self) -> Option<&mut T> {
         if self.is_null() {
             None
@@ -54,19 +80,35 @@ impl<T> Ptr<T> {
         }
     }
 
+    /// Reads the same address as a `Ptr<U>`.
+    ///
     /// # Safety
+    ///
+    /// Every later read or write goes through `U`, so the address must really
+    /// hold a `U`.
     pub unsafe fn cast<U>(self) -> Ptr<U> {
         Ptr {
             pointer: self.pointer as *mut U,
         }
     }
 
+    /// Takes the allocation back into a [`Box`].
+    ///
     /// # Safety
+    ///
+    /// The pointer must come from [`Ptr::from_box`] and must not have been
+    /// taken back already. The box frees the allocation on drop, so every other
+    /// copy of this pointer goes stale.
     pub unsafe fn into_box(self) -> Box<T> {
         unsafe { Box::from_raw(self.pointer) }
     }
 
+    /// Leaks a [`Box`] and keeps its address.
+    ///
     /// # Safety
+    ///
+    /// The allocation leaks unless [`Ptr::into_box`] takes it back exactly
+    /// once.
     pub unsafe fn from_box(value: Box<T>) -> Self {
         Self {
             pointer: Box::leak(value) as *mut T,
@@ -141,8 +183,9 @@ impl<T> Clone for Ptr<T> {
     }
 }
 
-// NOTE: I know this is bad, don't kill me - again, it's for experiments only sake,
-// some day it might disappear in favor of some smarter solution.
+// Safety: a `Ptr` owns nothing and points at a value that lives elsewhere, so
+// it can cross threads whenever that value can. Nothing checks that the value
+// is still alive, which is the risk this whole crate takes.
 unsafe impl<T> Send for Ptr<T> where T: Send {}
 unsafe impl<T> Sync for Ptr<T> where T: Sync {}
 
@@ -158,6 +201,10 @@ impl<T> std::fmt::Display for Ptr<T> {
     }
 }
 
+/// Passes references to scripts as [`Ptr`], and owned values as themselves.
+///
+/// The script side gets no borrow checking at all. Reading through a stale
+/// pointer is undefined, and a null one panics.
 pub struct PtrValueTransformer<T: Default + Clone + 'static>(PhantomData<fn() -> T>);
 
 impl<T: Default + Clone + 'static> ValueTransformer for PtrValueTransformer<T> {

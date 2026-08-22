@@ -165,12 +165,20 @@ fn build_script(script: &SerdeScript) -> ScriptHandle<'static, SerdeExpression> 
                 } => ScriptOperation::CallFunction {
                     query: FunctionQuery {
                         name: Some(name.to_owned().into()),
-                        module_name: module_name.as_ref().map(|name| name.to_owned().into()),
-                        type_query: type_name.as_ref().map(|name| TypeQuery {
-                            name: Some(name.to_owned().into()),
-                            module_name: module_name.as_ref().map(|name| name.to_owned().into()),
-                            ..Default::default()
-                        }),
+                        module_name: module_name
+                            .as_ref()
+                            .map(|name| name.to_owned().into())
+                            .into(),
+                        type_query: type_name
+                            .as_ref()
+                            .map(|name| TypeQuery {
+                                name: Some(name.to_owned().into()),
+                                module_name: module_name
+                                    .as_ref()
+                                    .map(|name| name.to_owned().into()),
+                                ..Default::default()
+                            })
+                            .into(),
                         visibility: *visibility,
                         ..Default::default()
                     },
@@ -1238,7 +1246,7 @@ mod tests {
             registry
                 .find_function(FunctionQuery {
                     name: Some("main".into()),
-                    module_name: Some("test".into()),
+                    module_name: Some("test".into()).into(),
                     ..Default::default()
                 })
                 .is_some()

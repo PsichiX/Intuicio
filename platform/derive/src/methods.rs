@@ -1,3 +1,16 @@
+//! Expansion of the `intuicio_methods` attribute.
+//!
+//! The `impl` block is emitted unchanged and a second one is added beside
+//! it. For every method carrying `#[intuicio_method]` that block holds
+//! three items named after the method:
+//!
+//! - `<name>__intuicio_function` - the `fn(&mut Context, &Registry)` shim.
+//! - `<name>__define_signature` - builds the `FunctionSignature`, with the
+//!   type of the `impl` attached so the method stays grouped under it.
+//! - `<name>__define_function` - pairs the two into a `Function`.
+//!
+//! A `self` receiver becomes the first parameter, named `this`. Methods
+//! without the marker attribute are skipped entirely.
 use proc_macro::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use std::collections::HashMap;
@@ -6,24 +19,42 @@ use syn::{
     Visibility, parse_macro_input,
 };
 
+/// Everything the attribute can carry on the `impl`.
 #[derive(Default)]
 struct ImplAttributes {
-    pub module_name: Option<Ident>,
+    /// Module the methods are registered under.
+    pub module_name: Option<String>,
+    /// `ValueTransformer` used by every method that does not name its own.
     pub transformer: Option<Ident>,
 }
 
+/// Everything `#[intuicio_method(...)]` can carry.
 #[derive(Default)]
 struct MethodAttributes {
-    pub name: Option<Ident>,
+    /// Registered name, [`None`] keeps the Rust one.
+    pub name: Option<String>,
+    /// Whether the argument named `registry` comes from the caller rather than
+    /// the stack.
     pub use_registry: bool,
+    /// Whether the argument named `context` comes from the caller rather than
+    /// the stack.
     pub use_context: bool,
+    /// Whether to print the expansion while compiling.
     pub debug: bool,
+    /// `ValueTransformer` for this method, overriding the one on the `impl`.
     pub transformer: Option<Ident>,
+    /// Argument that a returned reference borrows from, usually `this`.
     pub dependency: Option<Ident>,
+    /// `Meta` source attached to the method.
     pub meta: Option<String>,
+    /// `Meta` source per argument name.
     pub args_meta: HashMap<String, String>,
 }
 
+/// Reads the attribute list on the `impl` into [`ImplAttributes`].
+///
+/// Returns from the surrounding function on a parse error, so it only works
+/// inside one that returns [`TokenStream`].
 macro_rules! parse_impl_attributes {
     ($attributes:ident) => {{
         let mut result = ImplAttributes::default();
@@ -33,10 +64,7 @@ macro_rules! parse_impl_attributes {
                 NestedMeta::Meta(Meta::NameValue(name_value)) => {
                     if name_value.path.is_ident("module_name") {
                         match name_value.lit {
-                            Lit::Str(content) => {
-                                result.module_name =
-                                    Some(Ident::new(&content.value(), Span::call_site().into()))
-                            }
+                            Lit::Str(content) => result.module_name = Some(content.value()),
                             _ => {}
                         }
                     } else if name_value.path.is_ident("transformer") {
@@ -56,6 +84,10 @@ macro_rules! parse_impl_attributes {
     }};
 }
 
+/// Reads `#[intuicio_method(...)]` on one method into [`MethodAttributes`].
+///
+/// Yields the attributes together with whether the marker was present at
+/// all, since methods without it are left alone.
 macro_rules! parse_method_attributes {
     ($attributes:expr) => {{
         let mut found = false;
@@ -107,10 +139,7 @@ macro_rules! parse_method_attributes {
                                     if name_value.path.is_ident("name") {
                                         match &name_value.lit {
                                             Lit::Str(content) => {
-                                                result.name = Some(Ident::new(
-                                                    &content.value(),
-                                                    Span::call_site().into(),
-                                                ))
+                                                result.name = Some(content.value())
                                             }
                                             _ => {}
                                         }
@@ -155,6 +184,13 @@ macro_rules! parse_method_attributes {
     }};
 }
 
+/// Expands the attribute. See the [module docs](self) for the shape of the
+/// output.
+///
+/// # Panics
+///
+/// Panics on a trait `impl`, since only inherent ones can be exposed, and on
+/// an argument whose pattern is not a plain identifier.
 pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStream {
     let ImplAttributes {
         module_name,
@@ -166,7 +202,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         panic!("Intuicio methods must be applied only for non-trait implementations!");
     }
     let module_name = if let Some(module_name) = module_name {
-        quote! { result.module_name = Some(stringify!(#module_name).to_owned()); }
+        quote! { result.module_name = Some(#module_name.to_owned()); }
     } else {
         quote! {}
     };
@@ -222,7 +258,7 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
         let vis = item.vis.clone();
         let ident = item.sig.ident.clone();
         let name = if let Some(name) = name {
-            quote! { result.name = stringify!(#name).to_owned(); }
+            quote! { result.name = #name.to_owned(); }
         } else {
             quote! {}
         };
@@ -490,15 +526,15 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
                         }).unwrap_or_else(|| quote!{let __dependency__ = None;})],
                         vec![quote! {let result = #transformer::from_ref(registry, result, __dependency__);}],
                     ),
-                    UnpackedType::RefMut(_) => (
+                    UnpackedType::RefMut(ty) => (
                         vec![dependency.as_ref().map(|dependency|{
                             quote! {
                                 let __dependency__ = Some(
-                                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Dependency::as_ref_mut(&#dependency)
+                                    <#transformer<#ty> as intuicio_core::transformer::ValueTransformer>::Dependency::as_ref_mut(&mut #dependency)
                                 );
                             }
                         }).unwrap_or_else(|| quote!{let __dependency__ = None;})],
-                        vec![quote! {let result = #transformer::from_ref_mut(registry, result, None);}],
+                        vec![quote! {let result = #transformer::from_ref_mut(registry, result, __dependency__);}],
                     ),
                 },
             }
@@ -614,12 +650,22 @@ pub fn intuicio_methods(attributes: TokenStream, input: TokenStream) -> TokenStr
     .into()
 }
 
+/// A type split into the value it names and how that value is passed.
 enum UnpackedType {
+    /// A plain `T`, holding `T`.
     Owned(Type),
+    /// A `&T`, holding `T`.
     Ref(Type),
+    /// A `&mut T`, holding `T`.
     RefMut(Type),
 }
 
+/// Splits a type into an [`UnpackedType`].
+///
+/// # Panics
+///
+/// Panics on anything that is neither a path nor a reference, since a
+/// transformer has no rule for it.
 fn unpack_type(ty: &Type) -> UnpackedType {
     match ty {
         Type::Path(_) => UnpackedType::Owned(ty.clone()),

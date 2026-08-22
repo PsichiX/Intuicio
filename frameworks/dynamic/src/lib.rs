@@ -1,5 +1,22 @@
+//! Values for a dynamically typed language.
+//!
+//! Everything a script holds is a [`Reference`]: a shared, counted handle to an
+//! [`Object`], or null. Cloning a reference shares the value rather than
+//! copying it, so two scripts can see each other's writes.
+//!
+//! [`Type`] and [`Function`] are the same idea for registry entries, so a
+//! script can pass a type or a function around as data.
+//!
+//! Call [`install`] to register every type of this crate, along with the
+//! primitive aliases [`Boolean`], [`Integer`], [`Real`], [`Text`], [`Array`]
+//! and [`Map`].
+//!
+//! # Threads
+//!
+//! A reference is single threaded. To move one to another thread, turn it into
+//! a [`Transferable`], which is the only type here that crosses a thread.
 use intuicio_core::{
-    define_native_struct,
+    Filter, define_native_struct,
     function::{FunctionHandle, FunctionQuery},
     object::Object,
     registry::Registry,
@@ -11,11 +28,17 @@ use std::{
     collections::HashMap,
 };
 
+/// The boolean type scripts see.
 pub type Boolean = bool;
+/// The whole number type scripts see.
 pub type Integer = i64;
+/// The fractional number type scripts see.
 pub type Real = f64;
+/// The text type scripts see.
 pub type Text = String;
+/// The list type scripts see.
 pub type Array = Vec<Reference>;
+/// The map type scripts see, keyed by text.
 pub type Map = HashMap<Text, Reference>;
 
 thread_local! {
@@ -23,11 +46,16 @@ thread_local! {
 }
 
 #[derive(Default, Clone)]
+/// A registered type, as a value a script can hold.
+///
+/// Empty by default, which is what [`Type::handle`] reports as [`None`].
 pub struct Type {
     data: Option<TypeHandle>,
 }
 
 impl Type {
+    /// Looks a type up by name and module, or returns [`None`] when there is
+    /// none.
     pub fn by_name(name: &str, module_name: &str, registry: &Registry) -> Option<Self> {
         Some(Self::new(registry.find_type(TypeQuery {
             name: Some(name.into()),
@@ -36,6 +64,8 @@ impl Type {
         })?))
     }
 
+    /// Looks the Rust type `T` up, or returns [`None`] when it is not
+    /// registered.
     pub fn of<T: 'static>(registry: &Registry) -> Option<Self> {
         Some(Self::new(registry.find_type(TypeQuery {
             type_hash: Some(TypeHash::of::<T>()),
@@ -43,14 +73,17 @@ impl Type {
         })?))
     }
 
+    /// Wraps a handle that was already found.
     pub fn new(handle: TypeHandle) -> Self {
         Self { data: Some(handle) }
     }
 
+    /// Returns the handle, or [`None`] when this value is empty.
     pub fn handle(&self) -> Option<&TypeHandle> {
         self.data.as_ref()
     }
 
+    /// Returns `true` when this is the Rust type `T`.
     pub fn is<T: 'static>(&self) -> bool {
         self.data
             .as_ref()
@@ -58,6 +91,8 @@ impl Type {
             .unwrap_or(false)
     }
 
+    /// Returns `true` when both name the same type. Two empty values are not
+    /// the same.
     pub fn is_same_as(&self, other: &Self) -> bool {
         if let (Some(this), Some(other)) = (self.data.as_ref(), other.data.as_ref()) {
             this == other
@@ -66,33 +101,44 @@ impl Type {
         }
     }
 
+    /// Returns the runtime identity of the type, or [`None`] when this value is
+    /// empty.
     pub fn type_hash(&self) -> Option<TypeHash> {
         Some(self.data.as_ref()?.type_hash())
     }
 }
 
 #[derive(Default, Clone)]
+/// A registered function, as a value a script can hold.
+///
+/// Empty by default, which is what [`Function::handle`] reports as [`None`].
 pub struct Function {
     data: Option<FunctionHandle>,
 }
 
 impl Function {
+    /// Looks a function up by name and module, or returns [`None`] when there
+    /// is none.
     pub fn by_name(name: &str, module_name: &str, registry: &Registry) -> Option<Self> {
         Some(Self::new(registry.find_function(FunctionQuery {
             name: Some(name.into()),
-            module_name: Some(module_name.into()),
+            module_name: Filter::Matching(module_name.into()),
             ..Default::default()
         })?))
     }
 
+    /// Wraps a handle that was already found.
     pub fn new(handle: FunctionHandle) -> Self {
         Self { data: Some(handle) }
     }
 
+    /// Returns the handle, or [`None`] when this value is empty.
     pub fn handle(&self) -> Option<&FunctionHandle> {
         self.data.as_ref()
     }
 
+    /// Returns `true` when both have the same signature. Two empty values are
+    /// not the same.
     pub fn is_same_as(&self, other: &Self) -> bool {
         if let (Some(this), Some(other)) = (self.data.as_ref(), other.data.as_ref()) {
             this.signature() == other.signature()
@@ -103,19 +149,30 @@ impl Function {
 }
 
 #[derive(Default, Clone)]
+/// A shared handle to a script value, or null.
+///
+/// Cloning shares the value. Reads and writes are checked at runtime and
+/// return [`None`] when the value is already borrowed the other way, so a
+/// script reports an error instead of aborting the host.
 pub struct Reference {
     data: Option<Shared<Object>>,
 }
 
 impl Reference {
+    /// The null reference, which is also what [`Default`] gives.
     pub fn null() -> Self {
         Self { data: None }
     }
 
+    /// Returns `true` when this reference holds nothing.
     pub fn is_null(&self) -> bool {
         self.data.is_none()
     }
 
+    /// Returns `true` when the value was moved to another thread.
+    ///
+    /// See [`Transferable`]. Such a reference can no longer be read or written
+    /// here.
     pub fn is_transferred(&self) -> bool {
         self.data
             .as_ref()
@@ -124,6 +181,7 @@ impl Reference {
             .unwrap_or_default()
     }
 
+    /// Returns `true` while something else writes to the value.
     pub fn is_being_written(&mut self) -> bool {
         self.data
             .as_mut()
@@ -131,38 +189,55 @@ impl Reference {
             .unwrap_or_default()
     }
 
+    /// Boxes a [`Boolean`].
+    ///
+    /// # Panics
+    ///
+    /// Panics when the type is not registered. Call [`install`] first.
     pub fn new_boolean(value: Boolean, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
 
+    /// Boxes an [`Integer`]. Panics like [`Reference::new_boolean`].
     pub fn new_integer(value: Integer, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
 
+    /// Boxes a [`Real`]. Panics like [`Reference::new_boolean`].
     pub fn new_real(value: Real, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
 
+    /// Boxes a [`Text`]. Panics like [`Reference::new_boolean`].
     pub fn new_text(value: Text, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
 
+    /// Boxes an [`Array`]. Panics like [`Reference::new_boolean`].
     pub fn new_array(value: Array, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
 
+    /// Boxes a [`Map`]. Panics like [`Reference::new_boolean`].
     pub fn new_map(value: Map, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
 
+    /// Boxes a [`Type`]. Panics like [`Reference::new_boolean`].
     pub fn new_type(value: Type, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
 
+    /// Boxes a [`Function`]. Panics like [`Reference::new_boolean`].
     pub fn new_function(value: Function, registry: &Registry) -> Self {
         Self::new(value, registry)
     }
 
+    /// Boxes any registered Rust value.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `T` is not registered.
     pub fn new<T: 'static>(data: T, registry: &Registry) -> Self {
         let type_ = registry.find_type(TypeQuery::of::<T>()).unwrap_or_else(|| {
             panic!(
@@ -175,6 +250,12 @@ impl Reference {
         Self::new_raw(value)
     }
 
+    /// Boxes a value under a type given by hand, rather than looked up.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `ty` is empty. The caller has to make sure `ty` really
+    /// describes `T`, since nothing checks it.
     pub fn new_custom<T: 'static>(data: T, ty: &Type) -> Self {
         let mut value =
             unsafe { Object::new_uninitialized(ty.data.as_ref().unwrap().clone()).unwrap() };
@@ -182,31 +263,55 @@ impl Reference {
         Self::new_raw(value)
     }
 
+    /// Takes ownership of an [`Object`] that already exists.
     pub fn new_raw(data: Object) -> Self {
         Self {
             data: Some(Shared::new(data)),
         }
     }
 
+    /// Takes another handle to an object that is already shared.
     pub fn new_shared(data: Shared<Object>) -> Self {
         Self { data: Some(data) }
     }
 
+    /// Boxes a default value of `ty`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `ty` is empty or has no default value.
     pub fn initialized(ty: &Type) -> Self {
         Self::new_raw(Object::new(ty.data.as_ref().unwrap().clone()))
     }
 
     /// # Safety
+    /// Boxes room for a value of `ty` without creating one.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `ty` is empty.
+    ///
+    /// # Safety
+    ///
+    /// The memory holds garbage. Write a valid value into it before anything
+    /// reads the reference or drops it, because the drop runs the destructor of
+    /// the type over whatever is there.
     pub unsafe fn uninitialized(ty: &Type) -> Self {
         Self::new_raw(unsafe {
             Object::new_uninitialized(ty.data.as_ref().unwrap().clone()).unwrap()
         })
     }
 
+    /// Returns the type of the value, or [`None`] when this reference is null
+    /// or the value is being written.
     pub fn type_of(&self) -> Option<Type> {
         Some(Type::new(self.data.as_ref()?.read()?.type_handle().clone()))
     }
 
+    /// Borrows the value as a `T`.
+    ///
+    /// Returns [`None`] when this reference is null, when the value is another
+    /// type, or while something writes to it.
     pub fn read<T: 'static>(&'_ self) -> Option<Ref<'_, T>> {
         let result = self.data.as_ref()?.read()?;
         if result.type_handle().type_hash() == TypeHash::of::<T>() {
@@ -216,6 +321,10 @@ impl Reference {
         }
     }
 
+    /// Borrows the value as a `T` for writing.
+    ///
+    /// Returns [`None`] when this reference is null, when the value is another
+    /// type, or while anything else reads or writes it.
     pub fn write<T: 'static>(&'_ mut self) -> Option<RefMut<'_, T>> {
         let result = self.data.as_mut()?.write()?;
         if result.type_handle().type_hash() == TypeHash::of::<T>() {
@@ -225,14 +334,20 @@ impl Reference {
         }
     }
 
+    /// Borrows the whole object, whatever type it holds.
     pub fn read_object(&'_ self) -> Option<Ref<'_, Object>> {
         self.data.as_ref()?.read()
     }
 
+    /// Borrows the whole object for writing, whatever type it holds.
     pub fn write_object(&'_ mut self) -> Option<RefMut<'_, Object>> {
         self.data.as_mut()?.write()
     }
 
+    /// Puts `data` in place of the value and returns the old one.
+    ///
+    /// Returns [`None`] on the same terms as [`Reference::write`], and drops
+    /// `data` when it does.
     pub fn swap<T: 'static>(&mut self, data: T) -> Option<T> {
         Some(std::mem::replace(
             self.data.as_mut()?.write()?.write::<T>()?,
@@ -240,6 +355,9 @@ impl Reference {
         ))
     }
 
+    /// Takes the object out when this is the last reference to it.
+    ///
+    /// Gives the reference back when others still hold it, or when it is null.
     pub fn try_consume(self) -> Result<Object, Self> {
         match self.data {
             Some(data) => match data.try_consume() {
@@ -250,6 +368,7 @@ impl Reference {
         }
     }
 
+    /// Returns how many references point at this value. `0` for null.
     pub fn references_count(&self) -> usize {
         self.data
             .as_ref()
@@ -257,6 +376,9 @@ impl Reference {
             .unwrap_or(0)
     }
 
+    /// Returns `true` when both point at the same value.
+    ///
+    /// `consider_null` decides what two null references answer.
     pub fn does_share_reference(&self, other: &Self, consider_null: bool) -> bool {
         match (self.data.as_ref(), other.data.as_ref()) {
             (Some(this), Some(other)) => this.does_share_reference(other),
@@ -265,7 +387,17 @@ impl Reference {
         }
     }
 
+    /// Moves the value out and leaves a [`Transferred`] marker in its place.
+    ///
+    /// Returns [`None`] when this reference is null, when the value is being
+    /// written, or when the type of the value is not `Send`. Returns the address
+    /// of the marker as [`Err`] when the value was already moved out.
+    ///
     /// # Safety
+    ///
+    /// The returned object leaves the borrow tracking of this reference behind.
+    /// Use [`Transferable`], which pairs this call with the rebuild on the other
+    /// side.
     pub unsafe fn transfer(&self) -> Option<Result<Object, usize>> {
         let mut data = self.data.as_ref()?.write()?;
         if let Some(data) = data.read::<Transferred>() {
@@ -370,12 +502,16 @@ impl TransferableReference {
     }
 }
 
-/// Normally references are single-threaded, but they can be sent between threads
-/// only by means of transfer mechanism. Transfer mechanism works like this:
-/// For transferred reference, we construct graph of connected unpacked objects,
-/// replacing their original content objects with special Transferred type, so they
-/// cannot be accessed later in original thread. We send that graph and on the other
-/// thread we reconstruct objects and references from that graph and return main one.
+/// A whole graph of references, packed up to cross a thread.
+///
+/// A [`Reference`] is single threaded. This is the only way to move one to
+/// another thread. Building a [`Transferable`] walks the graph the reference
+/// leads to, takes every object out, and leaves a [`Transferred`] marker in its
+/// place, so the source thread can no longer reach any of them. Turning it back
+/// into a [`Reference`] on the other thread rebuilds the graph, links included.
+///
+/// A value whose type is not `Send` stops the walk, and the reference to it
+/// comes back null.
 #[derive(Debug)]
 pub struct Transferable {
     /// { reference's object address as its unique ID: object behind reference}
@@ -568,12 +704,20 @@ impl From<Reference> for Transferable {
 }
 
 #[derive(Debug, Default)]
+/// Marker left behind by a value that moved to another thread.
+///
+/// It holds the old address, which is what links the graph back together on
+/// the other side. A reference holding one answers `true` to
+/// [`Reference::is_transferred`] and can no longer be read.
 pub struct Transferred(usize);
 
+/// Registers every type of this crate, so scripts can hold values of them.
+///
+/// [`Reference`] itself is registered as neither `Send` nor `Sync`, which is
+/// what keeps it on one thread.
 pub fn install(registry: &mut Registry) {
     registry.add_type(define_native_struct! {
         registry => mod reflect struct Reference (Reference) {}
-        // [override_send = true]
     });
     registry.add_type(define_native_struct! {
         registry => mod reflect struct Type (Type) {}

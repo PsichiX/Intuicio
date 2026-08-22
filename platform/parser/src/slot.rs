@@ -1,20 +1,31 @@
+//! A hole in a grammar that is filled in later.
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
 use std::sync::RwLock;
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`SlotParser`].
     pub fn slot(parser: ParserHandle) -> ParserHandle {
         SlotParser::new(parser).into_handle()
     }
 
+    /// An empty [`SlotParser`], to be filled in later.
     pub fn slot_empty() -> ParserHandle {
         SlotParser::default().into_handle()
     }
 }
 
+/// Holds a parser that can be swapped at any time, even mid-grammar.
+///
+/// Lets a grammar be built before all of its parts exist, and lets a part
+/// be replaced afterwards. [`Parser::extend`] on a slot sets its contents.
+///
+/// An empty slot matches nothing and yields [`ParserNoValue`], unless it
+/// was built with [`SlotParser::parse_error_when_empty`].
 #[derive(Default)]
 pub struct SlotParser {
     parser: RwLock<Option<ParserHandle>>,
@@ -31,6 +42,7 @@ impl Clone for SlotParser {
 }
 
 impl SlotParser {
+    /// Starts out holding `parser`.
     pub fn new(parser: ParserHandle) -> Self {
         Self {
             parser: RwLock::new(Some(parser)),
@@ -38,25 +50,31 @@ impl SlotParser {
         }
     }
 
+    /// Makes an empty slot fail instead of quietly matching nothing.
     pub fn parse_error_when_empty(mut self) -> Self {
         self.parse_error_when_empty = true;
         self
     }
 
+    /// Returns `true` while a parser is in the slot.
     pub fn has(&self) -> bool {
         self.parser.read().map(|v| v.is_some()).unwrap_or_default()
     }
 
+    /// Puts `parser` in the slot, replacing what was there.
     pub fn set(&self, parser: ParserHandle) {
         if let Ok(mut v) = self.parser.write() {
             *v = Some(parser);
         }
     }
 
+    /// Returns the parser in the slot, if any.
     pub fn get(&self) -> Option<ParserHandle> {
         self.parser.read().ok()?.clone()
     }
 
+    /// Replaces the contents with whatever `f` makes of them, so a slot can be
+    /// wrapped in terms of itself.
     pub fn transform(&self, mut f: impl FnMut(Option<ParserHandle>) -> Option<ParserHandle>) {
         if let Ok(mut inner) = self.parser.write() {
             *inner = f(inner.clone());

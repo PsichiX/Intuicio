@@ -245,7 +245,7 @@ impl Worker {
                 let (context, registry) = host.context_and_registry();
                 if let Some(function) = registry.find_function(FunctionQuery {
                     name: Some(request.function_name.into()),
-                    module_name: request.function_module_name.map(|name| name.into()),
+                    module_name: request.function_module_name.map(|name| name.into()).into(),
                     ..Default::default()
                 }) {
                     if let Ok(mut result) = running_job_result.write() {

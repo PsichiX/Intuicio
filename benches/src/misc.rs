@@ -22,7 +22,7 @@ pub fn bench() {
             |_| {
                 FunctionQuery {
                     name: Some("function".to_owned().into()),
-                    module_name: Some("module".to_owned().into()),
+                    module_name: Some("module".to_owned().into()).into(),
                     ..Default::default()
                 }
                 .as_hash()

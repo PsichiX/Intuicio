@@ -74,7 +74,7 @@ mod tests {
             registry
                 .find_function(FunctionQuery {
                     name: Some("main".into()),
-                    module_name: Some("test".into()),
+                    module_name: Some("test".into()).into(),
                     ..Default::default()
                 })
                 .is_some()

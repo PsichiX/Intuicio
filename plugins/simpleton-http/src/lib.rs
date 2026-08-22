@@ -23,7 +23,7 @@ impl HttpClient {
         if let Ok(client) = Client::builder().build() {
             let mut request = client.get(url.as_str());
             if let Some(query) = query.read::<Map>() {
-                request = request.query(
+                request = request.json(
                     &query
                         .iter()
                         .map(|(key, value)| {
@@ -61,7 +61,7 @@ impl HttpClient {
                     .iter()
                     .map(|(key, value)| (key.as_str(), value.read::<Text>().unwrap().to_owned()))
                     .collect::<HashMap<_, _>>();
-                request = request.query(&query);
+                request = request.json(&query);
             }
             if let Some(body) = body.read::<Text>() {
                 request = request.body(body.to_string());

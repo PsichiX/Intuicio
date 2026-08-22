@@ -140,7 +140,7 @@ pub fn bench() -> Result<(), Box<dyn Error>> {
         let div = registry
             .find_function(FunctionQuery {
                 name: Some("div".into()),
-                module_name: Some("test".into()),
+                module_name: Some("test".into()).into(),
                 ..Default::default()
             })
             .unwrap();

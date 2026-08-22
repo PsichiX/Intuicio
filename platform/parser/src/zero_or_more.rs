@@ -1,17 +1,26 @@
+//! Repeating a parser any number of times.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`ZeroOrMoreParser`].
     pub fn zom(parser: ParserHandle) -> ParserHandle {
         ZeroOrMoreParser::new(parser).into_handle()
     }
 }
 
+/// Runs the inner parser until it fails, matching even when it never
+/// succeeds.
+///
+/// Yields a `Vec<ParserOutput>`, empty when nothing matched. Never fails,
+/// so a parser that can match an empty string loops forever.
 #[derive(Clone)]
 pub struct ZeroOrMoreParser(ParserHandle);
 
 impl ZeroOrMoreParser {
+    /// Repeats `parser`.
     pub fn new(parser: ParserHandle) -> Self {
         Self(parser)
     }

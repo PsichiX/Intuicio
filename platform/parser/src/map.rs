@@ -1,12 +1,15 @@
+//! Changing what a parser produces, or how it fails.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
 use std::{
     error::Error,
     sync::{Arc, RwLock},
 };
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`MapParser`].
     pub fn map<I: 'static, O: 'static>(
         parser: ParserHandle,
         f: impl FnMut(I) -> O + Send + Sync + 'static,
@@ -14,6 +17,7 @@ pub mod shorthand {
         MapParser::new(parser, f).into_handle()
     }
 
+    /// See [`OutputMapParser`].
     pub fn omap(
         parser: ParserHandle,
         f: impl FnMut(ParserOutput) -> ParserOutput + Send + Sync + 'static,
@@ -21,6 +25,7 @@ pub mod shorthand {
         OutputMapParser::new(parser, f).into_handle()
     }
 
+    /// See [`MapErrorParser`].
     pub fn map_err(
         parser: ParserHandle,
         f: impl FnMut(Box<dyn Error>) -> Box<dyn Error> + Send + Sync + 'static,
@@ -29,12 +34,18 @@ pub mod shorthand {
     }
 }
 
+/// Turns a value of type `I` into a value of type `O`.
+///
+/// The usual way to leave text behind: parse a `String` and map it into the
+/// type it stands for. Fails when the inner parser produced something other
+/// than `I`.
 pub struct MapParser<I, O> {
     parser: ParserHandle,
     closure: Arc<RwLock<dyn FnMut(I) -> O + Send + Sync>>,
 }
 
 impl<I, O> MapParser<I, O> {
+    /// Maps each output of `parser` with `f`.
     pub fn new(parser: ParserHandle, f: impl FnMut(I) -> O + Send + Sync + 'static) -> Self {
         Self {
             parser,
@@ -63,12 +74,17 @@ impl<I: 'static, O: 'static> Parser for MapParser<I, O> {
     }
 }
 
+/// Maps one [`ParserOutput`] into another, without naming either type.
+///
+/// For cases where the type depends on what was parsed. Prefer
+/// [`MapParser`] when the types are known.
 pub struct OutputMapParser {
     parser: ParserHandle,
     closure: Arc<RwLock<dyn FnMut(ParserOutput) -> ParserOutput + Send + Sync>>,
 }
 
 impl OutputMapParser {
+    /// Maps each output of `parser` with `f`.
     pub fn new(
         parser: ParserHandle,
         f: impl FnMut(ParserOutput) -> ParserOutput + Send + Sync + 'static,
@@ -91,6 +107,10 @@ impl Parser for OutputMapParser {
     }
 }
 
+/// Replaces the error of a failed parse, leaving successes untouched.
+///
+/// Used to turn the noise of a deeply nested failure into one message that
+/// names the rule that failed.
 pub struct MapErrorParser {
     parser: ParserHandle,
     #[allow(clippy::type_complexity)]
@@ -98,6 +118,7 @@ pub struct MapErrorParser {
 }
 
 impl MapErrorParser {
+    /// Maps each error of `parser` with `f`.
     pub fn new(
         parser: ParserHandle,
         f: impl FnMut(Box<dyn Error>) -> Box<dyn Error> + Send + Sync + 'static,

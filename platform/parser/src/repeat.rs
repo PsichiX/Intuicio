@@ -1,13 +1,20 @@
+//! Repeating a parser an exact number of times.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserOutput, ParserRegistry};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`RepeatParser`].
     pub fn rep(parser: ParserHandle, occurrences: usize) -> ParserHandle {
         RepeatParser::new(parser, occurrences).into_handle()
     }
 }
 
+/// Runs the inner parser a fixed number of times, all or nothing.
+///
+/// Yields a `Vec<ParserOutput>` of that length, and fails as soon as one
+/// of the rounds fails.
 #[derive(Clone)]
 pub struct RepeatParser {
     parser: ParserHandle,
@@ -15,6 +22,7 @@ pub struct RepeatParser {
 }
 
 impl RepeatParser {
+    /// Runs `parser` exactly `occurrences` times.
     pub fn new(parser: ParserHandle, occurrences: usize) -> Self {
         Self {
             parser,

@@ -1,19 +1,28 @@
+//! Making a parser allowed to fail.
 use crate::{
     ParseResult, Parser, ParserExt, ParserHandle, ParserNoValue, ParserOutput, ParserRegistry,
 };
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`OptionalParser`].
     pub fn opt(parser: ParserHandle) -> ParserHandle {
         OptionalParser::new(parser).into_handle()
     }
 }
 
+/// Runs the inner parser and turns a failure into a match of nothing.
+///
+/// On success it passes the value through. On failure it consumes nothing
+/// and yields [`ParserNoValue`], so check the output type to tell the two
+/// apart.
 #[derive(Clone)]
 pub struct OptionalParser(ParserHandle);
 
 impl OptionalParser {
+    /// Makes `parser` optional.
     pub fn new(parser: ParserHandle) -> Self {
         Self(parser)
     }

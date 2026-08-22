@@ -1,8 +1,25 @@
+//! Free-form annotations attached to types, functions and fields.
+//!
+//! Metadata is how a frontend or a tool marks up definitions without the
+//! platform having to know what the marks mean: a serialization hint, a
+//! documentation string, an editor category. Queries can filter on it, so a
+//! script or tool can ask the registry for "everything tagged like this".
+//!
+//! A [`Meta`] is a small tree of identifiers, literals, arrays, maps and named
+//! entries. Build one with the `meta!` macro, or parse one from text with
+//! [`Meta::parse`]:
+//!
+//! ```
+//! # use intuicio_core::meta::Meta;
+//! let meta = Meta::parse("{name: 'foo', size: 42, flags: [a, b]}").unwrap();
+//! assert!(meta.has_id("size"));
+//! ```
 use pest::{Parser, iterators::Pair};
 use pest_derive::Parser;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Write};
 
+/// Grammar-driven parser for the metadata syntax. See `meta.pest`.
 #[derive(Parser)]
 #[grammar = "meta.pest"]
 struct MetaParser;
@@ -78,15 +95,21 @@ impl MetaParser {
     }
 }
 
+/// A literal inside a [`Meta`] tree.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum MetaValue {
+    /// `true` or `false`.
     Bool(bool),
+    /// A whole number.
     Integer(i64),
+    /// A fractional number.
     Float(f64),
+    /// Text, written in single quotes.
     String(String),
 }
 
 impl MetaValue {
+    /// Returns the boolean, or [`None`] for any other kind.
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Self::Bool(value) => Some(*value),
@@ -94,6 +117,7 @@ impl MetaValue {
         }
     }
 
+    /// Returns the integer, or [`None`] for any other kind.
     pub fn as_integer(&self) -> Option<i64> {
         match self {
             Self::Integer(value) => Some(*value),
@@ -101,6 +125,7 @@ impl MetaValue {
         }
     }
 
+    /// Returns the float, or [`None`] for any other kind.
     pub fn as_float(&self) -> Option<f64> {
         match self {
             Self::Float(value) => Some(*value),
@@ -108,6 +133,7 @@ impl MetaValue {
         }
     }
 
+    /// Borrows the string, or [`None`] for any other kind.
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(value) => Some(value.as_str()),
@@ -115,6 +141,7 @@ impl MetaValue {
         }
     }
 
+    /// Copies the string, or [`None`] for any other kind.
     pub fn as_string(&self) -> Option<String> {
         match self {
             Self::String(value) => Some(value.to_owned()),
@@ -158,20 +185,28 @@ impl From<&str> for MetaValue {
     }
 }
 
+/// A tree of annotations. See the [module docs](self).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Meta {
+    /// A bare name, such as `serialize`.
     Identifier(String),
+    /// A literal, such as `42` or `'foo'`.
     Value(MetaValue),
+    /// An ordered list, written `[a, b]`.
     Array(Vec<Meta>),
+    /// Named entries, written `{a: 1, b: 2}`.
     Map(HashMap<String, Meta>),
+    /// A single named entry, written `a = 1`.
     Named(String, Box<Meta>),
 }
 
 impl Meta {
+    /// Parses metadata from text, returning the parser error as a message.
     pub fn parse(content: &str) -> Result<Self, String> {
         MetaParser::parse_main(content)
     }
 
+    /// Returns the identifier, or [`None`] for any other kind.
     pub fn as_identifier(&self) -> Option<&str> {
         match self {
             Self::Identifier(value) => Some(value.as_str()),
@@ -179,6 +214,7 @@ impl Meta {
         }
     }
 
+    /// Returns the literal, or [`None`] for any other kind.
     pub fn as_value(&self) -> Option<&MetaValue> {
         match self {
             Self::Value(value) => Some(value),
@@ -186,6 +222,7 @@ impl Meta {
         }
     }
 
+    /// Returns the list, or [`None`] for any other kind.
     pub fn as_array(&self) -> Option<&Vec<Meta>> {
         match self {
             Self::Array(value) => Some(value),
@@ -193,6 +230,7 @@ impl Meta {
         }
     }
 
+    /// Returns the map, or [`None`] for any other kind.
     pub fn as_map(&self) -> Option<&HashMap<String, Meta>> {
         match self {
             Self::Map(value) => Some(value),
@@ -200,6 +238,7 @@ impl Meta {
         }
     }
 
+    /// Returns the name and its value, or [`None`] for any other kind.
     pub fn as_named(&self) -> Option<(&str, &Meta)> {
         match self {
             Self::Named(name, value) => Some((name.as_str(), value)),
@@ -207,6 +246,11 @@ impl Meta {
         }
     }
 
+    /// Returns `true` when this tree mentions `name`, as an identifier, a string,
+    /// a map key or a named entry.
+    ///
+    /// Searches one level into arrays. This is the usual predicate for a
+    /// metadata query.
     pub fn has_id(&self, name: &str) -> bool {
         match self {
             Self::Identifier(value) => value == name,
@@ -217,6 +261,7 @@ impl Meta {
         }
     }
 
+    /// Returns what is stored under `name`, or [`None`] when it is absent.
     pub fn extract_by_id(&'_ self, name: &str) -> Option<MetaExtract<'_>> {
         match self {
             Self::Identifier(value) => {
@@ -257,6 +302,7 @@ impl Meta {
         }
     }
 
+    /// Iterates the immediate children, treating a leaf as a single item.
     pub fn items_iter(&'_ self) -> MetaExtractIter<'_> {
         match self {
             Self::Identifier(name) => {
@@ -308,19 +354,26 @@ impl std::fmt::Display for Meta {
     }
 }
 
+/// What a lookup into a [`Meta`] tree found.
 #[derive(Debug, PartialEq)]
 pub enum MetaExtract<'a> {
+    /// Nothing was found.
     Undefined,
+    /// The name itself, present as a bare identifier.
     Identifier(&'a str),
+    /// A subtree.
     Meta(&'a Meta),
+    /// A literal.
     Value(&'a MetaValue),
 }
 
 impl MetaExtract<'_> {
+    /// Returns `true` when nothing was found.
     pub fn is_undefined(&self) -> bool {
         matches!(self, Self::Undefined)
     }
 
+    /// Returns the identifier, or [`None`] for any other kind.
     pub fn as_identifier(&self) -> Option<&str> {
         match self {
             Self::Identifier(value) => Some(*value),
@@ -328,6 +381,7 @@ impl MetaExtract<'_> {
         }
     }
 
+    /// Returns the literal, or [`None`] for any other kind.
     pub fn as_value(&self) -> Option<&MetaValue> {
         match self {
             Self::Value(value) => Some(*value),
@@ -335,6 +389,7 @@ impl MetaExtract<'_> {
         }
     }
 
+    /// Returns the subtree, or [`None`] for any other kind.
     pub fn as_meta(&self) -> Option<&Meta> {
         match self {
             Self::Meta(value) => Some(*value),
@@ -343,6 +398,7 @@ impl MetaExtract<'_> {
     }
 }
 
+/// Iterator over the children of a [`Meta`], returned by [`Meta::items_iter`].
 pub struct MetaExtractIter<'a>(Box<dyn Iterator<Item = MetaExtract<'a>> + 'a>);
 
 impl<'a> MetaExtractIter<'a> {
@@ -359,6 +415,13 @@ impl<'a> Iterator for MetaExtractIter<'a> {
     }
 }
 
+/// Builds a [`Meta`] tree from literal syntax.
+///
+/// ```
+/// # use intuicio_core::meta;
+/// let meta = meta!({name: "foo", size: 42, flags: [a, b], mode: (speed = fast)});
+/// assert!(meta.has_id("size"));
+/// ```
 #[macro_export]
 macro_rules! meta {
     (@item { $( $key:ident : $item:tt ),* }) => {{

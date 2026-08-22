@@ -139,7 +139,7 @@ impl Rtree {
         let z = *z.read::<Real>().expect("`z` is not a Real!");
         rtree
             .tree
-            .nearest_neighbor(&[x, y, z])
+            .nearest_neighbor([x, y, z])
             .map(|item| {
                 Reference::new(
                     RtreeResult {
@@ -178,7 +178,7 @@ impl Rtree {
             *radius.read::<Real>().expect("`radius` is not a Real!")
         };
         let mut iterate = true;
-        for item in rtree.tree.nearest_neighbor_iter(&[x, y, z]) {
+        for item in rtree.tree.nearest_neighbor_iter([x, y, z]) {
             if !iterate {
                 break;
             }

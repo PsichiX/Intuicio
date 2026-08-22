@@ -1,26 +1,51 @@
-use proc_macro::{Span, TokenStream};
+//! Expansion of the `IntuicioStruct` derive.
+//!
+//! Produces an `IntuicioStruct::define_struct` impl that fills a
+//! `NativeStructBuilder`: name, module and visibility, then one
+//! `StructField` per field with the offset taken from the compiler through
+//! `offset_of`. Fields marked `ignore` are left out, so they stay invisible
+//! to scripts while remaining part of the Rust value.
+use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Ident, ItemStruct, Lit, Meta, NestedMeta, Visibility, parse_macro_input};
+use syn::{ItemStruct, Lit, Meta, NestedMeta, Visibility, parse_macro_input};
 
+/// Everything `#[intuicio(...)]` can carry on the struct.
 #[derive(Default)]
 struct StructAttributes {
-    pub name: Option<Ident>,
-    pub module_name: Option<Ident>,
+    /// Registered name, [`None`] uses the full Rust type name.
+    pub name: Option<String>,
+    /// Module the type is registered under.
+    pub module_name: Option<String>,
+    /// Whether to describe the type without a default constructor, letting
+    /// scripts hold values without being able to make one.
     pub uninitialized: bool,
+    /// Claims or denies `Send` regardless of the Rust type.
     pub override_send: Option<bool>,
+    /// Claims or denies `Sync` regardless of the Rust type.
     pub override_sync: Option<bool>,
+    /// Claims or denies copy semantics regardless of the Rust type.
     pub override_copy: Option<bool>,
+    /// Whether to print the expansion while compiling.
     pub debug: bool,
+    /// `Meta` source attached to the type.
     pub meta: Option<String>,
 }
 
+/// Everything `#[intuicio(...)]` can carry on a field.
 #[derive(Default)]
 struct FieldAttributes {
-    pub name: Option<Ident>,
+    /// Registered name, [`None`] keeps the Rust one.
+    pub name: Option<String>,
+    /// Whether to leave the field out of the description.
     pub ignore: bool,
+    /// `Meta` source attached to the field.
     pub meta: Option<String>,
 }
 
+/// Reads `#[intuicio(...)]` on the struct into [`StructAttributes`].
+///
+/// Returns a compile error from the surrounding function when an attribute
+/// fails to parse, so it only works inside one returning [`TokenStream`].
 macro_rules! parse_struct_attributes {
     ($attributes:expr) => {{
         let mut result = StructAttributes::default();
@@ -45,20 +70,14 @@ macro_rules! parse_struct_attributes {
                                     if name_value.path.is_ident("name") {
                                         match &name_value.lit {
                                             Lit::Str(content) => {
-                                                result.name = Some(Ident::new(
-                                                    &content.value(),
-                                                    Span::call_site().into(),
-                                                ))
+                                                result.name = Some(content.value())
                                             }
                                             _ => {}
                                         }
                                     } else if name_value.path.is_ident("module_name") {
                                         match &name_value.lit {
                                             Lit::Str(content) => {
-                                                result.module_name = Some(Ident::new(
-                                                    &content.value(),
-                                                    Span::call_site().into(),
-                                                ))
+                                                result.module_name = Some(content.value())
                                             }
                                             _ => {}
                                         }
@@ -105,6 +124,11 @@ macro_rules! parse_struct_attributes {
     }};
 }
 
+/// Reads `#[intuicio(...)]` on one field into [`FieldAttributes`].
+///
+/// Wraps its result in [`Some`] so it can be used inside the `filter_map`
+/// over fields, and returns a compile error from that closure on a parse
+/// failure.
 macro_rules! parse_field_attributes {
     ($attributes:expr) => {{
         let mut result = FieldAttributes::default();
@@ -125,10 +149,7 @@ macro_rules! parse_field_attributes {
                                     if name_value.path.is_ident("name") {
                                         match &name_value.lit {
                                             Lit::Str(content) => {
-                                                result.name = Some(Ident::new(
-                                                    &content.value(),
-                                                    Span::call_site().into(),
-                                                ))
+                                                result.name = Some(content.value())
                                             }
                                             _ => {}
                                         }
@@ -154,6 +175,12 @@ macro_rules! parse_field_attributes {
     }};
 }
 
+/// Expands the derive. See the [module docs](self) for the shape of the
+/// output.
+///
+/// # Panics
+///
+/// Panics on a field without a name, so tuple structs are not supported.
 pub fn intuicio_struct(input: TokenStream) -> TokenStream {
     let input2 = input.clone();
     let ItemStruct {
@@ -179,7 +206,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
         quote! { intuicio_core::types::struct_type::NativeStructBuilder::new_named::<#ident>(name) }
     };
     let name = if let Some(name) = name {
-        quote! { stringify!(#name) }
+        quote! { #name }
     } else {
         quote! { std::any::type_name::<#ident>() }
     };
@@ -193,7 +220,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
         Visibility::Public(_) => quote! {},
     };
     let module_name = if let Some(module_name) = module_name {
-        quote! { result = result.module_name(stringify!(#module_name)); }
+        quote! { result = result.module_name(#module_name); }
     } else {
         quote! {}
     };
@@ -209,7 +236,7 @@ pub fn intuicio_struct(input: TokenStream) -> TokenStream {
                 None => panic!("Struct: {ident} has field without a name!"),
             };
             let name = if let Some(name) = name {
-                quote! { stringify!(#name) }
+                quote! { #name }
             } else {
                 quote! { stringify!(#field_name) }
             };

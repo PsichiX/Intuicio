@@ -278,12 +278,17 @@ impl DataValue {
             }
             DataType::Pointer => Self::Pointer(reference),
             DataType::Value(type_) => {
-                if type_.is_copy() {
+                // `is_copy` means the bytes can be duplicated, which only a
+                // Rust type can promise, so the destructor is always a plain
+                // function pointer here.
+                if type_.is_copy()
+                    && let Some(finalizer) = type_.finalizer().as_native()
+                {
                     unsafe {
                         let mut data = vec![0u8; type_.layout().size()];
                         data.as_mut_ptr()
                             .copy_from(reference.read_object().unwrap().as_ptr(), data.len());
-                        Self::Value(*type_.layout(), type_.type_hash(), type_.finalizer(), data)
+                        Self::Value(*type_.layout(), type_.type_hash(), finalizer, data)
                     }
                 } else {
                     unreachable!()

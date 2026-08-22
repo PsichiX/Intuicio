@@ -1,3 +1,8 @@
+//! One small value type for dynamically typed script data.
+//!
+//! A [`Value`] is null, a small `Copy` primitive stored inline, a string, an
+//! array, a map, or a garbage collected box for everything else. Values order
+//! and compare with each other, so a [`Value`] can also be a map key.
 use intuicio_data::{
     lifetime::{ValueReadAccess, ValueWriteAccess},
     managed::gc::DynamicManagedGc,
@@ -119,22 +124,39 @@ impl Ord for ValueContent {
     }
 }
 
+/// A value of one of six kinds. See the [module docs](self).
+///
+/// Cloning copies a primitive, a string, an array or a map. A garbage
+/// collected value is not copied: the clone points at the same value and does
+/// not own it, so the value dies with the [`Value`] that made it.
+///
+/// Ordering compares the kinds first, in the order null, garbage collected,
+/// primitive, string, array, map. Two values of one kind then compare by
+/// content, and a garbage collected pair compares by raw bytes.
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Value {
     inner: ValueContent,
 }
 
 impl Value {
+    /// Returns the type of the stored value, or [`None`] when it is null.
     pub fn type_hash(&self) -> Option<TypeHash> {
         self.inner.type_hash()
     }
 
+    /// The null value, which is also what [`Default`] gives.
     pub fn null() -> Self {
         Self {
             inner: ValueContent::Null,
         }
     }
 
+    /// Stores a small `Copy` value inline, with no allocation.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `T` does not fit in the inline buffer. Use [`Value::gc`] for
+    /// anything larger.
     pub fn primitive<T: Copy>(value: T) -> Self {
         assert!(
             std::mem::size_of::<T>() <= SIZE,
@@ -153,58 +175,71 @@ impl Value {
         }
     }
 
+    /// Stores any value in a new garbage collected box, which this value owns.
     pub fn gc<T>(value: T) -> Self {
         Self {
             inner: ValueContent::Gc(DynamicManagedGc::new(value)),
         }
     }
 
+    /// Stores an existing garbage collected box, owning or referencing.
     pub fn gc_raw(value: DynamicManagedGc) -> Self {
         Self {
             inner: ValueContent::Gc(value),
         }
     }
 
+    /// Stores text.
     pub fn string(value: impl ToString) -> Self {
         Self {
             inner: ValueContent::String(value.to_string()),
         }
     }
 
+    /// Stores a list of values.
     pub fn array(values: impl IntoIterator<Item = Value>) -> Self {
         Self {
             inner: ValueContent::Array(values.into_iter().collect()),
         }
     }
 
+    /// Stores an empty list.
     pub fn array_empty() -> Self {
         Self {
             inner: ValueContent::Array(Default::default()),
         }
     }
 
+    /// Stores a map, sorted by key.
     pub fn map(values: impl IntoIterator<Item = (Value, Value)>) -> Self {
         Self {
             inner: ValueContent::Map(values.into_iter().collect()),
         }
     }
 
+    /// Stores an empty map.
     pub fn map_empty() -> Self {
         Self {
             inner: ValueContent::Map(Default::default()),
         }
     }
 
+    /// Returns `true` for the null value.
     pub fn is_null(&self) -> bool {
         matches!(self.inner, ValueContent::Null)
     }
 
+    /// Returns `true` when the stored value is a `T`.
     pub fn is<T>(&self) -> bool {
         self.type_hash()
             .map(|type_hash| type_hash == TypeHash::of::<T>())
             .unwrap_or_default()
     }
 
+    /// Guards the garbage collected value for reading.
+    ///
+    /// Returns [`None`] for any other kind, on a type mismatch, and while the
+    /// value is busy or gone.
     pub fn as_gc<T>(&'_ self) -> Option<ValueReadAccess<'_, T>> {
         if let ValueContent::Gc(value) = &self.inner {
             value.try_read::<T>()
@@ -213,6 +248,10 @@ impl Value {
         }
     }
 
+    /// Guards the garbage collected value for writing.
+    ///
+    /// Returns [`None`] for any other kind, on a type mismatch, and while the
+    /// value is busy or gone.
     pub fn as_gc_mut<T>(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
         if let ValueContent::Gc(value) = &mut self.inner {
             value.try_write::<T>()
@@ -221,6 +260,8 @@ impl Value {
         }
     }
 
+    /// Copies the inline primitive out, or returns [`None`] for any other kind
+    /// or another type.
     pub fn as_primitive<T: Copy>(&self) -> Option<T> {
         if let ValueContent::Primitive { type_hash, data } = &self.inner {
             if *type_hash == TypeHash::of::<T>() {
@@ -233,6 +274,7 @@ impl Value {
         }
     }
 
+    /// Borrows the text, or returns [`None`] for any other kind.
     pub fn as_string(&self) -> Option<&str> {
         if let ValueContent::String(content) = &self.inner {
             Some(content.as_str())
@@ -241,6 +283,7 @@ impl Value {
         }
     }
 
+    /// Borrows the list, or returns [`None`] for any other kind.
     pub fn as_array(&self) -> Option<&Vec<Value>> {
         if let ValueContent::Array(content) = &self.inner {
             Some(content)
@@ -249,6 +292,7 @@ impl Value {
         }
     }
 
+    /// Borrows the list mutably, or returns [`None`] for any other kind.
     pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
         if let ValueContent::Array(content) = &mut self.inner {
             Some(content)
@@ -257,6 +301,7 @@ impl Value {
         }
     }
 
+    /// Borrows the map, or returns [`None`] for any other kind.
     pub fn as_map(&self) -> Option<&BTreeMap<Value, Value>> {
         if let ValueContent::Map(content) = &self.inner {
             Some(content)
@@ -265,6 +310,7 @@ impl Value {
         }
     }
 
+    /// Borrows the map mutably, or returns [`None`] for any other kind.
     pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<Value, Value>> {
         if let ValueContent::Map(content) = &mut self.inner {
             Some(content)
@@ -280,15 +326,29 @@ mod tests {
 
     #[test]
     fn test_value() {
+        // Both numbers went up by 8 when the finalizer stopped being a bare
+        // function pointer. A `Finalizer` is 16 bytes, because a runtime type
+        // has to carry the description its destructor walks, and a function
+        // pointer has nowhere to keep one.
         assert_eq!(
             std::mem::size_of::<Value>(),
             if cfg!(feature = "typehash_debug_name") {
-                112
+                120
             } else {
-                80
+                88
             }
         );
-        assert_eq!(SIZE, 80);
+        // `SIZE` is the size of `DynamicManagedGc`, which holds a `TypeHash`.
+        // `typehash_debug_name` grows that hash from 8 to 24 bytes, so this
+        // has to branch on the feature the same way the check above does.
+        assert_eq!(
+            SIZE,
+            if cfg!(feature = "typehash_debug_name") {
+                88
+            } else {
+                72
+            }
+        );
         let a = Value::primitive(42u8);
         let b = Value::primitive(10u16);
         let c = Value::primitive(4.2f32);

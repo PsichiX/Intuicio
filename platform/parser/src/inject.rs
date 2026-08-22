@@ -1,17 +1,28 @@
+//! Referring to a parser by name instead of by value.
 use crate::{ParseResult, Parser, ParserExt, ParserHandle, ParserRegistry};
 
+/// Short constructors for this module.
 pub mod shorthand {
     use super::*;
 
+    /// See [`InjectParser`].
     pub fn inject(id: impl ToString) -> ParserHandle {
         InjectParser::new(id).into_handle()
     }
 }
 
+/// Looks a parser up in the [`ParserRegistry`] by id and runs it.
+///
+/// The lookup happens per parse, not when the grammar is built, so the id
+/// may still be empty at that point. That is what makes recursive grammars
+/// possible: a rule can inject itself.
+///
+/// Fails when nothing is registered under the id.
 #[derive(Clone)]
 pub struct InjectParser(String);
 
 impl InjectParser {
+    /// Refers to the parser registered as `id`.
     pub fn new(id: impl ToString) -> Self {
         Self(id.to_string())
     }
