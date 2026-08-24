@@ -12,6 +12,12 @@
 //! [`DynamicManagedGc::transfer_ownership`], which is how a value outlives the
 //! handle it started in.
 //!
+//! A box can also **borrow** memory it does not own, with
+//! [`DynamicManagedGc::borrowed`]. It acts like an owner while it lives, and it
+//! invalidates every reference when it drops, but it never frees the memory and
+//! it refuses [`DynamicManagedGc::consume`]. This is how a host lends a value to
+//! a script for the length of a call.
+//!
 //! [`ManagedGc`] is the typed box, [`DynamicManagedGc`] the type-erased one it
 //! is built on.
 //!
@@ -96,6 +102,23 @@ impl<T> ManagedGc<T> {
         }
     }
 
+    /// Borrows a value the caller keeps.
+    ///
+    /// See [`DynamicManagedGc::borrowed_raw`] for what a borrowed box does and
+    /// does not do.
+    ///
+    /// # Safety
+    ///
+    /// The box carries no lifetime, so it can outlive `value`. The caller must
+    /// drop the box first, and must not reach `value` by any other path while
+    /// the box lives.
+    pub unsafe fn borrowed(value: &mut T) -> Self {
+        Self {
+            dynamic: unsafe { DynamicManagedGc::borrowed(value) },
+            _phantom: PhantomData,
+        }
+    }
+
     /// Allocates a value that can point back at itself.
     ///
     /// `f` is handed a reference to the box before the value exists, so it can
@@ -164,6 +187,13 @@ impl<T> ManagedGc<T> {
     /// Returns `true` when this handle owns the value.
     pub fn is_owning(&self) -> bool {
         self.dynamic.is_owning()
+    }
+
+    /// Returns `true` when this box borrows memory it does not own.
+    ///
+    /// See [`DynamicManagedGc::borrowed_raw`].
+    pub fn is_borrowed(&self) -> bool {
+        self.dynamic.is_borrowed()
     }
 
     /// Returns `true` when this handle only references the value.
@@ -311,6 +341,7 @@ pub struct DynamicManagedGc {
     layout: Layout,
     finalizer: Finalizer,
     drop: bool,
+    borrowed: bool,
 }
 
 unsafe impl Send for DynamicManagedGc {}
@@ -318,13 +349,16 @@ unsafe impl Sync for DynamicManagedGc {}
 
 impl Drop for DynamicManagedGc {
     fn drop(&mut self) {
-        if let Kind::Owned { lifetime, data } = &mut self.kind
-            && self.drop
-        {
+        if let Kind::Owned { lifetime, data } = &mut self.kind {
+            // These two run even when this box frees nothing, because a
+            // borrowed allocation goes back to its caller here.
             while lifetime.state().is_in_use() {
                 std::hint::spin_loop();
             }
             lifetime.invalidate();
+            if !self.drop {
+                return;
+            }
             unsafe {
                 if data.is_null() {
                     return;
@@ -355,6 +389,7 @@ impl DynamicManagedGc {
                 layout,
                 finalizer: Finalizer::of::<T>(),
                 drop: true,
+                borrowed: false,
             }
         }
     }
@@ -385,6 +420,7 @@ impl DynamicManagedGc {
                 layout,
                 finalizer: Finalizer::of::<T>(),
                 drop: true,
+                borrowed: false,
             };
             let data = f(result.reference());
             memory.cast::<T>().write(data);
@@ -418,6 +454,7 @@ impl DynamicManagedGc {
             layout,
             finalizer: finalizer.into(),
             drop: true,
+            borrowed: false,
         }
     }
 
@@ -443,6 +480,72 @@ impl DynamicManagedGc {
             layout,
             finalizer: finalizer.into(),
             drop: true,
+            borrowed: false,
+        }
+    }
+
+    /// Borrows an existing allocation without taking ownership of it.
+    ///
+    /// The box acts like an owner while it lives: it hands out references, and
+    /// it invalidates every one of them when it drops. But it never runs the
+    /// finalizer, never frees `memory`, and refuses [`Self::consume`]. The
+    /// caller keeps the value and the job of destroying it.
+    ///
+    /// This is how a host lends a value to a script for the length of a call.
+    /// The script gets [`Self::reference`] handles, and those report the value
+    /// as gone the moment this box drops. A reference holds a `Weak` on the
+    /// lifetime, so dropping the box is what kills the reference.
+    ///
+    /// `finalizer` is never run here. It is stored so that [`Self::finalizer`]
+    /// keeps describing the value, the same as it does for an owning box.
+    ///
+    /// # Safety
+    ///
+    /// `memory` must point at an initialized value that `type_hash` and
+    /// `layout` describe. The memory must stay valid, and the caller must not
+    /// reach it by any other path, until this box is dropped. The box carries
+    /// no lifetime, so nothing checks either rule.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `memory` is null.
+    pub unsafe fn borrowed_raw(
+        type_hash: TypeHash,
+        memory: *mut u8,
+        layout: Layout,
+        finalizer: impl Into<Finalizer>,
+    ) -> Self {
+        if memory.is_null() {
+            handle_alloc_error(layout);
+        }
+        Self {
+            type_hash,
+            kind: Kind::Owned {
+                lifetime: Default::default(),
+                data: memory,
+            },
+            layout,
+            finalizer: finalizer.into(),
+            drop: false,
+            borrowed: true,
+        }
+    }
+
+    /// Borrows a value the caller keeps. See [`Self::borrowed_raw`].
+    ///
+    /// # Safety
+    ///
+    /// The box carries no lifetime, so it can outlive `value`. The caller must
+    /// drop the box first, and must not reach `value` by any other path while
+    /// the box lives.
+    pub unsafe fn borrowed<T: Finalize>(value: &mut T) -> Self {
+        unsafe {
+            Self::borrowed_raw(
+                TypeHash::of::<T>(),
+                (value as *mut T).cast::<u8>(),
+                Layout::new::<T>().pad_to_align(),
+                Finalizer::of::<T>(),
+            )
         }
     }
 
@@ -458,6 +561,7 @@ impl DynamicManagedGc {
                 layout: self.layout,
                 finalizer: self.finalizer.clone(),
                 drop: true,
+                borrowed: false,
             },
             Kind::Referenced { lifetime, data } => Self {
                 type_hash: self.type_hash,
@@ -468,6 +572,7 @@ impl DynamicManagedGc {
                 layout: self.layout,
                 finalizer: self.finalizer.clone(),
                 drop: true,
+                borrowed: false,
             },
         }
     }
@@ -477,6 +582,9 @@ impl DynamicManagedGc {
     /// Gives the box back when it does not own the value, the type does not
     /// match, or something is accessing it.
     pub fn consume<T>(mut self) -> Result<T, Self> {
+        if self.borrowed {
+            return Err(self);
+        }
         if let Kind::Owned { lifetime, data } = &mut self.kind {
             if self.type_hash == TypeHash::of::<T>() && !lifetime.state().is_in_use() {
                 if data.is_null() {
@@ -581,6 +689,14 @@ impl DynamicManagedGc {
         matches!(self.kind, Kind::Owned { .. })
     }
 
+    /// Returns `true` when this box borrows memory it does not own.
+    ///
+    /// Such a box never frees the memory and refuses [`Self::consume`]. See
+    /// [`Self::borrowed_raw`].
+    pub fn is_borrowed(&self) -> bool {
+        self.borrowed
+    }
+
     /// Returns `true` when this handle only references the value.
     pub fn is_referencing(&self) -> bool {
         matches!(self.kind, Kind::Referenced { .. })
@@ -624,6 +740,10 @@ impl DynamicManagedGc {
             && l2.state().is_owned_by(l1.state())
         {
             std::mem::swap(&mut self.kind, &mut new_owner.kind);
+            // The flags describe the allocation, not the handle, so a borrowed
+            // value cannot hand a freeing owner to whoever takes it.
+            std::mem::swap(&mut self.drop, &mut new_owner.drop);
+            std::mem::swap(&mut self.borrowed, &mut new_owner.borrowed);
             true
         } else {
             false
@@ -1020,6 +1140,10 @@ impl TryFrom<DynamicManagedValue> for DynamicManagedGc {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     #[test]
     fn test_is_async() {
@@ -1283,5 +1407,70 @@ mod tests {
         assert!(!b.is_owned_by(&a));
         drop(b);
         assert!(!a.exists());
+    }
+
+    struct Probe(Arc<AtomicUsize>);
+
+    impl Drop for Probe {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    #[test]
+    fn test_borrowed_gc_leaves_the_value_to_its_owner() {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let mut value = Probe(drops.clone());
+        let handle = {
+            let owner = unsafe { DynamicManagedGc::borrowed(&mut value) };
+            assert!(owner.is_owning());
+            assert!(owner.is_borrowed());
+            let handle = owner.reference();
+            assert!(handle.exists());
+            handle
+        };
+
+        assert!(!handle.exists());
+        assert!(handle.try_read::<Probe>().is_none());
+
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+        drop(value);
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_borrowed_gc_refuses_to_be_consumed() {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let mut value = Probe(drops.clone());
+
+        let owner = unsafe { DynamicManagedGc::borrowed(&mut value) };
+        assert!(owner.consume::<Probe>().is_err());
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn test_a_transferred_borrow_still_frees_nothing() {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let mut value = Probe(drops.clone());
+        {
+            let mut owner = unsafe { DynamicManagedGc::borrowed(&mut value) };
+            let mut taker = owner.reference();
+            assert!(owner.transfer_ownership(&mut taker));
+
+            assert!(taker.is_owning());
+            assert!(taker.is_borrowed());
+            assert!(!owner.is_borrowed());
+        }
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn test_a_consumed_value_reports_gone_to_its_references() {
+        let owner = DynamicManagedGc::new(42i32);
+        let handle = owner.reference();
+        assert!(handle.exists());
+
+        assert_eq!(owner.consume::<i32>().ok(), Some(42));
+        assert!(!handle.exists());
     }
 }

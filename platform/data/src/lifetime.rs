@@ -484,7 +484,9 @@ impl Lifetime {
     /// `data` must stay valid and aligned for as long as the returned guard
     /// lives. A null pointer yields [`None`].
     pub unsafe fn read_ptr<T: ?Sized>(&'_ self, data: *const T) -> Option<ValueReadAccess<'_, T>> {
-        let data = unsafe { data.as_ref() }?;
+        if data.is_null() {
+            return None;
+        }
         unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
@@ -493,7 +495,7 @@ impl Lifetime {
                 access.acquire_read_access();
                 ValueReadAccess {
                     lifetime: self.0.clone(),
-                    data,
+                    data: unsafe { &*data },
                 }
             })
     }
@@ -548,7 +550,9 @@ impl Lifetime {
     /// `data` must stay valid, aligned and unaliased for as long as the
     /// returned guard lives. A null pointer yields [`None`].
     pub unsafe fn write_ptr<T: ?Sized>(&'_ self, data: *mut T) -> Option<ValueWriteAccess<'_, T>> {
-        let data = unsafe { data.as_mut() }?;
+        if data.is_null() {
+            return None;
+        }
         unsafe { self.0.update_tag(self) };
         self.0
             .try_lock()
@@ -557,7 +561,7 @@ impl Lifetime {
                 access.acquire_write_access();
                 ValueWriteAccess {
                     lifetime: self.0.clone(),
-                    data,
+                    data: unsafe { &mut *data },
                 }
             })
     }
@@ -835,7 +839,12 @@ impl LifetimeRef {
     /// `data` must stay valid and aligned for as long as the returned guard
     /// lives. A null pointer yields [`None`].
     pub unsafe fn read_ptr<T: ?Sized>(&'_ self, data: *const T) -> Option<ValueReadAccess<'_, T>> {
-        let data = unsafe { data.as_ref() }?;
+        // The upgrade must happen before the pointer becomes a reference. The
+        // owner can already be gone, and a reference into freed memory is
+        // undefined behavior even when this function then returns `None`.
+        if data.is_null() {
+            return None;
+        }
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -843,7 +852,7 @@ impl LifetimeRef {
             drop(access);
             Some(ValueReadAccess {
                 lifetime: state,
-                data,
+                data: unsafe { &*data },
             })
         } else {
             None
@@ -1153,7 +1162,12 @@ impl LifetimeRefMut {
     /// `data` must stay valid and aligned for as long as the returned guard
     /// lives. A null pointer yields [`None`].
     pub unsafe fn read_ptr<T: ?Sized>(&'_ self, data: *const T) -> Option<ValueReadAccess<'_, T>> {
-        let data = unsafe { data.as_ref() }?;
+        // The upgrade must happen before the pointer becomes a reference. The
+        // owner can already be gone, and a reference into freed memory is
+        // undefined behavior even when this function then returns `None`.
+        if data.is_null() {
+            return None;
+        }
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -1161,7 +1175,7 @@ impl LifetimeRefMut {
             drop(access);
             Some(ValueReadAccess {
                 lifetime: state,
-                data,
+                data: unsafe { &*data },
             })
         } else {
             None
@@ -1219,7 +1233,12 @@ impl LifetimeRefMut {
     /// `data` must stay valid, aligned and unaliased for as long as the
     /// returned guard lives. A null pointer yields [`None`].
     pub unsafe fn write_ptr<T: ?Sized>(&'_ self, data: *mut T) -> Option<ValueWriteAccess<'_, T>> {
-        let data = unsafe { data.as_mut() }?;
+        // The upgrade must happen before the pointer becomes a reference. The
+        // owner can already be gone, and a reference into freed memory is
+        // undefined behavior even when this function then returns `None`.
+        if data.is_null() {
+            return None;
+        }
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_write_accessible() {
@@ -1227,7 +1246,7 @@ impl LifetimeRefMut {
             drop(access);
             Some(ValueWriteAccess {
                 lifetime: state,
-                data,
+                data: unsafe { &mut *data },
             })
         } else {
             None
@@ -1543,7 +1562,12 @@ impl LifetimeLazy {
     /// `data` must stay valid and aligned for as long as the returned guard
     /// lives. A null pointer yields [`None`].
     pub unsafe fn read_ptr<T: ?Sized>(&'_ self, data: *const T) -> Option<ValueReadAccess<'_, T>> {
-        let data = unsafe { data.as_ref() }?;
+        // The upgrade must happen before the pointer becomes a reference. The
+        // owner can already be gone, and a reference into freed memory is
+        // undefined behavior even when this function then returns `None`.
+        if data.is_null() {
+            return None;
+        }
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_read_accessible() {
@@ -1551,7 +1575,7 @@ impl LifetimeLazy {
             drop(access);
             Some(ValueReadAccess {
                 lifetime: state,
-                data,
+                data: unsafe { &*data },
             })
         } else {
             None
@@ -1609,7 +1633,12 @@ impl LifetimeLazy {
     /// `data` must stay valid, aligned and unaliased for as long as the
     /// returned guard lives. A null pointer yields [`None`].
     pub unsafe fn write_ptr<T: ?Sized>(&'_ self, data: *mut T) -> Option<ValueWriteAccess<'_, T>> {
-        let data = unsafe { data.as_mut() }?;
+        // The upgrade must happen before the pointer becomes a reference. The
+        // owner can already be gone, and a reference into freed memory is
+        // undefined behavior even when this function then returns `None`.
+        if data.is_null() {
+            return None;
+        }
         let state = self.0.upgrade()?;
         let mut access = state.try_lock()?;
         if access.state.is_write_accessible() {
@@ -1617,7 +1646,7 @@ impl LifetimeLazy {
             drop(access);
             Some(ValueWriteAccess {
                 lifetime: state,
-                data,
+                data: unsafe { &mut *data },
             })
         } else {
             None
@@ -2173,6 +2202,29 @@ mod tests {
         assert!(lifetime.state().is_read_accessible());
         assert!(lifetime.state().is_write_accessible());
         assert!(lifetime.try_write_lock().is_some());
+    }
+
+    /// A dead owner must be detected before the pointer becomes a reference.
+    /// The other order builds a reference into freed memory, which is
+    /// undefined behavior even though the guard is then refused.
+    #[test]
+    fn test_dead_owner_never_dereferences_the_pointer() {
+        let data = Box::into_raw(Box::new(42usize));
+        let shared = Lifetime::default();
+        let exclusive = Lifetime::default();
+        let unclaimed = Lifetime::default();
+        let value_ref = shared.borrow().unwrap();
+        let value_ref_mut = exclusive.borrow_mut().unwrap();
+        let value_lazy = unclaimed.lazy();
+
+        drop((shared, exclusive, unclaimed));
+        unsafe { drop(Box::from_raw(data)) };
+
+        assert!(unsafe { value_ref.read_ptr(data) }.is_none());
+        assert!(unsafe { value_ref_mut.read_ptr(data) }.is_none());
+        assert!(unsafe { value_ref_mut.write_ptr(data) }.is_none());
+        assert!(unsafe { value_lazy.read_ptr(data) }.is_none());
+        assert!(unsafe { value_lazy.write_ptr(data) }.is_none());
     }
 
     #[test]

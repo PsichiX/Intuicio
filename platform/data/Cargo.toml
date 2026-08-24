@@ -1,6 +1,6 @@
 [package]
 name = "intuicio-data"
-version = "0.53.0"
+version = "0.53.1"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Data module for Intuicio scripting platform"
@@ -16,7 +16,7 @@ typehash_debug_name = []
 
 [dependencies]
 typid = "1"
-rustc-hash = "2"
+rustc-hash = "2.1"
 smallvec = "1.13"
 
 [dev-dependencies]

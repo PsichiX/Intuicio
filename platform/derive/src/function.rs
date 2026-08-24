@@ -540,11 +540,14 @@ enum UnpackedType {
 ///
 /// # Panics
 ///
-/// Panics on anything that is neither a path nor a reference, since a
-/// transformer has no rule for it.
+/// Panics on anything that is neither a path, a tuple, nor a reference, since
+/// a transformer has no rule for it.
 fn unpack_type(ty: &Type) -> UnpackedType {
     match ty {
-        Type::Path(_) => UnpackedType::Owned(ty.clone()),
+        // A tuple is an ordinary owned value, and `()` is the one that matters.
+        // A native function with no result cannot be written as `ReturnType::Default`,
+        // because a frontend that always expects one output then matches nothing.
+        Type::Path(_) | Type::Tuple(_) => UnpackedType::Owned(ty.clone()),
         Type::Reference(reference) => {
             if reference.mutability.is_some() {
                 UnpackedType::RefMut(*reference.elem.clone())

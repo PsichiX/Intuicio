@@ -42,36 +42,51 @@ use crate::{
     non_zero_alloc, non_zero_dealloc,
     type_hash::TypeHash,
 };
-use std::{alloc::Layout, mem::MaybeUninit};
+use std::{alloc::Layout, cell::UnsafeCell, mem::MaybeUninit};
 
 /// Owner of a value plus its runtime borrow state.
 ///
 /// The value is stored inline, so this is just `T` with a lifetime attached.
 /// Handles taken from it go dead when it is dropped. See the
 /// [module docs](self).
+///
+/// The value sits in an [`UnsafeCell`] because handles keep raw pointers to
+/// it. A pointer taken out of a plain field is derived from a borrow of the
+/// box. A later `&mut self` method invalidates that borrow, which makes every
+/// live handle unsound. [`UnsafeCell`] marks the value as shared mutable, so
+/// pointers taken from the value stay valid.
 #[derive(Default)]
 pub struct Managed<T> {
     lifetime: Lifetime,
-    data: T,
+    data: UnsafeCell<T>,
 }
+
+/// # Safety
+///
+/// The value is only reachable through the lifetime, which does the borrow
+/// checks at runtime. That makes the [`UnsafeCell`] safe to share.
+unsafe impl<T> Sync for Managed<T> where T: Sync {}
 
 impl<T> Managed<T> {
     /// Takes ownership of a value with a fresh lifetime.
     pub fn new(data: T) -> Self {
         Self {
             lifetime: Default::default(),
-            data,
+            data: UnsafeCell::new(data),
         }
     }
 
     /// Takes ownership of a value with a lifetime prepared elsewhere.
     pub fn new_raw(data: T, lifetime: Lifetime) -> Self {
-        Self { lifetime, data }
+        Self {
+            lifetime,
+            data: UnsafeCell::new(data),
+        }
     }
 
     /// Splits into the lifetime and the value, dropping no handles.
     pub fn into_inner(self) -> (Lifetime, T) {
-        (self.lifetime, self.data)
+        (self.lifetime, self.data.into_inner())
     }
 
     /// Moves the value into a type-erased box, giving `self` back when the
@@ -79,11 +94,11 @@ impl<T> Managed<T> {
     ///
     /// The lifetime is not carried over, so handles taken so far go dead.
     pub fn into_dynamic(self) -> Result<DynamicManaged, Self> {
-        match DynamicManaged::new(self.data) {
+        match DynamicManaged::new(self.data.into_inner()) {
             Ok(value) => Ok(value),
             Err(data) => Err(Managed {
                 lifetime: self.lifetime,
-                data,
+                data: UnsafeCell::new(data),
             }),
         }
     }
@@ -101,12 +116,12 @@ impl<T> Managed<T> {
 
     /// Guards the value for reading, or returns [`None`] while it is written.
     pub fn read(&'_ self) -> Option<ValueReadAccess<'_, T>> {
-        self.lifetime.read(&self.data)
+        unsafe { self.lifetime.read_ptr(self.data.get() as *const T) }
     }
 
     /// Guards the value for writing, or returns [`None`] while it is accessed.
     pub fn write(&'_ mut self) -> Option<ValueWriteAccess<'_, T>> {
-        self.lifetime.write(&mut self.data)
+        unsafe { self.lifetime.write_ptr(self.data.get()) }
     }
 
     /// Takes the value out, or gives the box back while any access guard is
@@ -115,7 +130,7 @@ impl<T> Managed<T> {
         if self.lifetime.state().is_in_use() {
             Err(self)
         } else {
-            Ok(self.data)
+            Ok(self.data.into_inner())
         }
     }
 
@@ -141,20 +156,26 @@ impl<T> Managed<T> {
 
     /// Takes a shared handle, or returns [`None`] when an exclusive one is out.
     pub fn borrow(&self) -> Option<ManagedRef<T>> {
-        Some(ManagedRef::new(&self.data, self.lifetime.borrow()?))
+        Some(ManagedRef {
+            lifetime: self.lifetime.borrow()?,
+            data: self.data.get(),
+        })
     }
 
     /// Takes an exclusive handle, or returns [`None`] when any handle is out.
     pub fn borrow_mut(&mut self) -> Option<ManagedRefMut<T>> {
-        Some(ManagedRefMut::new(
-            &mut self.data,
-            self.lifetime.borrow_mut()?,
-        ))
+        Some(ManagedRefMut {
+            lifetime: self.lifetime.borrow_mut()?,
+            data: self.data.get(),
+        })
     }
 
     /// Takes an unclaimed handle.
     pub fn lazy(&mut self) -> ManagedLazy<T> {
-        ManagedLazy::new(&mut self.data, self.lifetime.lazy())
+        ManagedLazy {
+            lifetime: self.lifetime.lazy(),
+            data: self.data.get(),
+        }
     }
 
     /// [`Managed::lazy`] from a shared reference.
@@ -164,8 +185,9 @@ impl<T> Managed<T> {
     /// The returned handle can write to a value the caller only borrowed
     /// immutably. Only use it when nothing else holds a `&T` to it.
     pub unsafe fn lazy_immutable(&self) -> ManagedLazy<T> {
-        unsafe {
-            ManagedLazy::new_raw(&self.data as *const T as *mut T, self.lifetime.lazy()).unwrap()
+        ManagedLazy {
+            lifetime: self.lifetime.lazy(),
+            data: self.data.get(),
         }
     }
 
@@ -178,7 +200,7 @@ impl<T> Managed<T> {
     pub unsafe fn map<U>(self, f: impl FnOnce(T) -> U) -> Managed<U> {
         Managed {
             lifetime: Default::default(),
-            data: f(self.data),
+            data: UnsafeCell::new(f(self.data.into_inner())),
         }
     }
 
@@ -188,9 +210,9 @@ impl<T> Managed<T> {
     ///
     /// Same as [`Managed::map`].
     pub unsafe fn try_map<U>(self, f: impl FnOnce(T) -> Option<U>) -> Option<Managed<U>> {
-        f(self.data).map(|data| Managed {
+        f(self.data.into_inner()).map(|data| Managed {
             lifetime: Default::default(),
-            data,
+            data: UnsafeCell::new(data),
         })
     }
 
@@ -201,7 +223,7 @@ impl<T> Managed<T> {
     /// The caller takes over checking for conflicting access, and must not
     /// outlive this box.
     pub unsafe fn as_ptr(&self) -> *const T {
-        &self.data as _
+        self.data.get() as *const T
     }
 
     /// Returns a mutable pointer to the value, bypassing the borrow state.
@@ -211,7 +233,7 @@ impl<T> Managed<T> {
     /// The caller takes over checking for conflicting access, and must not
     /// outlive this box.
     pub unsafe fn as_mut_ptr(&mut self) -> *mut T {
-        &mut self.data as _
+        self.data.get()
     }
 }
 
